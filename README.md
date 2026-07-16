@@ -41,9 +41,29 @@ uv run scripts/generate_wavs.py sleep_prep --duration 300
 uv run scripts/generate_wavs.py wind_down --waveform square
 ```
 
+## Background media library
+
+`src/bnb/background.py` holds the substrate × style taxonomy from
+[docs/background_music.md](docs/background_music.md): it turns a `(substrate, style)`
+signature into the Eleven Music prompt, composition plan, and per-track metadata
+record. `scripts/generate_background.py` is a thin CLI over it that calls ElevenLabs
+and writes each track plus a JSON sidecar into `run/background/`.
+
+```bash
+export ELEVENLABS_API_KEY=...
+uv run --extra media scripts/generate_background.py --list      # print the catalog
+uv run --extra media scripts/generate_background.py --dry-run   # write prompts/metadata, no API call
+uv run --extra media scripts/generate_background.py             # curated sample set, 60 s each
+uv run --extra media scripts/generate_background.py buddhist_meditative:drone --duration 90
+```
+
+These samples are for the Stage 1 provider bake-off; the WAV master and measured-MER
+extraction pipeline land in Stage 2.
+
 ## Layout
 
 - `src/bnb/tone.py` — binaural tone rendering and WAV output
+- `src/bnb/background.py` — background-media substrate × style taxonomy and prompts
 - `scripts/` — dev utilities, not shipped
 - `tests/` — test suite
 - `docs/` — product and feasibility docs
