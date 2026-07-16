@@ -11,14 +11,16 @@ things a render needs:
 
 Scope is down-regulation only, so every continuous MER axis (tempo, energy,
 brightness, harmony, texture, register, nature-bed) is authored biased low. The
-actual API call and file writing live in scripts/generate_background.py; nothing
-here imports the ElevenLabs SDK, so the taxonomy stays importable and testable
-without an API key.
+spec is written by scripts/plan_background.py and rendered by
+scripts/render_background.py; nothing here imports the ElevenLabs SDK, so the
+taxonomy stays importable and testable without an API key.
 """
 
 from __future__ import annotations
 
 import hashlib
+from collections import Counter
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -319,29 +321,23 @@ class Signature:
     def track_id(self) -> str:
         return f"{self.style.name}_{self.substrate.short}_seed{self.seed}"
 
-    def metadata(
-        self,
-        *,
-        provider: str,
-        model_version: str,
-        generated_at: str,
-        output_format: str,
-        license: str,
-        measured_features: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Assemble the §3 metadata record.
+    def spec(self) -> dict[str, Any]:
+        """The render-independent request record (§3), before any audio exists.
 
-        ``measured_features`` stays ``None`` until the objective-feature
-        extraction pipeline (librosa/Essentia) runs over the render — the bandit
-        needs *measured* MER, and models don't reliably hit requested coordinates.
+        Everything here is provider-agnostic on purpose: spec management is free
+        and offline, so the same spec can be rendered by ElevenLabs now or a local
+        model later. The renderer fills the ``render`` block (provider, model,
+        output format, provenance, audio file). ``measured_features`` stays
+        ``None`` until the objective-feature extraction pass runs over the audio —
+        the bandit needs *measured* MER, and models don't reliably hit requested
+        coordinates.
         """
         return {
             "track_id": self.track_id,
-            "provider": provider,
             "substrate": self.substrate.name,
             "style": self.style.name,
             "requested_features": self.requested_features,
-            "measured_features": measured_features,
+            "measured_features": None,
             "instrumentation": list(self.instrumentation),
             "prompt": self.prompt,
             "negative_prompt": self.negative_prompt,
@@ -349,19 +345,21 @@ class Signature:
             "seed": self.seed,
             "duration_s": self.duration_s,
             "loopable": True,
-            "license": license,
-            "output_format": output_format,
-            "provenance": {
-                "generated_at": generated_at,
-                "model_version": model_version,
-                "watermark": None,
-            },
+            "render": None,
         }
 
 
-def _seed(style_name: str, substrate_name: str) -> int:
-    """A deterministic per-signature seed so re-renders stay reproducible (§1)."""
-    digest = hashlib.sha256(f"{style_name}:{substrate_name}".encode()).digest()
+def _seed(style_name: str, substrate_name: str, variant: int = 0) -> int:
+    """A deterministic per-signature seed so re-renders stay reproducible (§1).
+
+    ``variant`` gives a cell more than one render (the doc wants 3-5 seeds per
+    cell, §5). ``variant == 0`` keeps the original one-seed-per-cell identity so
+    existing track_ids stay stable.
+    """
+    key = f"{style_name}:{substrate_name}"
+    if variant:
+        key = f"{key}:{variant}"
+    digest = hashlib.sha256(key.encode()).digest()
     return int.from_bytes(digest[:4], "big") % 100_000
 
 
@@ -385,12 +383,14 @@ def build_prompt(substrate: Substrate, style: Style, body: str, nature_bed: str)
     )
 
 
-def build_signature(substrate_name: str, style_name: str, duration_s: int) -> Signature:
+def build_signature(
+    substrate_name: str, style_name: str, duration_s: int, variant: int = 0
+) -> Signature:
     """Resolve a (substrate, style) pair into a full render spec.
 
     Any pair is valid (§2): where the style has a coherent realization for the
     substrate we use it, otherwise the substrate's generic body is coloured by
-    the style's global tags.
+    the style's global tags. ``variant`` selects a distinct seed within the cell.
     """
     if substrate_name not in SUBSTRATES:
         raise ValueError(f"unknown substrate {substrate_name!r}, expected one of {list(SUBSTRATES)}")
@@ -435,7 +435,7 @@ def build_signature(substrate_name: str, style_name: str, duration_s: int) -> Si
         substrate=substrate,
         style=style,
         duration_s=duration_s,
-        seed=_seed(style_name, substrate_name),
+        seed=_seed(style_name, substrate_name, variant),
         prompt=build_prompt(substrate, style, body, requested["nature_bed"]),
         negative_prompt=NEGATIVE_PROMPT,
         instrumentation=instrumentation,
@@ -462,3 +462,122 @@ SAMPLE_PAIRS: tuple[tuple[str, str], ...] = (
 def sample_signatures(duration_s: int) -> list[Signature]:
     """The default sample set, one signature per SAMPLE_PAIRS entry."""
     return [build_signature(sub, style, duration_s) for style, sub in SAMPLE_PAIRS]
+
+
+# --- Coverage-driven enrichment ---------------------------------------------
+#
+# The library grows one (substrate, style) cell at a time. Rather than hand-pick
+# what to add next, we let a coverage guide place the next N specs. "Evenly
+# distribute across substrates and styles" == keep the per-cell counts as level
+# as possible, which also levels the substrate and style marginals.
+
+Cell = tuple[str, str]  # (substrate, style)
+
+
+def _resolve_axes(
+    substrates: Sequence[str] | None, styles: Sequence[str] | None
+) -> tuple[list[str], list[str]]:
+    subs = list(substrates) if substrates is not None else list(SUBSTRATES)
+    stys = list(styles) if styles is not None else list(STYLES)
+    for name in subs:
+        if name not in SUBSTRATES:
+            raise ValueError(f"unknown substrate {name!r}, expected one of {list(SUBSTRATES)}")
+    for name in stys:
+        if name not in STYLES:
+            raise ValueError(f"unknown style {name!r}, expected one of {list(STYLES)}")
+    return subs, stys
+
+
+def coverage_report(
+    existing_cells: Iterable[Cell],
+    substrates: Sequence[str] | None = None,
+    styles: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """Count how many tracks each cell / substrate / style currently has."""
+    subs, stys = _resolve_axes(substrates, styles)
+    grid = {(sub, sty) for sub in subs for sty in stys}
+    counts = Counter(cell for cell in existing_cells if cell in grid)
+    return {
+        "total": sum(counts.values()),
+        "per_cell": {f"{sty}:{sub}": counts[(sub, sty)] for sub in subs for sty in stys},
+        "per_substrate": {sub: sum(counts[(sub, sty)] for sty in stys) for sub in subs},
+        "per_style": {sty: sum(counts[(sub, sty)] for sub in subs) for sty in stys},
+    }
+
+
+def _next_signature(substrate: str, style: str, duration_s: int, used: set[str]) -> Signature:
+    """The lowest-variant signature for a cell whose track_id isn't taken yet."""
+    variant = 0
+    while True:
+        sig = build_signature(substrate, style, duration_s, variant)
+        if sig.track_id not in used:
+            return sig
+        variant += 1
+
+
+def plan_coverage(
+    n: int,
+    duration_s: int,
+    *,
+    existing_cells: Iterable[Cell] = (),
+    used_track_ids: Iterable[str] = (),
+    substrates: Sequence[str] | None = None,
+    styles: Sequence[str] | None = None,
+) -> list[Signature]:
+    """Pick the next ``n`` signatures that most evenly fill the substrate×style grid.
+
+    Greedy: each step adds to the cell with the fewest tracks, breaking ties by
+    the least-covered substrate then style, so the marginals stay balanced too.
+    Seeds advance per cell (``variant``) so repeated picks are distinct renders.
+    Restrict the grid with ``substrates`` / ``styles`` for targeted coverage.
+    """
+    if n <= 0:
+        return []
+    subs, stys = _resolve_axes(substrates, styles)
+    grid = {(sub, sty) for sub in subs for sty in stys}
+    counts = Counter(cell for cell in existing_cells if cell in grid)
+    used = set(used_track_ids)
+
+    signatures: list[Signature] = []
+    for _ in range(n):
+        sub_marginal = {sub: sum(counts[(sub, sty)] for sty in stys) for sub in subs}
+        sty_marginal = {sty: sum(counts[(sub, sty)] for sub in subs) for sty in stys}
+        sub, sty = min(
+            grid,
+            key=lambda cell: (
+                counts[cell],
+                sub_marginal[cell[0]],
+                sty_marginal[cell[1]],
+                subs.index(cell[0]),
+                stys.index(cell[1]),
+            ),
+        )
+        sig = _next_signature(sub, sty, duration_s, used)
+        signatures.append(sig)
+        used.add(sig.track_id)
+        counts[(sub, sty)] += 1
+    return signatures
+
+
+def fill_to_per_cell(
+    target: int,
+    duration_s: int,
+    *,
+    existing_cells: Iterable[Cell] = (),
+    used_track_ids: Iterable[str] = (),
+    substrates: Sequence[str] | None = None,
+    styles: Sequence[str] | None = None,
+) -> list[Signature]:
+    """Coverage guide: bring every selected cell up to ``target`` tracks."""
+    subs, stys = _resolve_axes(substrates, styles)
+    grid = {(sub, sty) for sub in subs for sty in stys}
+    counts = Counter(cell for cell in existing_cells if cell in grid)
+    needed = sum(max(0, target - counts[cell]) for cell in grid)
+    return plan_coverage(
+        needed,
+        duration_s,
+        existing_cells=existing_cells,
+        used_track_ids=used_track_ids,
+        substrates=substrates,
+        styles=styles,
+    )

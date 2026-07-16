@@ -1,0 +1,72 @@
+{
+  "track_id": "buddhist_meditative_bowls_seed59164",
+  "substrate": "percussive_with_tail",
+  "style": "buddhist_meditative",
+  "requested_features": {
+    "tempo_bpm": null,
+    "energy": "very_low",
+    "spectral_centroid": "warm_metallic",
+    "mode": "just_intonation",
+    "register": "low_mid",
+    "texture_density": "very_sparse",
+    "nature_bed": "none"
+  },
+  "measured_features": null,
+  "instrumentation": [
+    "tibetan_singing_bowls",
+    "distant_temple_bell"
+  ],
+  "prompt": "Instrumental meditative soundscape for deep relaxation. Tibetan singing bowls and a distant temple bell, long resonant decays, inharmonic metallic partials, over a soft continuous drone. Tempo arrhythmic, sparse strikes, very low energy, very soft dynamics. warm-metallic timbre, warm and dark, low spectral brightness. inharmonic partials harmony, sparse texture, low-mid register. No vocals, no percussion hits, no sudden transitions. Seamless, calm, continuous.",
+  "negative_prompt": "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions",
+  "composition_plan": {
+    "positive_global_styles": [
+      "singing bowls",
+      "long resonant tails",
+      "meditative",
+      "just intonation",
+      "instrumental",
+      "very sparse",
+      "low register",
+      "tibetan singing bowls"
+    ],
+    "negative_global_styles": [
+      "bright",
+      "aggressive",
+      "drums",
+      "vocals",
+      "fast",
+      "buildup"
+    ],
+    "sections": [
+      {
+        "section_name": "loop",
+        "positive_local_styles": [
+          "tibetan_singing_bowls",
+          "distant_temple_bell"
+        ],
+        "negative_local_styles": [
+          "bright",
+          "aggressive",
+          "drums",
+          "vocals",
+          "fast",
+          "buildup"
+        ],
+        "duration_ms": 60000,
+        "lines": []
+      }
+    ]
+  },
+  "seed": 59164,
+  "duration_s": 60,
+  "loopable": true,
+  "render": {
+    "provider": "elevenlabs",
+    "model_version": "music_v1",
+    "output_format": "pcm_44100",
+    "license": "elevenlabs-eleven-music",
+    "generated_at": "2026-07-16T19:25:44.353756+00:00",
+    "audio_file": "tracks/buddhist_meditative_bowls_seed59164.wav",
+    "watermark": null
+  }
+}

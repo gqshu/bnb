@@ -1,0 +1,69 @@
+{
+  "track_id": "nature_ambient_noise_seed12891",
+  "substrate": "noise_texture",
+  "style": "nature_ambient",
+  "requested_features": {
+    "tempo_bpm": null,
+    "energy": "very_low",
+    "spectral_centroid": "dark_smooth",
+    "mode": "none",
+    "register": "low_full",
+    "texture_density": "even",
+    "nature_bed": "present"
+  },
+  "measured_features": null,
+  "instrumentation": [
+    "noise_texture"
+  ],
+  "prompt": "Instrumental nature-ambient soundscape for deep relaxation. A steady tonal noise wash, like gentle pink or brown noise. Tempo arrhythmic, very low energy, very soft dynamics. smooth, dark timbre, warm and dark, low spectral brightness. no tonal center harmony, flat and even texture, low-weighted, full register. A soft natural bed blended gently underneath. No vocals, no percussion hits, no sudden transitions. Seamless, calm, continuous.",
+  "negative_prompt": "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions",
+  "composition_plan": {
+    "positive_global_styles": [
+      "noise texture",
+      "steady wash",
+      "nature ambient",
+      "field recording",
+      "wide stereo",
+      "water",
+      "wind"
+    ],
+    "negative_global_styles": [
+      "bright",
+      "aggressive",
+      "drums",
+      "vocals",
+      "fast",
+      "buildup"
+    ],
+    "sections": [
+      {
+        "section_name": "loop",
+        "positive_local_styles": [
+          "noise_texture"
+        ],
+        "negative_local_styles": [
+          "bright",
+          "aggressive",
+          "drums",
+          "vocals",
+          "fast",
+          "buildup"
+        ],
+        "duration_ms": 60000,
+        "lines": []
+      }
+    ]
+  },
+  "seed": 12891,
+  "duration_s": 60,
+  "loopable": true,
+  "render": {
+    "provider": "elevenlabs",
+    "model_version": "music_v1",
+    "output_format": "pcm_44100",
+    "license": "elevenlabs-eleven-music",
+    "generated_at": "2026-07-16T19:27:32.993248+00:00",
+    "audio_file": "tracks/nature_ambient_noise_seed12891.wav",
+    "watermark": null
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "track_id": "neoclassical_field_seed11247",
+  "substrate": "field_recording",
+  "style": "neoclassical",
+  "requested_features": {
+    "tempo_bpm": null,
+    "energy": "very_low",
+    "spectral_centroid": "soft_broadband",
+    "mode": "atonal",
+    "register": "full",
+    "texture_density": "continuous",
+    "nature_bed": "present"
+  },
+  "measured_features": null,
+  "instrumentation": [
+    "field_recording"
+  ],
+  "prompt": "Instrumental neoclassical soundscape for deep relaxation. A soft natural field-recording bed, broadband and pitchless. Tempo arrhythmic, very low energy, very soft dynamics. soft broadband timbre, warm and dark, low spectral brightness. no tonal center harmony, continuous wash texture, full but gentle register. A soft natural bed blended gently underneath. No vocals, no percussion hits, no sudden transitions. Seamless, calm, continuous.",
+  "negative_prompt": "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions",
+  "composition_plan": {
+    "positive_global_styles": [
+      "field recording",
+      "nature ambience",
+      "wide stereo",
+      "neoclassical",
+      "felt piano",
+      "strings",
+      "warm",
+      "intimate"
+    ],
+    "negative_global_styles": [
+      "bright",
+      "aggressive",
+      "drums",
+      "vocals",
+      "fast",
+      "buildup"
+    ],
+    "sections": [
+      {
+        "section_name": "loop",
+        "positive_local_styles": [
+          "field_recording"
+        ],
+        "negative_local_styles": [
+          "bright",
+          "aggressive",
+          "drums",
+          "vocals",
+          "fast",
+          "buildup"
+        ],
+        "duration_ms": 60000,
+        "lines": []
+      }
+    ]
+  },
+  "seed": 11247,
+  "duration_s": 60,
+  "loopable": true,
+  "render": {
+    "provider": "elevenlabs",
+    "model_version": "music_v1",
+    "output_format": "pcm_44100",
+    "license": "elevenlabs-eleven-music",
+    "generated_at": "2026-07-16T19:27:52.206221+00:00",
+    "audio_file": "tracks/neoclassical_field_seed11247.wav",
+    "watermark": null
+  }
+}

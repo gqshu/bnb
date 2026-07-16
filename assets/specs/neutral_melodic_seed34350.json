@@ -1,0 +1,68 @@
+{
+  "track_id": "neutral_melodic_seed34350",
+  "substrate": "melodic_instrument",
+  "style": "neutral",
+  "requested_features": {
+    "tempo_bpm": 50,
+    "energy": "low",
+    "spectral_centroid": "warm_dark",
+    "mode": "simple_consonant",
+    "register": "mid",
+    "texture_density": "sparse",
+    "nature_bed": "none"
+  },
+  "measured_features": null,
+  "instrumentation": [
+    "solo_instrument"
+  ],
+  "prompt": "Instrumental ambient soundscape for deep relaxation. A sparse solo instrument line, gentle and unhurried. Tempo around a 50 bpm feel, low energy, very soft dynamics. warm-dark timbre, warm and dark, low spectral brightness. simple, consonant harmony, sparse texture, mid register. No vocals, no percussion hits, no sudden transitions. Seamless, calm, continuous.",
+  "negative_prompt": "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions",
+  "composition_plan": {
+    "positive_global_styles": [
+      "solo instrument",
+      "sparse melody",
+      "instrumental",
+      "ambient",
+      "calm",
+      "minimal"
+    ],
+    "negative_global_styles": [
+      "bright",
+      "aggressive",
+      "drums",
+      "vocals",
+      "fast",
+      "buildup"
+    ],
+    "sections": [
+      {
+        "section_name": "loop",
+        "positive_local_styles": [
+          "solo_instrument"
+        ],
+        "negative_local_styles": [
+          "bright",
+          "aggressive",
+          "drums",
+          "vocals",
+          "fast",
+          "buildup"
+        ],
+        "duration_ms": 60000,
+        "lines": []
+      }
+    ]
+  },
+  "seed": 34350,
+  "duration_s": 60,
+  "loopable": true,
+  "render": {
+    "provider": "elevenlabs",
+    "model_version": "music_v1",
+    "output_format": "pcm_44100",
+    "license": "elevenlabs-eleven-music",
+    "generated_at": "2026-07-16T19:28:33.960234+00:00",
+    "audio_file": "tracks/neutral_melodic_seed34350.wav",
+    "watermark": null
+  }
+}

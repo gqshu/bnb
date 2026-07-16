@@ -1,0 +1,645 @@
+{
+  "count": 25,
+  "tracks": [
+    {
+      "track_id": "buddhist_meditative_bowls_seed59164",
+      "summary": "buddhist_meditative \u00d7 percussive_with_tail \u2014 tibetan_singing_bowls, distant_temple_bell; very_low, low_mid, very_sparse",
+      "substrate": "percussive_with_tail",
+      "style": "buddhist_meditative",
+      "seed": 59164,
+      "duration_s": 60,
+      "instrumentation": [
+        "tibetan_singing_bowls",
+        "distant_temple_bell"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "warm_metallic",
+        "mode": "just_intonation",
+        "register": "low_mid",
+        "texture_density": "very_sparse",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/buddhist_meditative_bowls_seed59164.json",
+      "audio": "tracks/buddhist_meditative_bowls_seed59164.wav"
+    },
+    {
+      "track_id": "buddhist_meditative_drone_seed81657",
+      "summary": "buddhist_meditative \u00d7 drone \u2014 singing_bowl_drone, wordless_vocal_hum; very_low, low, very_sparse",
+      "substrate": "drone",
+      "style": "buddhist_meditative",
+      "seed": 81657,
+      "duration_s": 60,
+      "instrumentation": [
+        "singing_bowl_drone",
+        "wordless_vocal_hum"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "warm_dark",
+        "mode": "just_intonation",
+        "register": "low",
+        "texture_density": "very_sparse",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/buddhist_meditative_drone_seed81657.json",
+      "audio": "tracks/buddhist_meditative_drone_seed81657.wav"
+    },
+    {
+      "track_id": "buddhist_meditative_field_seed67927",
+      "summary": "buddhist_meditative \u00d7 field_recording \u2014 temple_bells, mountain_stream, wind_chime; very_low, full, continuous",
+      "substrate": "field_recording",
+      "style": "buddhist_meditative",
+      "seed": 67927,
+      "duration_s": 60,
+      "instrumentation": [
+        "temple_bells",
+        "mountain_stream",
+        "wind_chime"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "soft_broadband",
+        "mode": "just_intonation",
+        "register": "full",
+        "texture_density": "continuous",
+        "nature_bed": "present"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/buddhist_meditative_field_seed67927.json",
+      "audio": "tracks/buddhist_meditative_field_seed67927.wav"
+    },
+    {
+      "track_id": "buddhist_meditative_melodic_seed57864",
+      "summary": "buddhist_meditative \u00d7 melodic_instrument \u2014 shakuhachi, singing_bowl_drone; low, mid, sparse",
+      "substrate": "melodic_instrument",
+      "style": "buddhist_meditative",
+      "seed": 57864,
+      "duration_s": 60,
+      "instrumentation": [
+        "shakuhachi",
+        "singing_bowl_drone"
+      ],
+      "requested_features": {
+        "tempo_bpm": 50,
+        "energy": "low",
+        "spectral_centroid": "warm_dark",
+        "mode": "just_intonation",
+        "register": "mid",
+        "texture_density": "sparse",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/buddhist_meditative_melodic_seed57864.json",
+      "audio": "tracks/buddhist_meditative_melodic_seed57864.wav"
+    },
+    {
+      "track_id": "buddhist_meditative_noise_seed35194",
+      "summary": "buddhist_meditative \u00d7 noise_texture \u2014 noise_texture; very_low, low_full, even",
+      "substrate": "noise_texture",
+      "style": "buddhist_meditative",
+      "seed": 35194,
+      "duration_s": 60,
+      "instrumentation": [
+        "noise_texture"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "dark_smooth",
+        "mode": "just_intonation",
+        "register": "low_full",
+        "texture_density": "even",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/buddhist_meditative_noise_seed35194.json",
+      "audio": "tracks/buddhist_meditative_noise_seed35194.wav"
+    },
+    {
+      "track_id": "lofi_bowls_seed10866",
+      "summary": "lofi \u00d7 percussive_with_tail \u2014 singing_bowls, bells; very_low, low_mid, very_sparse",
+      "substrate": "percussive_with_tail",
+      "style": "lofi",
+      "seed": 10866,
+      "duration_s": 60,
+      "instrumentation": [
+        "singing_bowls",
+        "bells"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "warm_metallic",
+        "mode": "inharmonic",
+        "register": "low_mid",
+        "texture_density": "very_sparse",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/lofi_bowls_seed10866.json",
+      "audio": "tracks/lofi_bowls_seed10866.wav"
+    },
+    {
+      "track_id": "lofi_drone_seed47621",
+      "summary": "lofi \u00d7 drone \u2014 sustained_pad, low_drone; very_low, low, very_sparse",
+      "substrate": "drone",
+      "style": "lofi",
+      "seed": 47621,
+      "duration_s": 60,
+      "instrumentation": [
+        "sustained_pad",
+        "low_drone"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "warm_dark",
+        "mode": "static_drone",
+        "register": "low",
+        "texture_density": "very_sparse",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/lofi_drone_seed47621.json",
+      "audio": "tracks/lofi_drone_seed47621.wav"
+    },
+    {
+      "track_id": "lofi_field_seed20802",
+      "summary": "lofi \u00d7 field_recording \u2014 field_recording; very_low, full, continuous",
+      "substrate": "field_recording",
+      "style": "lofi",
+      "seed": 20802,
+      "duration_s": 60,
+      "instrumentation": [
+        "field_recording"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "soft_broadband",
+        "mode": "atonal",
+        "register": "full",
+        "texture_density": "continuous",
+        "nature_bed": "present"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/lofi_field_seed20802.json",
+      "audio": "tracks/lofi_field_seed20802.wav"
+    },
+    {
+      "track_id": "lofi_melodic_seed53413",
+      "summary": "lofi \u00d7 melodic_instrument \u2014 soft_keys, tape_texture; low, mid, sparse",
+      "substrate": "melodic_instrument",
+      "style": "lofi",
+      "seed": 53413,
+      "duration_s": 60,
+      "instrumentation": [
+        "soft_keys",
+        "tape_texture"
+      ],
+      "requested_features": {
+        "tempo_bpm": 50,
+        "energy": "low",
+        "spectral_centroid": "warm_dark",
+        "mode": "simple_consonant",
+        "register": "mid",
+        "texture_density": "sparse",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/lofi_melodic_seed53413.json",
+      "audio": "tracks/lofi_melodic_seed53413.wav"
+    },
+    {
+      "track_id": "lofi_noise_seed32107",
+      "summary": "lofi \u00d7 noise_texture \u2014 noise_texture; very_low, low_full, even",
+      "substrate": "noise_texture",
+      "style": "lofi",
+      "seed": 32107,
+      "duration_s": 60,
+      "instrumentation": [
+        "noise_texture"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "dark_smooth",
+        "mode": "none",
+        "register": "low_full",
+        "texture_density": "even",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/lofi_noise_seed32107.json",
+      "audio": "tracks/lofi_noise_seed32107.wav"
+    },
+    {
+      "track_id": "nature_ambient_bowls_seed9682",
+      "summary": "nature_ambient \u00d7 percussive_with_tail \u2014 singing_bowls, bells; very_low, low_mid, very_sparse",
+      "substrate": "percussive_with_tail",
+      "style": "nature_ambient",
+      "seed": 9682,
+      "duration_s": 60,
+      "instrumentation": [
+        "singing_bowls",
+        "bells"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "warm_metallic",
+        "mode": "inharmonic",
+        "register": "low_mid",
+        "texture_density": "very_sparse",
+        "nature_bed": "present"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/nature_ambient_bowls_seed9682.json",
+      "audio": "tracks/nature_ambient_bowls_seed9682.wav"
+    },
+    {
+      "track_id": "nature_ambient_drone_seed92879",
+      "summary": "nature_ambient \u00d7 drone \u2014 warm_pad, rain, distant_wind; very_low, low, very_sparse",
+      "substrate": "drone",
+      "style": "nature_ambient",
+      "seed": 92879,
+      "duration_s": 60,
+      "instrumentation": [
+        "warm_pad",
+        "rain",
+        "distant_wind"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "warm_dark",
+        "mode": "static_drone",
+        "register": "low",
+        "texture_density": "very_sparse",
+        "nature_bed": "present"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/nature_ambient_drone_seed92879.json",
+      "audio": "tracks/nature_ambient_drone_seed92879.wav"
+    },
+    {
+      "track_id": "nature_ambient_field_seed97740",
+      "summary": "nature_ambient \u00d7 field_recording \u2014 mountain_stream, wind; very_low, full, continuous",
+      "substrate": "field_recording",
+      "style": "nature_ambient",
+      "seed": 97740,
+      "duration_s": 60,
+      "instrumentation": [
+        "mountain_stream",
+        "wind"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "soft_broadband",
+        "mode": "atonal",
+        "register": "full",
+        "texture_density": "continuous",
+        "nature_bed": "present"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/nature_ambient_field_seed97740.json",
+      "audio": "tracks/nature_ambient_field_seed97740.wav"
+    },
+    {
+      "track_id": "nature_ambient_melodic_seed65443",
+      "summary": "nature_ambient \u00d7 melodic_instrument \u2014 solo_instrument; low, mid, sparse",
+      "substrate": "melodic_instrument",
+      "style": "nature_ambient",
+      "seed": 65443,
+      "duration_s": 60,
+      "instrumentation": [
+        "solo_instrument"
+      ],
+      "requested_features": {
+        "tempo_bpm": 50,
+        "energy": "low",
+        "spectral_centroid": "warm_dark",
+        "mode": "simple_consonant",
+        "register": "mid",
+        "texture_density": "sparse",
+        "nature_bed": "present"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/nature_ambient_melodic_seed65443.json",
+      "audio": "tracks/nature_ambient_melodic_seed65443.wav"
+    },
+    {
+      "track_id": "nature_ambient_noise_seed12891",
+      "summary": "nature_ambient \u00d7 noise_texture \u2014 noise_texture; very_low, low_full, even",
+      "substrate": "noise_texture",
+      "style": "nature_ambient",
+      "seed": 12891,
+      "duration_s": 60,
+      "instrumentation": [
+        "noise_texture"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "dark_smooth",
+        "mode": "none",
+        "register": "low_full",
+        "texture_density": "even",
+        "nature_bed": "present"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/nature_ambient_noise_seed12891.json",
+      "audio": "tracks/nature_ambient_noise_seed12891.wav"
+    },
+    {
+      "track_id": "neoclassical_bowls_seed49037",
+      "summary": "neoclassical \u00d7 percussive_with_tail \u2014 singing_bowls, bells; very_low, low_mid, very_sparse",
+      "substrate": "percussive_with_tail",
+      "style": "neoclassical",
+      "seed": 49037,
+      "duration_s": 60,
+      "instrumentation": [
+        "singing_bowls",
+        "bells"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "warm_metallic",
+        "mode": "inharmonic",
+        "register": "low_mid",
+        "texture_density": "very_sparse",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/neoclassical_bowls_seed49037.json",
+      "audio": "tracks/neoclassical_bowls_seed49037.wav"
+    },
+    {
+      "track_id": "neoclassical_drone_seed3964",
+      "summary": "neoclassical \u00d7 drone \u2014 string_pad; very_low, low, very_sparse",
+      "substrate": "drone",
+      "style": "neoclassical",
+      "seed": 3964,
+      "duration_s": 60,
+      "instrumentation": [
+        "string_pad"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "warm_dark",
+        "mode": "static_drone",
+        "register": "low",
+        "texture_density": "very_sparse",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/neoclassical_drone_seed3964.json",
+      "audio": "tracks/neoclassical_drone_seed3964.wav"
+    },
+    {
+      "track_id": "neoclassical_field_seed11247",
+      "summary": "neoclassical \u00d7 field_recording \u2014 field_recording; very_low, full, continuous",
+      "substrate": "field_recording",
+      "style": "neoclassical",
+      "seed": 11247,
+      "duration_s": 60,
+      "instrumentation": [
+        "field_recording"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "soft_broadband",
+        "mode": "atonal",
+        "register": "full",
+        "texture_density": "continuous",
+        "nature_bed": "present"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/neoclassical_field_seed11247.json",
+      "audio": "tracks/neoclassical_field_seed11247.wav"
+    },
+    {
+      "track_id": "neoclassical_melodic_seed76352",
+      "summary": "neoclassical \u00d7 melodic_instrument \u2014 felt_piano; low, mid, sparse",
+      "substrate": "melodic_instrument",
+      "style": "neoclassical",
+      "seed": 76352,
+      "duration_s": 60,
+      "instrumentation": [
+        "felt_piano"
+      ],
+      "requested_features": {
+        "tempo_bpm": 50,
+        "energy": "low",
+        "spectral_centroid": "warm_dark",
+        "mode": "simple_consonant",
+        "register": "mid",
+        "texture_density": "sparse",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/neoclassical_melodic_seed76352.json",
+      "audio": "tracks/neoclassical_melodic_seed76352.wav"
+    },
+    {
+      "track_id": "neoclassical_noise_seed97660",
+      "summary": "neoclassical \u00d7 noise_texture \u2014 noise_texture; very_low, low_full, even",
+      "substrate": "noise_texture",
+      "style": "neoclassical",
+      "seed": 97660,
+      "duration_s": 60,
+      "instrumentation": [
+        "noise_texture"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "dark_smooth",
+        "mode": "none",
+        "register": "low_full",
+        "texture_density": "even",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/neoclassical_noise_seed97660.json",
+      "audio": "tracks/neoclassical_noise_seed97660.wav"
+    },
+    {
+      "track_id": "neutral_bowls_seed84050",
+      "summary": "neutral \u00d7 percussive_with_tail \u2014 singing_bowls, bells; very_low, low_mid, very_sparse",
+      "substrate": "percussive_with_tail",
+      "style": "neutral",
+      "seed": 84050,
+      "duration_s": 60,
+      "instrumentation": [
+        "singing_bowls",
+        "bells"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "warm_metallic",
+        "mode": "inharmonic",
+        "register": "low_mid",
+        "texture_density": "very_sparse",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/neutral_bowls_seed84050.json",
+      "audio": "tracks/neutral_bowls_seed84050.wav"
+    },
+    {
+      "track_id": "neutral_drone_seed56505",
+      "summary": "neutral \u00d7 drone \u2014 sustained_pad, low_drone; very_low, low, very_sparse",
+      "substrate": "drone",
+      "style": "neutral",
+      "seed": 56505,
+      "duration_s": 60,
+      "instrumentation": [
+        "sustained_pad",
+        "low_drone"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "warm_dark",
+        "mode": "static_drone",
+        "register": "low",
+        "texture_density": "very_sparse",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/neutral_drone_seed56505.json",
+      "audio": "tracks/neutral_drone_seed56505.wav"
+    },
+    {
+      "track_id": "neutral_field_seed17737",
+      "summary": "neutral \u00d7 field_recording \u2014 field_recording; very_low, full, continuous",
+      "substrate": "field_recording",
+      "style": "neutral",
+      "seed": 17737,
+      "duration_s": 60,
+      "instrumentation": [
+        "field_recording"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "soft_broadband",
+        "mode": "atonal",
+        "register": "full",
+        "texture_density": "continuous",
+        "nature_bed": "present"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/neutral_field_seed17737.json",
+      "audio": "tracks/neutral_field_seed17737.wav"
+    },
+    {
+      "track_id": "neutral_melodic_seed34350",
+      "summary": "neutral \u00d7 melodic_instrument \u2014 solo_instrument; low, mid, sparse",
+      "substrate": "melodic_instrument",
+      "style": "neutral",
+      "seed": 34350,
+      "duration_s": 60,
+      "instrumentation": [
+        "solo_instrument"
+      ],
+      "requested_features": {
+        "tempo_bpm": 50,
+        "energy": "low",
+        "spectral_centroid": "warm_dark",
+        "mode": "simple_consonant",
+        "register": "mid",
+        "texture_density": "sparse",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/neutral_melodic_seed34350.json",
+      "audio": "tracks/neutral_melodic_seed34350.wav"
+    },
+    {
+      "track_id": "neutral_noise_seed50801",
+      "summary": "neutral \u00d7 noise_texture \u2014 noise_texture; very_low, low_full, even",
+      "substrate": "noise_texture",
+      "style": "neutral",
+      "seed": 50801,
+      "duration_s": 60,
+      "instrumentation": [
+        "noise_texture"
+      ],
+      "requested_features": {
+        "tempo_bpm": null,
+        "energy": "very_low",
+        "spectral_centroid": "dark_smooth",
+        "mode": "none",
+        "register": "low_full",
+        "texture_density": "even",
+        "nature_bed": "none"
+      },
+      "measured_features": null,
+      "rendered": true,
+      "provider": "elevenlabs",
+      "spec": "specs/neutral_noise_seed50801.json",
+      "audio": "tracks/neutral_noise_seed50801.wav"
+    }
+  ]
+}

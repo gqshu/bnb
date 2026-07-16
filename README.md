@@ -45,26 +45,76 @@ uv run scripts/generate_wavs.py wind_down --waveform square
 
 `src/bnb/background.py` holds the substrate × style taxonomy from
 [docs/background_music.md](docs/background_music.md): it turns a `(substrate, style)`
-signature into the Eleven Music prompt, composition plan, and per-track metadata
-record. `scripts/generate_background.py` is a thin CLI over it that calls ElevenLabs
-and writes each track plus a JSON sidecar into `run/background/`.
+signature into the Eleven Music prompt, composition plan, seed, and per-track
+spec record. Two thin CLIs sit over it and the **asset repository**
+(`src/bnb/assets.py`): `scripts/plan_background.py` writes specs offline, and
+`scripts/render_background.py` renders them into audio.
+
+The asset repo is a *flat, tagged store* rather than a category tree — the bandit
+selects on categorical tags (substrate, style) plus a continuous MER vector, which
+a hierarchy can't express:
+
+```
+assets/
+  specs/<track_id>.json    per-track metadata (§3); the source of truth (git-tracked)
+  tracks/<track_id>.wav    rendered audio master (git-ignored: large, costs credits)
+  catalog.json             generated index of compact descriptors for selection
+```
+
+The selection workflow reads only `catalog.json`; it never opens every spec.
+
+**Planning and rendering are two separate scripts.** Spec management is offline
+and free (no API, no key), so you preview the catalog before spending on a paid
+model — and the same specs can be rendered by a local model later. A spec is
+render-independent; the renderer fills its `render` block (provider, model,
+format, provenance, audio file).
+
+`scripts/plan_background.py` — write/inspect specs (free, offline):
+
+```bash
+uv run scripts/plan_background.py --list             # print the taxonomy axes + sample set
+uv run scripts/plan_background.py --coverage         # print the substrate × style count matrix
+uv run scripts/plan_background.py                    # write the curated sample set
+uv run scripts/plan_background.py buddhist_meditative:drone --duration 90
+uv run scripts/plan_background.py --only-new         # skip pairs whose spec already exists
+uv run scripts/plan_background.py --rebuild-catalog  # rebuild catalog.json from specs
+```
+
+Grow the library by coverage guide — place the next specs so the substrate × style
+grid fills evenly (which also levels the per-substrate and per-style marginals).
+Each repeat of a cell advances the seed (`variant`), matching the doc's "3–5 seeds
+per cell" (§5):
+
+```bash
+uv run scripts/plan_background.py --fill 10          # next 10 specs, evenly distributed
+uv run scripts/plan_background.py --per-cell 2       # top every cell up to 2 tracks
+uv run scripts/plan_background.py --fill 6 --styles buddhist_meditative,neutral   # restrict the grid
+```
+
+`scripts/render_background.py` — turn specs into audio (paid / heavyweight):
 
 ```bash
 export ELEVENLABS_API_KEY=...
-uv run --extra media scripts/generate_background.py --list      # print the catalog
-uv run --extra media scripts/generate_background.py --dry-run   # write prompts/metadata, no API call
-uv run --extra media scripts/generate_background.py             # curated sample set, 60 s each
-uv run --extra media scripts/generate_background.py buddhist_meditative:drone --duration 90
+uv run scripts/render_background.py --dry-run        # list what would render, no API call
+uv run scripts/render_background.py                  # render every spec still missing audio
+uv run scripts/render_background.py buddhist_meditative_drone_seed81657   # render specific track(s)
+uv run scripts/render_background.py --force <track_id>    # re-render an existing track
 ```
 
-These samples are for the Stage 1 provider bake-off; the WAV master and measured-MER
-extraction pipeline land in Stage 2.
+Rendering is credit-safe: specs that already have audio are skipped unless you pass
+`--force`. Provider is pluggable (`--provider`); only ElevenLabs is wired today. These
+samples are for the Stage 1 provider bake-off; the measured-MER extraction pipeline
+lands in Stage 2.
 
 ## Layout
 
 - `src/bnb/tone.py` — binaural tone rendering and WAV output
 - `src/bnb/background.py` — background-media substrate × style taxonomy and prompts
+- `src/bnb/assets.py` — the background asset repository (specs, tracks, catalog)
+- `scripts/plan_background.py` — write/inspect background specs (offline, free)
+- `scripts/render_background.py` — render specs into audio via a provider
 - `scripts/` — dev utilities, not shipped
 - `tests/` — test suite
 - `docs/` — product and feasibility docs
-- `run/` — generated audio, git-ignored
+- `assets/` — background-media asset repo (specs + catalog tracked, audio ignored)
+- `run/` — binaural ear-check renders, git-ignored

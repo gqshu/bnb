@@ -4,3 +4,7 @@ __pycache__/
 .pytest_cache/
 *.wav
 run/
+
+# Asset repository: track the specs and catalog (source of truth), not the audio
+# masters (large, cost credits, regenerable from the spec's seed).
+/assets/tracks/
