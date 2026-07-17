@@ -5,7 +5,7 @@
   "requested_features": {
     "tempo_bpm": null,
     "energy": "very_low",
-    "spectral_centroid": "dark_smooth",
+    "spectral_centroid": "deep_warm",
     "mode": "none",
     "register": "low_full",
     "texture_density": "even",
@@ -13,14 +13,17 @@
   },
   "measured_features": null,
   "instrumentation": [
-    "noise_texture"
+    "brown_noise",
+    "distant_surf"
   ],
-  "prompt": "Instrumental ambient soundscape for deep relaxation. A steady tonal noise wash, like gentle pink or brown noise. Tempo arrhythmic, very low energy, very soft dynamics. smooth, dark timbre, warm and dark, low spectral brightness. no tonal center harmony, flat and even texture, low-weighted, full register. No vocals, no percussion hits, no sudden transitions. Seamless, calm, continuous.",
-  "negative_prompt": "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions",
+  "prompt": "Instrumental ambient soundscape for deep relaxation. A soft, deep brown-noise wash, warm and enveloping, like distant ocean surf or steady rainfall heard from far away, gently low-pass filtered. Tempo arrhythmic, very low energy, very soft dynamics. deep, warm, heavily low-pass filtered, no hiss timbre, warm and dark, low spectral brightness. no tonal center harmony, smooth and even texture, low, full-bodied register. No vocals, no percussion hits, no sudden transitions. Seamless, calm, continuous.",
+  "negative_prompt": "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions, hiss, static, white noise",
   "composition_plan": {
     "positive_global_styles": [
-      "noise texture",
-      "steady wash",
+      "brown noise",
+      "warm wash",
+      "distant surf",
+      "soft rainfall",
       "instrumental",
       "ambient",
       "calm",
@@ -32,13 +35,16 @@
       "drums",
       "vocals",
       "fast",
-      "buildup"
+      "buildup",
+      "hiss",
+      "white noise"
     ],
     "sections": [
       {
         "section_name": "loop",
         "positive_local_styles": [
-          "noise_texture"
+          "brown_noise",
+          "distant_surf"
         ],
         "negative_local_styles": [
           "bright",
@@ -46,7 +52,9 @@
           "drums",
           "vocals",
           "fast",
-          "buildup"
+          "buildup",
+          "hiss",
+          "white noise"
         ],
         "duration_ms": 60000,
         "lines": []
@@ -58,10 +66,10 @@
   "loopable": true,
   "render": {
     "provider": "elevenlabs",
-    "model_version": "music_v1",
+    "model_version": "music_v2",
     "output_format": "pcm_44100",
     "license": "elevenlabs-eleven-music",
-    "generated_at": "2026-07-16T19:28:40.134452+00:00",
+    "generated_at": "2026-07-17T16:26:19.280772+00:00",
     "audio_file": "tracks/neutral_noise_seed50801.wav",
     "watermark": null
   }

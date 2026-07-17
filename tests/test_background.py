@@ -4,6 +4,7 @@ from bnb.background import (
     STYLES,
     SUBSTRATES,
     build_signature,
+    composition_plan_for_model,
     coverage_report,
     fill_to_per_cell,
     plan_coverage,
@@ -72,3 +73,21 @@ def test_coverage_can_restrict_to_subsets():
 def test_unknown_axis_names_rejected():
     with pytest.raises(ValueError):
         plan_coverage(1, 60, substrates=["gong"])
+
+
+def test_composition_plan_v1_is_sections():
+    spec = build_signature("noise_texture", "neutral", 60).spec()
+    plan = composition_plan_for_model(spec, "music_v1")
+    assert "sections" in plan and "chunks" not in plan
+
+
+def test_composition_plan_v2_is_instrumental_chunks():
+    from elevenlabs.types import CompositionPlan  # validate against the real SDK model
+
+    spec = build_signature("noise_texture", "neutral", 60).spec()
+    plan = composition_plan_for_model(spec, "music_v2")
+    CompositionPlan.model_validate(plan)
+    chunk = plan["chunks"][0]
+    assert 3000 <= chunk["duration_ms"] <= 120000
+    assert "instrumental" in chunk["positive_styles"]
+    assert "vocals" in chunk["negative_styles"]  # wordless guardrail without force_instrumental

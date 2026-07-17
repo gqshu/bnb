@@ -106,13 +106,62 @@ Rendering is credit-safe: specs that already have audio are skipped unless you p
 samples are for the Stage 1 provider bake-off; the measured-MER extraction pipeline
 lands in Stage 2.
 
+## Live stream service
+
+A single-stream backend service that generates the binaural beat live and streams it
+over HTTP, with a demo web portal. One stream, one fixed port (`bnb.server.PORT`,
+default 8000). The **backend** owns the stream — it renders phase-continuous tones in
+small chunks and mixes an optional looped background track — so live spec edits are
+heard within a chunk. The browser just plays `/stream.wav` and PATCHes the spec.
+
+```bash
+uv run scripts/serve.py        # then open http://127.0.0.1:8000
+```
+
+| method | path | purpose |
+|---|---|---|
+| GET | `/` | the demo portal |
+| GET | `/api/stream` | current state (running, beat, background, volumes) |
+| POST | `/api/stream/start` | start; `beat` and `background_id` both optional (no beat ⇒ silence/background only) |
+| POST | `/api/stream/stop` | stop |
+| PATCH | `/api/stream/spec` | live-update `beat` (or `null` to drop it), `background_id`, `background_volume` |
+| GET | `/api/backgrounds` | catalog tracks; only `rendered` ones are playable |
+| GET | `/stream.wav` | the live audio (open-ended WAV, paced to real time) |
+
+The stream runs at 44.1 kHz to match the background masters (`pcm_44100`), so no
+resampling is needed in the common case. Headphones required — the beat only exists
+across the two ears.
+
+### Control client
+
+`bnb.client.StreamClient` wraps the endpoints for driving the stream from Python,
+and `scripts/control.py` is a CLI over it (the service must be running):
+
+```bash
+uv run scripts/control.py backgrounds                 # list background track meta
+uv run scripts/control.py current                     # get the current background
+uv run scripts/control.py play --background neutral_noise_seed50801 --beat 10 --volume 0.3
+uv run scripts/control.py volume 0.5                   # change the beat volume
+uv run scripts/control.py freq 7.83                    # change the beat frequency
+```
+
+`play` starts the stream if it's stopped, otherwise changes it live (the background
+crossfades). Since the server's PATCH replaces the whole beat, the `volume`/`freq`
+helpers read the current beat, change one field, and send it back.
+
 ## Layout
 
 - `src/bnb/tone.py` — binaural tone rendering and WAV output
 - `src/bnb/background.py` — background-media substrate × style taxonomy and prompts
 - `src/bnb/assets.py` — the background asset repository (specs, tracks, catalog)
+- `src/bnb/stream.py` — the live stream engine (phase-continuous beat + background mix)
+- `src/bnb/server.py` — FastAPI service and endpoints
+- `src/bnb/client.py` — control client for the stream service
+- `src/bnb/web/index.html` — the demo portal
 - `scripts/plan_background.py` — write/inspect background specs (offline, free)
 - `scripts/render_background.py` — render specs into audio via a provider
+- `scripts/serve.py` — run the stream service
+- `scripts/control.py` — command-line control client
 - `scripts/` — dev utilities, not shipped
 - `tests/` — test suite
 - `docs/` — product and feasibility docs

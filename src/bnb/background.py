@@ -27,7 +27,8 @@ from typing import Any
 # Applies to every down-regulation track (§4). Kept as prose (prompt) and as
 # discrete style tags (composition plan) because ElevenLabs consumes both.
 NEGATIVE_PROMPT = (
-    "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions"
+    "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions, "
+    "hiss, static, white noise"
 )
 NEGATIVE_GLOBAL_STYLES: tuple[str, ...] = (
     "bright",
@@ -36,6 +37,8 @@ NEGATIVE_GLOBAL_STYLES: tuple[str, ...] = (
     "vocals",
     "fast",
     "buildup",
+    "hiss",
+    "white noise",
 )
 
 
@@ -136,19 +139,25 @@ SUBSTRATES: dict[str, Substrate] = {
     "noise_texture": Substrate(
         name="noise_texture",
         short="noise",
-        body="A steady tonal noise wash, like gentle pink or brown noise",
-        instrumentation=("noise_texture",),
-        style_tags=("noise texture", "steady wash"),
+        # Framed as deep brown noise / distant surf rather than plain "noise": music
+        # models render bare noise as harsh hiss, but a soft, low-passed surf-like
+        # wash is the same MER footprint and far more pleasant to sit with.
+        body=(
+            "A soft, deep brown-noise wash, warm and enveloping, like distant ocean "
+            "surf or steady rainfall heard from far away, gently low-pass filtered"
+        ),
+        instrumentation=("brown_noise", "distant_surf"),
+        style_tags=("brown noise", "warm wash", "distant surf", "soft rainfall"),
         tempo="arrhythmic",
         energy="very low",
-        timbre="smooth, dark",
+        timbre="deep, warm, heavily low-pass filtered, no hiss",
         harmony="no tonal center",
-        texture="flat and even",
-        register="low-weighted, full",
+        texture="smooth and even",
+        register="low, full-bodied",
         requested={
             "tempo_bpm": None,
             "energy": "very_low",
-            "spectral_centroid": "dark_smooth",
+            "spectral_centroid": "deep_warm",
             "mode": "none",
             "register": "low_full",
             "texture_density": "even",
@@ -442,6 +451,40 @@ def build_signature(
         composition_plan=composition_plan,
         requested_features=requested,
     )
+
+
+def composition_plan_for_model(spec: dict[str, Any], model_id: str) -> dict[str, Any]:
+    """Translate a spec's stored plan into the shape the target model expects.
+
+    The spec stores the ``music_v1`` plan (a ``MusicPrompt``: global styles + one
+    loop ``section``). ``music_v2`` (and newer) instead take a ``CompositionPlan``
+    of ``chunks`` where ``text`` is section/lyrics and ``positive_styles`` carries
+    the musical direction. We derive the v2 chunk from the same stored fields, so
+    existing specs render on either model without re-planning.
+
+    Instrumental is enforced the same way in both: no lyric lines (the v2 ``text``
+    is a bare section tag) plus ``vocals`` in the negative styles.
+    """
+    plan = spec["composition_plan"]
+    if model_id == "music_v1":
+        return plan
+
+    section = plan["sections"][0]
+    styles = _dedupe(
+        tuple(plan["positive_global_styles"])
+        + tuple(section["positive_local_styles"])
+        + ("instrumental", "high production quality")
+    )
+    return {
+        "chunks": [
+            {
+                "text": "[Ambient instrumental soundscape]",
+                "duration_ms": int(spec["duration_s"] * 1000),
+                "positive_styles": styles,
+                "negative_styles": list(plan["negative_global_styles"]),
+            }
+        ]
+    }
 
 
 # A curated, representative slice of the catalog for sample generation. Mirrors

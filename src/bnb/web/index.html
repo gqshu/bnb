@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>bnb — binaural beat stream</title>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #171b22; --line: #262c36; --text: #e6e9ef;
+    --muted: #8b93a3; --accent: #6ea8fe; --good: #4ade80; --off: #4b5563;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    display: flex; justify-content: center; padding: 2rem 1rem;
+  }
+  main { width: 100%; max-width: 640px; }
+  h1 { font-size: 1.3rem; margin: 0 0 .25rem; }
+  .sub { color: var(--muted); margin: 0 0 1.5rem; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
+  .row { display: flex; align-items: center; gap: .75rem; margin: .7rem 0; }
+  .row label { flex: 0 0 8.5rem; color: var(--muted); }
+  .row output { flex: 0 0 4rem; text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=range] { flex: 1; accent-color: var(--accent); }
+  select { flex: 1; background: #0d1017; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: .4rem; }
+  .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .3rem; }
+  .head h2 { font-size: .95rem; margin: 0; letter-spacing: .02em; }
+  .toggle { display: flex; align-items: center; gap: .4rem; color: var(--muted); }
+  button { font: inherit; border: 0; border-radius: 9px; padding: .6rem 1.15rem; cursor: pointer; color: #0b0e13; font-weight: 600; }
+  .start { background: var(--good); } .stop { background: #f87171; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .controls { display: flex; align-items: center; gap: .8rem; }
+  .pill { display: inline-flex; align-items: center; gap: .45rem; color: var(--muted); font-size: .9rem; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--off); }
+  .dot.on { background: var(--good); box-shadow: 0 0 8px var(--good); }
+  .hint { color: var(--muted); font-size: .82rem; margin-top: .5rem; }
+  pre { background: #0d1017; border: 1px solid var(--line); border-radius: 8px; padding: .8rem; overflow-x: auto; color: var(--muted); font-size: .82rem; }
+  fieldset { border: 0; padding: 0; margin: 0; }
+  fieldset:disabled { opacity: .4; }
+</style>
+</head>
+<body>
+<main>
+  <h1>bnb — binaural beat stream</h1>
+  <p class="sub">Demo portal for the live down-regulation stream. Headphones required —
+    the beat only exists across the two ears.</p>
+
+  <div class="panel">
+    <div class="controls">
+      <button id="startBtn" class="start">Start</button>
+      <button id="stopBtn" class="stop" disabled>Stop</button>
+      <span class="pill"><span id="dot" class="dot"></span><span id="statusText">stopped</span></span>
+    </div>
+    <div class="hint">Start opens the audio stream; the controls below edit it live.</div>
+  </div>
+
+  <div class="panel">
+    <div class="head">
+      <h2>BINAURAL BEAT</h2>
+      <label class="toggle"><input type="checkbox" id="beatOn" checked /> enabled</label>
+    </div>
+    <fieldset id="beatControls">
+      <div class="row">
+        <label>Carrier</label>
+        <input type="range" id="carrier" min="200" max="900" step="1" value="432" />
+        <output id="carrierOut">432 Hz</output>
+      </div>
+      <div class="row">
+        <label>Beat Δ</label>
+        <input type="range" id="beat" min="0.5" max="14" step="0.1" value="10" />
+        <output id="beatOut">10.0 Hz</output>
+      </div>
+      <div class="row">
+        <label>Volume</label>
+        <input type="range" id="volume" min="0" max="1" step="0.01" value="0.3" />
+        <output id="volumeOut">0.30</output>
+      </div>
+      <div class="row">
+        <label>Waveform</label>
+        <select id="waveform">
+          <option>sine</option><option>triangle</option><option>square</option><option>sawtooth</option>
+        </select>
+      </div>
+    </fieldset>
+  </div>
+
+  <div class="panel">
+    <div class="head"><h2>BACKGROUND</h2></div>
+    <div class="row">
+      <label>Track</label>
+      <select id="background"><option value="">(none)</option></select>
+    </div>
+    <div class="row">
+      <label>Volume</label>
+      <input type="range" id="bgVolume" min="0" max="1" step="0.01" value="1" />
+      <output id="bgVolumeOut">1.00</output>
+    </div>
+    <div class="hint" id="bgHint">Only rendered tracks can play; others are greyed out.</div>
+  </div>
+
+  <div class="panel">
+    <div class="head"><h2>STATE</h2></div>
+    <pre id="state">—</pre>
+  </div>
+
+  <audio id="player"></audio>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const player = $("player");
+let running = false;
+
+// --- read the UI into request bodies ---------------------------------------
+function beatBody() {
+  if (!$("beatOn").checked) return null;
+  return {
+    carrier_hz: +$("carrier").value,
+    beat_hz: +$("beat").value,
+    volume: +$("volume").value,
+    waveform: $("waveform").value,
+  };
+}
+function startBody() {
+  return {
+    beat: beatBody(),
+    background_id: $("background").value || null,
+    background_volume: +$("bgVolume").value,
+  };
+}
+
+// --- API -------------------------------------------------------------------
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+  return res.json();
+}
+
+function showState(s) {
+  $("state").textContent = JSON.stringify(s, null, 2);
+  running = s.running;
+  $("dot").classList.toggle("on", running);
+  $("statusText").textContent = running ? "streaming" : "stopped";
+  $("startBtn").disabled = running;
+  $("stopBtn").disabled = !running;
+}
+
+async function start() {
+  try {
+    const s = await api("POST", "/api/stream/start", startBody());
+    // (Re)open the stream with a cache-buster so the browser fetches fresh audio.
+    player.src = "/stream.wav?t=" + Date.now();
+    await player.play();
+    showState(s);
+  } catch (e) { alert("start failed: " + e.message); }
+}
+
+async function stop() {
+  try {
+    const s = await api("POST", "/api/stream/stop");
+    player.pause();
+    player.removeAttribute("src");
+    player.load();
+    showState(s);
+  } catch (e) { alert("stop failed: " + e.message); }
+}
+
+// Live spec edits: only meaningful while streaming; debounced so sliders don't flood.
+let patchTimer = null;
+function patch(partial, immediate = false) {
+  if (!running) return;
+  clearTimeout(patchTimer);
+  const send = () => api("PATCH", "/api/stream/spec", partial).then(showState).catch(() => {});
+  patchTimer = setTimeout(send, immediate ? 0 : 80);
+}
+
+// --- wire up controls ------------------------------------------------------
+const fmt = { carrier: (v) => v + " Hz", beat: (v) => (+v).toFixed(1) + " Hz",
+              volume: (v) => (+v).toFixed(2), bgVolume: (v) => (+v).toFixed(2) };
+function bindOut(id) { const o = $(id + "Out"); if (o) o.textContent = fmt[id]($(id).value); }
+
+["carrier", "beat", "volume"].forEach((id) => {
+  $(id).addEventListener("input", () => { bindOut(id); patch({ beat: beatBody() }); });
+});
+$("waveform").addEventListener("change", () => patch({ beat: beatBody() }, true));
+$("beatOn").addEventListener("change", () => {
+  $("beatControls").disabled = !$("beatOn").checked;
+  patch({ beat: beatBody() }, true);
+});
+$("background").addEventListener("change", () => patch({ background_id: $("background").value || null }, true));
+$("bgVolume").addEventListener("input", () => { bindOut("bgVolume"); patch({ background_volume: +$("bgVolume").value }); });
+
+$("startBtn").addEventListener("click", start);
+$("stopBtn").addEventListener("click", stop);
+
+// --- init ------------------------------------------------------------------
+async function init() {
+  ["carrier", "beat", "volume", "bgVolume"].forEach(bindOut);
+  try {
+    const bgs = await api("GET", "/api/backgrounds");
+    const sel = $("background");
+    for (const b of bgs) {
+      const opt = document.createElement("option");
+      opt.value = b.track_id;
+      opt.textContent = b.track_id + (b.rendered ? "" : "  (not rendered)");
+      opt.disabled = !b.rendered;
+      opt.title = b.summary;
+      sel.appendChild(opt);
+    }
+    if (!bgs.some((b) => b.rendered)) $("bgHint").textContent =
+      "No rendered background tracks yet — run scripts/render_background.py to add some.";
+  } catch (e) { /* ignore */ }
+  showState(await api("GET", "/api/stream"));
+}
+init();
+</script>
+</body>
+</html>

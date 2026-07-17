@@ -10,7 +10,7 @@ paid / heavyweight half, kept separate so specs can be previewed for free first.
     uv run scripts/render_background.py --dry-run        # list what would render, no API call
     uv run scripts/render_background.py buddhist_meditative_drone_seed81657   # render specific track(s)
     uv run scripts/render_background.py --force buddhist_meditative_drone_seed81657   # re-render existing
-    uv run scripts/render_background.py --output-format mp3_44100_192 --model-id music_v2
+    uv run scripts/render_background.py --output-format mp3_44100_192 --model-id music_v1
 
 Default is credit-safe and idempotent: specs that already have audio are skipped
 unless you pass --force. Provider is pluggable (--provider); only ElevenLabs is
@@ -25,9 +25,10 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from bnb import assets
+from bnb.background import composition_plan_for_model
 
 DEFAULT_OUTPUT_FORMAT = "pcm_44100"  # -> WAV master (§2); mp3_*/opus_* also accepted
-DEFAULT_MODEL_ID = "music_v1"
+DEFAULT_MODEL_ID = "music_v2"  # newest Eleven Music model; music_v1 available via --model-id
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,11 +47,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def render_elevenlabs(spec: dict[str, Any], *, output_format: str, model_id: str) -> bytes:
-    """Call Eleven Music with the spec's composition plan and seed.
+    """Call Eleven Music with the model-appropriate composition plan and seed.
 
-    ``force_instrumental`` is *not* passed: the API rejects it alongside a
-    composition plan (422), and the plan's empty section ``lines`` already force a
-    wordless, instrumental render (guardrail §6).
+    The plan shape differs per model (v1 sections vs. v2 chunks), so we translate
+    the stored spec via ``composition_plan_for_model``. ``force_instrumental`` is
+    *not* passed: the API rejects it alongside a composition plan (422), and the
+    plan itself forces a wordless render (no lyric lines + ``vocals`` negative, §6).
     """
     from elevenlabs import ElevenLabs
 
@@ -60,7 +62,7 @@ def render_elevenlabs(spec: dict[str, Any], *, output_format: str, model_id: str
 
     client = ElevenLabs(api_key=api_key)
     stream = client.music.compose(
-        composition_plan=spec["composition_plan"],
+        composition_plan=composition_plan_for_model(spec, model_id),
         model_id=model_id,
         output_format=output_format,
         seed=spec["seed"],

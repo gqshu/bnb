@@ -108,18 +108,19 @@
     },
     {
       "track_id": "buddhist_meditative_noise_seed35194",
-      "summary": "buddhist_meditative \u00d7 noise_texture \u2014 noise_texture; very_low, low_full, even",
+      "summary": "buddhist_meditative \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
       "substrate": "noise_texture",
       "style": "buddhist_meditative",
       "seed": 35194,
       "duration_s": 60,
       "instrumentation": [
-        "noise_texture"
+        "brown_noise",
+        "distant_surf"
       ],
       "requested_features": {
         "tempo_bpm": null,
         "energy": "very_low",
-        "spectral_centroid": "dark_smooth",
+        "spectral_centroid": "deep_warm",
         "mode": "just_intonation",
         "register": "low_full",
         "texture_density": "even",
@@ -236,18 +237,19 @@
     },
     {
       "track_id": "lofi_noise_seed32107",
-      "summary": "lofi \u00d7 noise_texture \u2014 noise_texture; very_low, low_full, even",
+      "summary": "lofi \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
       "substrate": "noise_texture",
       "style": "lofi",
       "seed": 32107,
       "duration_s": 60,
       "instrumentation": [
-        "noise_texture"
+        "brown_noise",
+        "distant_surf"
       ],
       "requested_features": {
         "tempo_bpm": null,
         "energy": "very_low",
-        "spectral_centroid": "dark_smooth",
+        "spectral_centroid": "deep_warm",
         "mode": "none",
         "register": "low_full",
         "texture_density": "even",
@@ -365,18 +367,19 @@
     },
     {
       "track_id": "nature_ambient_noise_seed12891",
-      "summary": "nature_ambient \u00d7 noise_texture \u2014 noise_texture; very_low, low_full, even",
+      "summary": "nature_ambient \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
       "substrate": "noise_texture",
       "style": "nature_ambient",
       "seed": 12891,
       "duration_s": 60,
       "instrumentation": [
-        "noise_texture"
+        "brown_noise",
+        "distant_surf"
       ],
       "requested_features": {
         "tempo_bpm": null,
         "energy": "very_low",
-        "spectral_centroid": "dark_smooth",
+        "spectral_centroid": "deep_warm",
         "mode": "none",
         "register": "low_full",
         "texture_density": "even",
@@ -491,18 +494,19 @@
     },
     {
       "track_id": "neoclassical_noise_seed97660",
-      "summary": "neoclassical \u00d7 noise_texture \u2014 noise_texture; very_low, low_full, even",
+      "summary": "neoclassical \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
       "substrate": "noise_texture",
       "style": "neoclassical",
       "seed": 97660,
       "duration_s": 60,
       "instrumentation": [
-        "noise_texture"
+        "brown_noise",
+        "distant_surf"
       ],
       "requested_features": {
         "tempo_bpm": null,
         "energy": "very_low",
-        "spectral_centroid": "dark_smooth",
+        "spectral_centroid": "deep_warm",
         "mode": "none",
         "register": "low_full",
         "texture_density": "even",
@@ -618,18 +622,19 @@
     },
     {
       "track_id": "neutral_noise_seed50801",
-      "summary": "neutral \u00d7 noise_texture \u2014 noise_texture; very_low, low_full, even",
+      "summary": "neutral \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
       "substrate": "noise_texture",
       "style": "neutral",
       "seed": 50801,
       "duration_s": 60,
       "instrumentation": [
-        "noise_texture"
+        "brown_noise",
+        "distant_surf"
       ],
       "requested_features": {
         "tempo_bpm": null,
         "energy": "very_low",
-        "spectral_centroid": "dark_smooth",
+        "spectral_centroid": "deep_warm",
         "mode": "none",
         "register": "low_full",
         "texture_density": "even",
