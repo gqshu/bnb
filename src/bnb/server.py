@@ -37,10 +37,18 @@ engine = StreamEngine()
 
 
 class BeatSpec(BaseModel):
-    """A binaural beat. Bounds come straight from the audio-design constraints."""
+    """A binaural beat. Bounds come straight from the audio-design constraints.
+
+    ``beat_hz`` may be exactly 0: both ears then get the same carrier and no beat
+    exists, which is the acoustically-matched **sham** condition (carrier audible,
+    Δ absent) the EEG pilot compares against. The engine renders it natively —
+    identical phase on both channels. Note this is deliberately looser than
+    ``tone.render_binaural``, which still rejects 0 because a 0 Hz *binaural* WAV
+    is not a binaural tone at all; the sham only exists as a live stream state.
+    """
 
     carrier_hz: float = Field(CARRIER_HZ, ge=MIN_CARRIER_HZ, le=MAX_CARRIER_HZ)
-    beat_hz: float = Field(10.0, gt=0.0, lt=MAX_BEAT_HZ)
+    beat_hz: float = Field(10.0, ge=0.0, lt=MAX_BEAT_HZ)
     volume: float = Field(0.3, ge=0.0, le=1.0)
     waveform: Waveform = "sine"
 

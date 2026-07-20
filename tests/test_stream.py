@@ -78,6 +78,17 @@ def test_start_rejects_unknown_background():
 
 def test_beat_bounds_are_validated():
     assert client.post("/api/stream/start", json={"beat": {"beat_hz": 999}}).status_code == 422
+    assert client.post("/api/stream/start", json={"beat": {"beat_hz": -1}}).status_code == 422
+
+
+def test_zero_beat_is_accepted_as_the_sham_condition():
+    """Δ=0 means carrier in both ears and no beat — the EEG pilot's sham arm."""
+    started = client.post("/api/stream/start", json={"beat": {"beat_hz": 0}}).json()
+    assert started["running"] is True and started["beat"]["beat_hz"] == 0
+    # Both ears must be bit-identical: a beat would show up as a channel difference.
+    chunk = engine.read(2048)
+    assert np.array_equal(chunk[:, 0], chunk[:, 1])
+    client.post("/api/stream/stop")
 
 
 def test_stream_wav_when_stopped_is_just_a_header():

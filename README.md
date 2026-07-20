@@ -132,6 +132,14 @@ The stream runs at 44.1 kHz to match the background masters (`pcm_44100`), so no
 resampling is needed in the common case. Headphones required — the beat only exists
 across the two ears.
 
+**Sham condition.** `beat_hz` may be exactly `0` on the stream endpoints: both ears
+then get the same carrier and no beat exists, while the carrier stays audible. That is
+the acoustically-matched control arm for the EEG pilot (`docs/control.md` §2.5) —
+identical to an active session in everything but Δ. This is deliberately looser than
+`tone.render_binaural`, which still rejects 0 because a 0 Hz *binaural* WAV is not a
+binaural tone at all; the sham exists only as a live stream state. Passing
+`beat: null` is a different thing — it removes the carrier too, leaving background only.
+
 ### Control client
 
 `bnb.client.StreamClient` wraps the endpoints for driving the stream from Python,
