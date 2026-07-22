@@ -49,7 +49,7 @@ class BeatSpec(BaseModel):
 
     carrier_hz: float = Field(CARRIER_HZ, ge=MIN_CARRIER_HZ, le=MAX_CARRIER_HZ)
     beat_hz: float = Field(10.0, ge=0.0, lt=MAX_BEAT_HZ)
-    volume: float = Field(0.3, ge=0.0, le=1.0)
+    volume: float = Field(0.5, ge=0.0, le=1.0)
     waveform: Waveform = "sine"
 
     def to_engine(self) -> Beat:

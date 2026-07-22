@@ -1,8 +1,9 @@
 import numpy as np
 from fastapi.testclient import TestClient
 
+import bnb.stream as stream_mod
 from bnb.server import app, engine
-from bnb.stream import Beat, StreamEngine, to_int16_bytes
+from bnb.stream import SHUFFLE, Beat, StreamEngine, to_int16_bytes
 
 
 def dominant_hz(channel: np.ndarray, sample_rate: int) -> float:
@@ -69,6 +70,57 @@ def test_patch_updates_beat_and_can_disable_it():
     updated = client.patch("/api/stream/spec", json={"beat": {"beat_hz": 4, "volume": 0.5}}).json()
     assert updated["beat"]["beat_hz"] == 4 and updated["beat"]["volume"] == 0.5
     assert client.patch("/api/stream/spec", json={"beat": None}).json()["beat"] is None
+
+
+def _fake_library(monkeypatch, eng, tracks, frames=80):
+    """Point an engine at a set of tiny in-memory 'rendered' tracks (no disk)."""
+    monkeypatch.setattr(stream_mod.assets, "list_rendered", lambda: list(tracks))
+    monkeypatch.setattr(eng, "_read_asset",
+                        lambda tid: np.full((frames, 2), 0.1, dtype=np.float32))
+
+
+def test_shuffle_picks_a_track_and_reports_the_flag(monkeypatch):
+    eng = StreamEngine()
+    _fake_library(monkeypatch, eng, ["a", "b", "c"])
+    eng.start(beat=None, background_id=SHUFFLE, background_volume=1.0)
+    snap = eng.snapshot()
+    assert snap["shuffle"] is True
+    assert snap["background_id"] in ("a", "b", "c")
+
+
+def test_shuffle_hands_off_near_the_end_of_a_track(monkeypatch):
+    eng = StreamEngine()
+    _fake_library(monkeypatch, eng, ["a", "b"], frames=4000)
+    eng.start(beat=None, background_id=SHUFFLE, background_volume=1.0)
+    first = eng.background_id
+    # Jump to just inside the final fade-out window and render one chunk: the
+    # current track's tail should hand off (crossfade) to the *other* track.
+    eng._bg_pos = eng._bg.shape[0] - 10
+    eng.read(64)
+    assert eng.background_id != first  # advanced to the other rendered track
+    assert eng._bg_out is not None     # the outgoing track is now fading out
+    assert eng.shuffle is True
+
+
+def test_pinning_a_track_turns_shuffle_off(monkeypatch):
+    eng = StreamEngine()
+    _fake_library(monkeypatch, eng, ["a", "b"])
+    eng.start(beat=None, background_id=SHUFFLE, background_volume=1.0)
+    assert eng.shuffle is True
+    eng.set_background("a")
+    assert eng.shuffle is False and eng.background_id == "a"
+
+
+def test_shuffle_over_the_api_reports_a_real_rendered_track():
+    """End-to-end against the real asset repo — starts and reports a playable track."""
+    snap = client.post("/api/stream/start",
+                       json={"background_id": SHUFFLE}).json()
+    from bnb import assets
+    rendered = assets.list_rendered()
+    if rendered:  # only assert when the repo actually has rendered audio
+        assert snap["shuffle"] is True
+        assert snap["background_id"] in rendered
+    client.post("/api/stream/stop")
 
 
 def test_start_rejects_unknown_background():

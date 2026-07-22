@@ -21,6 +21,7 @@ common case; a mismatched background is linearly resampled on load.
 
 from __future__ import annotations
 
+import random
 import struct
 from dataclasses import asdict, dataclass
 from threading import Lock
@@ -35,8 +36,19 @@ from .tone import CARRIER_HZ
 STREAM_SAMPLE_RATE = 44_100
 TWO_PI = 2.0 * np.pi
 
-BACKGROUND_FADE_SECONDS = 0.6  # crossfade length when the background track changes
+# Background transition. The incoming track fades in quickly so it connects
+# promptly; the outgoing track fades out over a slightly longer tail so the seam
+# isn't abrupt. A shuffle hand-off fires this fade *before* the current track ends,
+# so its real tail crossfades with the next track's head (not a looped restart).
+BACKGROUND_FADE_IN_SECONDS = 0.25
+BACKGROUND_FADE_OUT_SECONDS = 0.5
 LIMITER_THRESHOLD = 0.8  # mix stays linear below this; peaks above saturate softly
+
+SHUFFLE = "shuffle"
+"""Sentinel ``background_id``: play the rendered library on infinite random shuffle
+rather than one pinned track. Each track hands off (crossfaded) to another random
+one when it finishes, so background audio never ends or repeats a single loop until
+the stream is stopped."""
 
 
 @dataclass
@@ -45,7 +57,7 @@ class Beat:
 
     carrier_hz: float = CARRIER_HZ
     beat_hz: float = 10.0
-    volume: float = 0.3
+    volume: float = 0.5
     waveform: str = "sine"
 
 
@@ -99,18 +111,26 @@ class StreamEngine:
         self.beat: Beat | None = None
         self.background_id: str | None = None
         self.background_volume = 1.0
+        # When True, a finished track hands off to another random rendered track
+        # instead of looping itself forever. `background_id` still reports whatever
+        # is audible right now.
+        self.shuffle = False
         # Per-channel phase and ramped amplitude carried across chunks.
         self._left_phase = 0.0
         self._right_phase = 0.0
         self._amp = 0.0
         # Background: the current track plus (during a switch) the outgoing one it
-        # crossfades from. ``_fade`` is how faded-in the current track is, 0..1.
+        # crossfades from. ``_fade_in`` is how faded-in the current track is (0..1);
+        # ``_fade_out`` is the outgoing track's remaining gain (1..0). Separate so the
+        # incoming can ramp up faster than the outgoing ramps down.
         self._bg: np.ndarray | None = None
         self._bg_pos = 0
         self._bg_out: np.ndarray | None = None
         self._bg_out_pos = 0
-        self._fade = 1.0
-        self._fade_frames = max(1, int(BACKGROUND_FADE_SECONDS * sample_rate))
+        self._fade_in = 1.0
+        self._fade_out = 0.0
+        self._fade_in_frames = max(1, int(BACKGROUND_FADE_IN_SECONDS * sample_rate))
+        self._fade_out_frames = max(1, int(BACKGROUND_FADE_OUT_SECONDS * sample_rate))
 
     # --- control (called from API threads) ---------------------------------
 
@@ -120,7 +140,12 @@ class StreamEngine:
             self.background_volume = background_volume
             self._left_phase = self._right_phase = 0.0
             self._amp = 0.0  # fade in over the first chunk
-            self._switch_background(background_id)
+            # A fresh stream starts from clean background state — no crossfade
+            # bleeding in from a previously-stopped one.
+            self._bg = self._bg_out = None
+            self._bg_pos = self._bg_out_pos = 0
+            self._fade_in, self._fade_out = 1.0, 0.0
+            self._begin_background(background_id)
             self.running = True
 
     def stop(self) -> None:
@@ -133,7 +158,22 @@ class StreamEngine:
 
     def set_background(self, background_id: str | None) -> None:
         with self._lock:
+            self._begin_background(background_id)
+
+    def _begin_background(self, background_id: str | None) -> None:
+        """Point the background at a pinned track, silence, or ``SHUFFLE``. Holds lock."""
+        if background_id == SHUFFLE:
+            self.shuffle = True
+            self._switch_background(self._random_track())
+        else:
+            self.shuffle = False
             self._switch_background(background_id)
+
+    def _random_track(self, exclude: str | None = None) -> str | None:
+        """A random rendered track_id, avoiding ``exclude`` when there's a choice."""
+        rendered = assets.list_rendered()
+        pool = [t for t in rendered if t != exclude] or rendered
+        return random.choice(pool) if pool else None
 
     def set_background_volume(self, volume: float) -> None:
         with self._lock:
@@ -146,6 +186,7 @@ class StreamEngine:
                 "beat": asdict(self.beat) if self.beat else None,
                 "background_id": self.background_id,
                 "background_volume": self.background_volume,
+                "shuffle": self.shuffle,
                 "sample_rate": self.sample_rate,
             }
 
@@ -167,10 +208,12 @@ class StreamEngine:
         if new is None and self._bg is None and self._bg_out is None:
             self.background_id = None
             return
-        # The currently-audible track becomes the outgoing one we fade out from.
+        # The currently-audible track becomes the outgoing one; it fades out from
+        # its current level while the incoming track fades in quickly from silence.
         self._bg_out, self._bg_out_pos = self._bg, self._bg_pos
+        self._fade_out = self._fade_in  # hand the audible gain to the outgoing track
         self._bg, self._bg_pos = new, 0
-        self._fade = 0.0
+        self._fade_in = 0.0
         self.background_id = background_id
 
     # --- rendering (called from the streaming request thread) --------------
@@ -210,17 +253,30 @@ class StreamEngine:
 
     def _render_background(self, n: int) -> np.ndarray:
         out = np.zeros((n, 2), dtype=np.float32)
-        fade_end = min(1.0, self._fade + n / self._fade_frames)
-        gain_new = np.linspace(self._fade, fade_end, n, dtype=np.float32)[:, None]
+        near_end = False
         if self._bg is not None:
+            near_end = self._bg.shape[0] - self._bg_pos <= self._fade_out_frames
+            fade_in_end = min(1.0, self._fade_in + n / self._fade_in_frames)
+            gain_in = np.linspace(self._fade_in, fade_in_end, n, dtype=np.float32)[:, None]
             seg, self._bg_pos = self._take(self._bg, self._bg_pos, n)
-            out += seg * gain_new
+            out += seg * gain_in
+            self._fade_in = fade_in_end
         if self._bg_out is not None:
+            fade_out_end = max(0.0, self._fade_out - n / self._fade_out_frames)
+            gain_out = np.linspace(self._fade_out, fade_out_end, n, dtype=np.float32)[:, None]
             seg, self._bg_out_pos = self._take(self._bg_out, self._bg_out_pos, n)
-            out += seg * (1.0 - gain_new)
-        self._fade = fade_end
-        if self._fade >= 1.0:  # crossfade finished; drop the outgoing track
-            self._bg_out = None
+            out += seg * gain_out
+            self._fade_out = fade_out_end
+            if self._fade_out <= 0.0:  # fully faded out; drop the outgoing track
+                self._bg_out = None
+        # Shuffle: hand off while the current track is inside its final fade-out
+        # window, so its real tail crossfades with the next track's head instead of
+        # looping back to a hard restart. The `_bg_out is None` guard means we only
+        # start one hand-off at a time.
+        if self.shuffle and near_end and self._bg_out is None:
+            nxt = self._random_track(exclude=self.background_id)
+            if nxt is not None and nxt != self.background_id:
+                self._switch_background(nxt)
         return out
 
 

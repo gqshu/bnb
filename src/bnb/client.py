@@ -94,7 +94,7 @@ class StreamClient:
             beat = {
                 "carrier_hz": carrier_hz,
                 "beat_hz": beat_hz,
-                "volume": 0.3 if volume is None else volume,
+                "volume": 0.5 if volume is None else volume,
                 "waveform": waveform,
             }
         if not self.get_state()["running"]:
@@ -141,4 +141,4 @@ class StreamClient:
         beat = self.get_state().get("beat")
         if beat:
             return dict(beat)
-        return {"carrier_hz": CARRIER_HZ, "beat_hz": 10.0, "volume": 0.3, "waveform": "sine"}
+        return {"carrier_hz": CARRIER_HZ, "beat_hz": 10.0, "volume": 0.5, "waveform": "sine"}

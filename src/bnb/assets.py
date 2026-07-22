@@ -72,6 +72,11 @@ def list_specs() -> list[str]:
     return sorted(p.stem for p in SPECS_DIR.glob("*.json"))
 
 
+def list_rendered() -> list[str]:
+    """Every track_id that has rendered audio on disk (i.e. is playable), sorted."""
+    return [tid for tid in list_specs() if has_track(tid)]
+
+
 def write_pcm_wav(path: Path, pcm: bytes, sample_rate: int, channels: int = 2) -> None:
     """Wrap raw signed-16-bit little-endian PCM in a WAV container.
 

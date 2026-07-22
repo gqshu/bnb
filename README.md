@@ -132,6 +132,13 @@ The stream runs at 44.1 kHz to match the background masters (`pcm_44100`), so no
 resampling is needed in the common case. Headphones required — the beat only exists
 across the two ears.
 
+**Background shuffle.** `background_id` may be the sentinel `"shuffle"`: the backend
+then plays the rendered library on **infinite random shuffle**, crossfading each
+finished track into another random one, so the background never ends or repeats a
+single loop until the stream is stopped. The state reports `shuffle: true` plus the
+`background_id` of whatever is audible right now. A pinned `background_id` (or `null`)
+turns shuffle back off. This is the default background for a session driver.
+
 **Sham condition.** `beat_hz` may be exactly `0` on the stream endpoints: both ears
 then get the same carrier and no beat exists, while the carrier stays audible. That is
 the acoustically-matched control arm for the EEG pilot (`docs/control.md` §2.5) —
