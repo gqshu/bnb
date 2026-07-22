@@ -157,6 +157,16 @@ identical to an active session in everything but Δ. This is deliberately looser
 binaural tone at all; the sham exists only as a live stream state. Passing
 `beat: null` is a different thing — it removes the carrier too, leaving background only.
 
+**Presentation mode.** A beat's `mode` selects how the two tones reach the ears:
+
+- `dichotic` (default) — carrier in the left ear, carrier + Δ in the right: the binaural
+  beat, which exists only across the two ears (no physical amplitude modulation).
+- `diotic` — both tones summed identically into both ears, so the Δ beat is a real
+  acoustic modulation present in each ear. This is the **ASSR/ITPC control**: the sound
+  is physically comparable to dichotic but carries no binaural (neural-construct) beat
+  to entrain to, so an elevated 40 Hz phase-locking under dichotic but not diotic is
+  evidence the response is neural. The channels are bit-identical in diotic.
+
 ### Control client
 
 `bnb.client.StreamClient` wraps the endpoints for driving the stream from Python,

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -51,9 +52,10 @@ class BeatSpec(BaseModel):
     beat_hz: float = Field(10.0, ge=0.0, le=MAX_BEAT_HZ)
     volume: float = Field(0.5, ge=0.0, le=1.0)
     waveform: Waveform = "sine"
+    mode: Literal["dichotic", "diotic"] = "dichotic"
 
     def to_engine(self) -> Beat:
-        return Beat(self.carrier_hz, self.beat_hz, self.volume, self.waveform)
+        return Beat(self.carrier_hz, self.beat_hz, self.volume, self.waveform, self.mode)
 
 
 class StartRequest(BaseModel):

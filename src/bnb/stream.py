@@ -53,12 +53,21 @@ the stream is stopped."""
 
 @dataclass
 class Beat:
-    """The live binaural-beat spec: left ear = carrier, right ear = carrier + beat."""
+    """The live beat spec. ``mode`` selects how the two tones are presented:
+
+    - ``dichotic`` (default) — left ear = carrier, right ear = carrier + beat: the
+      binaural beat, which exists only across the two ears (no physical modulation).
+    - ``diotic`` — both tones summed into *both* ears identically, so the beat is a
+      real acoustic amplitude modulation present in each ear. This is the in-session
+      control for ASSR/ITPC: the sound is physically comparable but there is no
+      binaural (neural-construct) beat to entrain to.
+    """
 
     carrier_hz: float = CARRIER_HZ
     beat_hz: float = 10.0
     volume: float = 0.5
     waveform: str = "sine"
+    mode: str = "dichotic"
 
 
 def _oscillator(phase_rad: np.ndarray, waveform: str) -> np.ndarray:
@@ -237,10 +246,15 @@ class StreamEngine:
         self._left_phase = float(left_phase[-1] % TWO_PI)
         self._right_phase = float(right_phase[-1] % TWO_PI)
 
-        stereo = np.stack(
-            [_oscillator(left_phase, beat.waveform), _oscillator(right_phase, beat.waveform)],
-            axis=1,
-        ).astype(np.float32)
+        tone_lo = _oscillator(left_phase, beat.waveform)
+        tone_hi = _oscillator(right_phase, beat.waveform)
+        if beat.mode == "diotic":
+            # Both tones summed into both ears (halved to keep the per-ear level near
+            # the dichotic case): a real acoustic beat, no binaural difference.
+            mono = 0.5 * (tone_lo + tone_hi)
+            stereo = np.stack([mono, mono], axis=1).astype(np.float32)
+        else:  # dichotic: carrier left, carrier + beat right
+            stereo = np.stack([tone_lo, tone_hi], axis=1).astype(np.float32)
         ramp = np.linspace(self._amp, beat.volume, n, dtype=np.float32)
         self._amp = beat.volume
         return stereo * ramp[:, None]

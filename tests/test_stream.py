@@ -115,6 +115,25 @@ def test_repeat_crossfades_a_pinned_track_into_its_own_loop(monkeypatch):
     assert eng._bg_pos < 100             # ...while the head restarts from the top
 
 
+def test_diotic_mode_puts_the_beat_in_both_ears_identically():
+    """The ASSR control: both ears carry the same summed tones — a real acoustic beat,
+    but no interaural difference, so the channels are bit-identical."""
+    eng = StreamEngine()
+    eng.start(beat=Beat(carrier_hz=400.0, beat_hz=40.0, mode="diotic"),
+              background_id=None, background_volume=1.0)
+    frames = eng.read(4096)
+    assert np.array_equal(frames[:, 0], frames[:, 1])            # diotic: L == R
+    # The summed tones beat at 40 Hz — the amplitude envelope is modulated, unlike a
+    # single-tone dichotic ear, so the signal is not a pure carrier.
+    assert np.ptp(np.abs(frames[:, 0])) > 0.1
+    eng2 = StreamEngine()
+    eng2.start(beat=Beat(carrier_hz=400.0, beat_hz=40.0, mode="dichotic"),
+               background_id=None, background_volume=1.0)
+    di = eng2.read(4096)
+    assert not np.array_equal(di[:, 0], di[:, 1])                # dichotic: L != R
+    eng.stop(); eng2.stop()
+
+
 def test_beat_range_extends_to_40hz():
     """The stream accepts the full experimental Δ range (percept weakens past ~30)."""
     snap = client.post("/api/stream/start", json={"beat": {"beat_hz": 40}}).json()
