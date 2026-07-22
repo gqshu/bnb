@@ -28,8 +28,14 @@ CARRIER_HZ = 432.0
 MIN_CARRIER_HZ = 200.0
 MAX_CARRIER_HZ = 900.0
 
-MAX_BEAT_HZ = 30.0
-"""Above this the two tones separate into distinct pitches and the beat collapses."""
+MAX_BEAT_HZ = 40.0
+"""Upper bound on Δ, set for experimentation rather than product use.
+
+The beat percept weakens badly above ~30 Hz — the two tones start to separate into
+distinct pitches rather than fusing into a beat — so nothing we ship goes near it
+(all down-regulation modes sit at ≤ 14 Hz). The headroom to 40 Hz exists so the demo
+portal can explore the gamma range; treat anything above ~30 as a research setting,
+not a usable beat."""
 
 
 def _oscillator(freq_hz: float, t: np.ndarray, waveform: Waveform) -> np.ndarray:

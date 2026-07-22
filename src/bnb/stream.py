@@ -269,15 +269,31 @@ class StreamEngine:
             self._fade_out = fade_out_end
             if self._fade_out <= 0.0:  # fully faded out; drop the outgoing track
                 self._bg_out = None
-        # Shuffle: hand off while the current track is inside its final fade-out
-        # window, so its real tail crossfades with the next track's head instead of
-        # looping back to a hard restart. The `_bg_out is None` guard means we only
-        # start one hand-off at a time.
-        if self.shuffle and near_end and self._bg_out is None:
-            nxt = self._random_track(exclude=self.background_id)
-            if nxt is not None and nxt != self.background_id:
-                self._switch_background(nxt)
+        # Hand off while the current track is inside its final fade-out window, so its
+        # real tail crossfades with the next head instead of hard-splicing. Shuffle
+        # moves to another random track; a pinned track crossfades into itself, which
+        # is what makes repeat loop seamlessly. The `_bg_out is None` guard means only
+        # one hand-off runs at a time.
+        if near_end and self._bg_out is None:
+            if self.shuffle:
+                nxt = self._random_track(exclude=self.background_id)
+                if nxt is not None and nxt != self.background_id:
+                    self._switch_background(nxt)
+            else:
+                self._restart_current()
         return out
+
+    def _restart_current(self) -> None:
+        """Crossfade the current track into its own start — a seamless repeat loop.
+
+        Reuses the same buffer for both sides (only the read positions differ), so
+        looping costs no extra load."""
+        if self._bg is None:
+            return
+        self._bg_out, self._bg_out_pos = self._bg, self._bg_pos
+        self._fade_out = self._fade_in
+        self._bg_pos = 0
+        self._fade_in = 0.0
 
 
 def wav_stream_header(sample_rate: int, channels: int = 2, bits: int = 16) -> bytes:

@@ -102,6 +102,28 @@ def test_shuffle_hands_off_near_the_end_of_a_track(monkeypatch):
     assert eng.shuffle is True
 
 
+def test_repeat_crossfades_a_pinned_track_into_its_own_loop(monkeypatch):
+    """A pinned track loops forever, and the seam is crossfaded rather than spliced."""
+    eng = StreamEngine()
+    _fake_library(monkeypatch, eng, ["a", "b"], frames=4000)
+    eng.start(beat=None, background_id="a", background_volume=1.0)
+    assert eng.shuffle is False
+    eng._bg_pos = eng._bg.shape[0] - 10  # just inside the final fade-out window
+    eng.read(64)
+    assert eng.background_id == "a"      # still the same track — repeat, not shuffle
+    assert eng._bg_out is not None       # ...but its tail is crossfading out
+    assert eng._bg_pos < 100             # ...while the head restarts from the top
+
+
+def test_beat_range_extends_to_40hz():
+    """The stream accepts the full experimental Δ range (percept weakens past ~30)."""
+    snap = client.post("/api/stream/start", json={"beat": {"beat_hz": 40}}).json()
+    assert snap["beat"]["beat_hz"] == 40
+    assert client.post("/api/stream/start",
+                       json={"beat": {"beat_hz": 41}}).status_code == 422
+    client.post("/api/stream/stop")
+
+
 def test_pinning_a_track_turns_shuffle_off(monkeypatch):
     eng = StreamEngine()
     _fake_library(monkeypatch, eng, ["a", "b"])

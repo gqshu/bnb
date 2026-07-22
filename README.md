@@ -11,7 +11,9 @@ These come straight from the product docs and are what the code enforces:
 - **Carrier** is a fixed pure sine at ~400–440 Hz, held constant for the whole session.
   Below ~200 Hz and above ~900 Hz the beat percept weakens badly.
 - **Beat frequency Δ** is the target state, not a free parameter. All our modes sit at
-  ≤ 14 Hz. Δ must stay under 30 Hz or the two tones separate into distinct pitches.
+  ≤ 14 Hz. Above ~30 Hz the two tones separate into distinct pitches and the beat
+  percept collapses, so nothing we ship goes near it. `MAX_BEAT_HZ` is 40 only so the
+  demo portal can explore the gamma range — treat > 30 Hz as a research setting.
 - **Only one ear moves.** Left gets the carrier `f`, right gets `f + Δ`. The user hears a
   steady pitch while the beat slows down underneath it.
 - **Loudness is matched between ears.** An interaural imbalance is heard as the sound
@@ -132,12 +134,20 @@ The stream runs at 44.1 kHz to match the background masters (`pcm_44100`), so no
 resampling is needed in the common case. Headphones required — the beat only exists
 across the two ears.
 
-**Background shuffle.** `background_id` may be the sentinel `"shuffle"`: the backend
-then plays the rendered library on **infinite random shuffle**, crossfading each
-finished track into another random one, so the background never ends or repeats a
-single loop until the stream is stopped. The state reports `shuffle: true` plus the
-`background_id` of whatever is audible right now. A pinned `background_id` (or `null`)
-turns shuffle back off. This is the default background for a session driver.
+**Background: shuffle or repeat.** Either way the background plays until the stream is
+stopped; the only difference is what comes next.
+
+- **Shuffle** — `background_id: "shuffle"` plays the rendered library on infinite
+  random shuffle, handing each finished track off to another random one. State reports
+  `shuffle: true` plus the `background_id` audible right now. This is the default for a
+  session driver.
+- **Repeat** — a pinned `background_id` loops that one track forever (`shuffle: false`).
+
+Both transitions are crossfaded rather than spliced: the hand-off fires while the
+current track is inside its final fade-out window, so its real tail overlaps the next
+head (for repeat, its own head). The incoming side fades in about twice as fast as the
+outgoing fades out, so the next track connects promptly. `background_id: null` is
+silence.
 
 **Sham condition.** `beat_hz` may be exactly `0` on the stream endpoints: both ears
 then get the same carrier and no beat exists, while the carrier stays audible. That is

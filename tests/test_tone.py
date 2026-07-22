@@ -99,7 +99,7 @@ def test_sine_is_the_purest_waveform():
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"beat_hz": MAX_BEAT_HZ},  # beat percept collapses at/above 30 Hz
+        {"beat_hz": MAX_BEAT_HZ},  # the offline renderer stays exclusive of the bound
         {"beat_hz": 0.0},
         {"beat_hz": BEAT_HZ, "carrier_hz": 1000.0},  # above the usable carrier range
         {"beat_hz": BEAT_HZ, "carrier_hz": 100.0},

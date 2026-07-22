@@ -68,7 +68,7 @@
       </div>
       <div class="row">
         <label>Beat Δ</label>
-        <input type="range" id="beat" min="0.5" max="14" step="0.1" value="10" />
+        <input type="range" id="beat" min="0.5" max="40" step="0.1" value="10" />
         <output id="beatOut">10.0 Hz</output>
       </div>
       <div class="row">
@@ -88,8 +88,16 @@
   <div class="panel">
     <div class="head"><h2>BACKGROUND</h2></div>
     <div class="row">
+      <label>Mode</label>
+      <select id="bgMode">
+        <option value="off">(none)</option>
+        <option value="shuffle">🔀 Shuffle — random tracks, forever</option>
+        <option value="repeat">🔁 Repeat — one track, looped</option>
+      </select>
+    </div>
+    <div class="row">
       <label>Track</label>
-      <select id="background"><option value="">(none)</option><option value="shuffle">🔀 Shuffle (random, infinite)</option></select>
+      <select id="background"><option value="">(none)</option></select>
     </div>
     <div class="row">
       <label>Volume</label>
@@ -122,10 +130,18 @@ function beatBody() {
     waveform: $("waveform").value,
   };
 }
+// Background mode -> the backend's background_id. "shuffle" is the sentinel for
+// random-forever; a pinned track_id loops itself (that *is* repeat); null = silence.
+function backgroundId() {
+  const mode = $("bgMode").value;
+  if (mode === "shuffle") return "shuffle";
+  if (mode === "repeat") return $("background").value || null;
+  return null;
+}
 function startBody() {
   return {
     beat: beatBody(),
-    background_id: $("background").value || null,
+    background_id: backgroundId(),
     background_volume: +$("bgVolume").value,
   };
 }
@@ -192,7 +208,15 @@ $("beatOn").addEventListener("change", () => {
   $("beatControls").disabled = !$("beatOn").checked;
   patch({ beat: beatBody() }, true);
 });
-$("background").addEventListener("change", () => patch({ background_id: $("background").value || null }, true));
+// The track picker only applies to repeat; shuffle picks its own.
+function syncBgMode() {
+  $("background").disabled = $("bgMode").value !== "repeat";
+}
+$("bgMode").addEventListener("change", () => {
+  syncBgMode();
+  patch({ background_id: backgroundId() }, true);
+});
+$("background").addEventListener("change", () => patch({ background_id: backgroundId() }, true));
 $("bgVolume").addEventListener("input", () => { bindOut("bgVolume"); patch({ background_volume: +$("bgVolume").value }); });
 
 $("startBtn").addEventListener("click", start);
@@ -201,6 +225,7 @@ $("stopBtn").addEventListener("click", stop);
 // --- init ------------------------------------------------------------------
 async function init() {
   ["carrier", "beat", "volume", "bgVolume"].forEach(bindOut);
+  syncBgMode();
   try {
     const bgs = await api("GET", "/api/backgrounds");
     const sel = $("background");
