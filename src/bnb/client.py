@@ -86,9 +86,17 @@ class StreamClient:
         carrier_hz: float = CARRIER_HZ,
         waveform: str = "sine",
         background_volume: float | None = None,
+        mode: str | None = None,
+        depth: float | None = None,
+        duty: float | None = None,
+        ramp_ms: float | None = None,
     ) -> dict[str, Any]:
         """Point the stream at ``background_id`` with a beat. Starts the stream if it's
-        stopped, otherwise changes it live (the background crossfades)."""
+        stopped, otherwise changes it live (the background crossfades).
+
+        ``mode``/``depth``/``duty``/``ramp_ms`` are only meaningful for isochronic
+        beats and are omitted (server defaults apply) when left ``None``.
+        """
         beat = None
         if beat_hz is not None:
             beat = {
@@ -97,6 +105,14 @@ class StreamClient:
                 "volume": 0.5 if volume is None else volume,
                 "waveform": waveform,
             }
+            if mode is not None:
+                beat["mode"] = mode
+            if depth is not None:
+                beat["depth"] = depth
+            if duty is not None:
+                beat["duty"] = duty
+            if ramp_ms is not None:
+                beat["ramp_ms"] = ramp_ms
         if not self.get_state()["running"]:
             return self.start(
                 beat=beat,

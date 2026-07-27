@@ -38,9 +38,11 @@ can put headphones on and check them. These are not the product — the real ses
 the beat down from the user's measured EEG baseline.
 
 ```bash
-uv run scripts/generate_wavs.py                          # all modes, 60 s each
+uv run scripts/generate_wavs.py                          # all modes, 60 s each, binaural
 uv run scripts/generate_wavs.py sleep_prep --duration 300
 uv run scripts/generate_wavs.py wind_down --waveform square
+uv run scripts/generate_wavs.py --stimulus monaural
+uv run scripts/generate_wavs.py --stimulus isochronic recharge --duration 30
 ```
 
 ## Background media library
@@ -157,7 +159,8 @@ identical to an active session in everything but Δ. This is deliberately looser
 binaural tone at all; the sham exists only as a live stream state. Passing
 `beat: null` is a different thing — it removes the carrier too, leaving background only.
 
-**Presentation mode.** A beat's `mode` selects how the two tones reach the ears:
+**Presentation mode.** A beat's `mode` selects how the stimulus reaches the ears (see
+`docs/Monaural_and_Isochronic_Beats_Implementation.md` for the full design):
 
 - `dichotic` (default) — carrier in the left ear, carrier + Δ in the right: the binaural
   beat, which exists only across the two ears (no physical amplitude modulation).
@@ -166,6 +169,33 @@ binaural tone at all; the sham exists only as a live stream state. Passing
   is physically comparable to dichotic but carries no binaural (neural-construct) beat
   to entrain to, so an elevated 40 Hz phase-locking under dichotic but not diotic is
   evidence the response is neural. The channels are bit-identical in diotic.
+- `monaural` — the product-facing name for the exact same summed-tone signal `diotic`
+  renders. Binaural is the better *listening* experience; monaural is a stronger EEG
+  probe (real acoustic beat, not just a neural construct) and a reasonable middle
+  ground for product audio. Kept as a separate mode name (not a rename of `diotic`) so
+  the ASSR-control framing above stays intact.
+- `isochronic` — a single carrier (`carrier_hz`, usable range 100–500 Hz, default 250)
+  amplitude-gated on/off `beat_hz` times per second. Mono by nature (identical L/R) and
+  the strongest, spectrally cleanest entrainment drive of the three. Three extra
+  parameters apply only to this mode:
+  - `depth` (0–1, default 1) — how far the "off" phase drops; 1.0 = full silence.
+  - `duty` (0.1–0.9, default 0.5) — fraction of each cycle the tone is on.
+  - `ramp_ms` (2–10 ms, default 5) — raised-cosine fade on every on/off transition.
+    **Mandatory**, not cosmetic: a hard gate clicks audibly and splatters harmonics of
+    `beat_hz` into the EEG-relevant band, muddying the spectral readout the probe
+    exists to produce.
+
+  **Isochronic can never be combined with a background track** — the pulsing *is* the
+  entrainment signal, and any soundscape underneath reduces its effective modulation
+  depth. The engine rejects that combination as soon as either side of the spec is set
+  (a `400` from `/api/stream/start` or `/api/stream/spec`, before any audio renders),
+  not with a per-sample check in the render loop. Binaural and monaural have no such
+  restriction — the beat survives a background layered on top either way.
+
+The offline renderer (`bnb.tone`) has one function per stimulus —
+`render_binaural`/`render_monaural`/`render_isochronic` — each returning float32
+stereo. `render_isochronic` deliberately has no background parameter at all: it's the
+no-background "measurement probe" path from the doc, not a live-mixed product track.
 
 ### Control client
 
@@ -176,6 +206,8 @@ and `scripts/control.py` is a CLI over it (the service must be running):
 uv run scripts/control.py backgrounds                 # list background track meta
 uv run scripts/control.py current                     # get the current background
 uv run scripts/control.py play --background neutral_noise_seed50801 --beat 10 --volume 0.3
+uv run scripts/control.py play --beat 10 --mode monaural
+uv run scripts/control.py play --beat 40 --mode isochronic --carrier 250 --depth 1 --duty 0.5
 uv run scripts/control.py volume 0.5                   # change the beat volume
 uv run scripts/control.py freq 7.83                    # change the beat frequency
 ```
@@ -186,7 +218,7 @@ helpers read the current beat, change one field, and send it back.
 
 ## Layout
 
-- `src/bnb/tone.py` — binaural tone rendering and WAV output
+- `src/bnb/tone.py` — offline binaural/monaural/isochronic tone rendering and WAV output
 - `src/bnb/background.py` — background-media substrate × style taxonomy and prompts
 - `src/bnb/assets.py` — the background asset repository (specs, tracks, catalog)
 - `src/bnb/stream.py` — the live stream engine (phase-continuous beat + background mix)

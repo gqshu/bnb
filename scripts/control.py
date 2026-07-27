@@ -41,6 +41,12 @@ def parse_args() -> argparse.Namespace:
     play.add_argument("--carrier", type=float, default=None, help="carrier Hz (default 432)")
     play.add_argument("--waveform", default=None, choices=["sine", "triangle", "square", "sawtooth"])
     play.add_argument("--bg-volume", type=float, default=None, help="background volume 0..1")
+    play.add_argument(
+        "--mode", default=None, choices=["dichotic", "diotic", "monaural", "isochronic"]
+    )
+    play.add_argument("--depth", type=float, default=None, help="isochronic gate depth 0..1")
+    play.add_argument("--duty", type=float, default=None, help="isochronic duty cycle 0.1..0.9")
+    play.add_argument("--ramp-ms", type=float, default=None, help="isochronic ramp edge, 2..10 ms")
 
     vol = sub.add_parser("volume", help="change the beat volume")
     vol.add_argument("value", type=float, help="beat volume 0..1")
@@ -74,6 +80,14 @@ def run(args: argparse.Namespace, client: StreamClient) -> None:
             kwargs["carrier_hz"] = args.carrier
         if args.waveform is not None:
             kwargs["waveform"] = args.waveform
+        if args.mode is not None:
+            kwargs["mode"] = args.mode
+        if args.depth is not None:
+            kwargs["depth"] = args.depth
+        if args.duty is not None:
+            kwargs["duty"] = args.duty
+        if args.ramp_ms is not None:
+            kwargs["ramp_ms"] = args.ramp_ms
         _emit(client.set_background(args.background, **kwargs))
     elif args.command == "volume":
         _emit(client.set_beat_volume(args.value))

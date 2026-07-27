@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from fastapi.testclient import TestClient
 
 import bnb.stream as stream_mod
@@ -194,3 +195,117 @@ def test_backgrounds_lists_specs():
     rows = client.get("/api/backgrounds").json()
     assert isinstance(rows, list)
     assert all({"track_id", "summary", "rendered"} <= row.keys() for row in rows)
+
+
+# --- monaural ----------------------------------------------------------------
+
+
+def test_monaural_mode_matches_diotic_signal():
+    """"monaural" is the product-facing name for the exact same summed-tone signal
+    "diotic" already renders (doc §3) — not a rename, but the same DSP branch."""
+    eng = StreamEngine()
+    eng.start(beat=Beat(carrier_hz=400.0, beat_hz=40.0, mode="monaural"),
+              background_id=None, background_volume=1.0)
+    mono_frames = eng.read(4096)
+    assert np.array_equal(mono_frames[:, 0], mono_frames[:, 1])  # monaural: L == R
+
+    eng2 = StreamEngine()
+    eng2.start(beat=Beat(carrier_hz=400.0, beat_hz=40.0, mode="diotic"),
+               background_id=None, background_volume=1.0)
+    diotic_frames = eng2.read(4096)
+    assert np.array_equal(mono_frames, diotic_frames)
+    eng.stop(); eng2.stop()
+
+
+# --- isochronic ----------------------------------------------------------------
+
+
+def test_isochronic_mode_gates_an_identical_signal_in_both_ears():
+    eng = StreamEngine()
+    eng.start(beat=Beat(carrier_hz=250.0, beat_hz=10.0, mode="isochronic", volume=0.5),
+              background_id=None, background_volume=1.0)
+    eng._amp = eng.beat.volume  # skip the fade-in ramp so the envelope is clean
+    frames = eng.read(eng.sample_rate * 2)  # 2 s
+    assert np.array_equal(frames[:, 0], frames[:, 1])  # isochronic: L == R (mono)
+
+    envelope = np.abs(frames[:, 0])
+    spectrum = np.abs(np.fft.rfft(envelope - envelope.mean()))
+    freqs = np.fft.rfftfreq(len(envelope), 1 / eng.sample_rate)
+    assert freqs[np.argmax(spectrum)] == pytest.approx(10.0, abs=0.5)
+    eng.stop()
+
+
+def test_isochronic_phase_is_continuous_across_chunks():
+    def render_flat(chunks):
+        eng = StreamEngine()
+        eng.start(beat=Beat(carrier_hz=250.0, beat_hz=10.0, mode="isochronic"),
+                  background_id=None, background_volume=1.0)
+        eng._amp = eng.beat.volume
+        return np.concatenate([eng.read(n) for n in chunks])
+
+    one_chunk = render_flat([2000])
+    two_chunks = render_flat([1000, 1000])
+    assert np.allclose(one_chunk, two_chunks, atol=1e-6)
+
+
+def test_isochronic_beat_rejects_background_at_start():
+    eng = StreamEngine()
+    with pytest.raises(ValueError):
+        eng.start(beat=Beat(mode="isochronic"), background_id="anything", background_volume=1.0)
+
+
+def test_isochronic_beat_rejects_background_via_set_background():
+    eng = StreamEngine()
+    eng.start(beat=Beat(mode="isochronic"), background_id=None, background_volume=1.0)
+    with pytest.raises(ValueError):
+        eng.set_background("anything")
+    eng.stop()
+
+
+def test_background_rejects_isochronic_via_set_beat(monkeypatch):
+    eng = StreamEngine()
+    _fake_library(monkeypatch, eng, ["a"])
+    eng.start(beat=Beat(mode="dichotic"), background_id="a", background_volume=1.0)
+    with pytest.raises(ValueError):
+        eng.set_beat(Beat(mode="isochronic"))
+    eng.stop()
+
+
+def test_update_allows_switching_to_isochronic_while_clearing_background(monkeypatch):
+    """A single combined update (new isochronic beat + background_id=None) must be
+    judged by what it ends up as, not by which field a field-by-field application
+    would apply first — that ordering bug would spuriously reject this."""
+    eng = StreamEngine()
+    _fake_library(monkeypatch, eng, ["a"])
+    eng.start(beat=Beat(mode="dichotic"), background_id="a", background_volume=1.0)
+    eng.update(beat=Beat(mode="isochronic"), background_id=None)
+    assert eng.beat.mode == "isochronic"
+    assert eng.background_id is None
+    eng.stop()
+
+
+def test_update_rejects_isochronic_combined_with_a_background():
+    eng = StreamEngine()
+    eng.start(beat=Beat(mode="dichotic"), background_id=None, background_volume=1.0)
+    with pytest.raises(ValueError):
+        eng.update(beat=Beat(mode="isochronic"), background_id="anything")
+    eng.stop()
+
+
+def test_isochronic_over_the_api_rejects_a_background():
+    res = client.post(
+        "/api/stream/start",
+        json={"beat": {"mode": "isochronic", "carrier_hz": 250}, "background_id": "anything"},
+    )
+    assert res.status_code == 400
+    client.post("/api/stream/stop")
+
+
+def test_isochronic_carrier_range_is_validated_over_the_api():
+    assert client.post(
+        "/api/stream/start", json={"beat": {"mode": "isochronic", "carrier_hz": 600}}
+    ).status_code == 422
+    assert client.post(
+        "/api/stream/start", json={"beat": {"mode": "dichotic", "carrier_hz": 150}}
+    ).status_code == 422
+    client.post("/api/stream/stop")

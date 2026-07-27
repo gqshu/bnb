@@ -31,7 +31,7 @@ import numpy as np
 import soundfile as sf
 
 from . import assets
-from .tone import CARRIER_HZ
+from .tone import CARRIER_HZ, _gate_envelope
 
 STREAM_SAMPLE_RATE = 44_100
 TWO_PI = 2.0 * np.pi
@@ -44,6 +44,10 @@ BACKGROUND_FADE_IN_SECONDS = 0.25
 BACKGROUND_FADE_OUT_SECONDS = 0.5
 LIMITER_THRESHOLD = 0.8  # mix stays linear below this; peaks above saturate softly
 
+_UNSET = object()
+"""Sentinel distinguishing "field omitted" from "field explicitly set to None" in
+:meth:`StreamEngine.update`."""
+
 SHUFFLE = "shuffle"
 """Sentinel ``background_id``: play the rendered library on infinite random shuffle
 rather than one pinned track. Each track hands off (crossfaded) to another random
@@ -53,7 +57,7 @@ the stream is stopped."""
 
 @dataclass
 class Beat:
-    """The live beat spec. ``mode`` selects how the two tones are presented:
+    """The live beat spec. ``mode`` selects how the stimulus is presented:
 
     - ``dichotic`` (default) — left ear = carrier, right ear = carrier + beat: the
       binaural beat, which exists only across the two ears (no physical modulation).
@@ -61,6 +65,16 @@ class Beat:
       real acoustic amplitude modulation present in each ear. This is the in-session
       control for ASSR/ITPC: the sound is physically comparable but there is no
       binaural (neural-construct) beat to entrain to.
+    - ``monaural`` — the product-facing name for the exact same summed-tone signal
+      ``diotic`` renders (doc: Monaural_and_Isochronic_Beats_Implementation.md §3).
+      Kept as a separate literal rather than a rename so the ASSR-control naming
+      above stays intact for the research API.
+    - ``isochronic`` — a single carrier (``carrier_hz``) amplitude-gated on/off at
+      ``beat_hz`` times per second, using ``depth``/``duty``/``ramp_ms``. Mono by
+      nature (identical L/R). Never mix a background under this mode (doc §5) —
+      enforced by :class:`StreamEngine`, not here.
+
+    ``depth``, ``duty``, and ``ramp_ms`` only apply to ``isochronic``.
     """
 
     carrier_hz: float = CARRIER_HZ
@@ -68,6 +82,9 @@ class Beat:
     volume: float = 0.5
     waveform: str = "sine"
     mode: str = "dichotic"
+    depth: float = 1.0
+    duty: float = 0.5
+    ramp_ms: float = 5.0
 
 
 def _oscillator(phase_rad: np.ndarray, waveform: str) -> np.ndarray:
@@ -128,6 +145,10 @@ class StreamEngine:
         self._left_phase = 0.0
         self._right_phase = 0.0
         self._amp = 0.0
+        # Isochronic carries its own carrier/gate phase, kept separate from
+        # _left_phase/_right_phase so switching modes never cross-contaminates.
+        self._iso_carrier_phase = 0.0
+        self._iso_gate_phase = 0.0
         # Background: the current track plus (during a switch) the outgoing one it
         # crossfades from. ``_fade_in`` is how faded-in the current track is (0..1);
         # ``_fade_out`` is the outgoing track's remaining gain (1..0). Separate so the
@@ -144,10 +165,12 @@ class StreamEngine:
     # --- control (called from API threads) ---------------------------------
 
     def start(self, *, beat: Beat | None, background_id: str | None, background_volume: float) -> None:
+        self._check_isochronic_background(beat, background_id)
         with self._lock:
             self.beat = beat
             self.background_volume = background_volume
             self._left_phase = self._right_phase = 0.0
+            self._iso_carrier_phase = self._iso_gate_phase = 0.0
             self._amp = 0.0  # fade in over the first chunk
             # A fresh stream starts from clean background state — no crossfade
             # bleeding in from a previously-stopped one.
@@ -163,14 +186,53 @@ class StreamEngine:
 
     def set_beat(self, beat: Beat | None) -> None:
         with self._lock:
+            self._check_isochronic_background(beat, self.background_id)
             self.beat = beat
 
     def set_background(self, background_id: str | None) -> None:
         with self._lock:
             self._begin_background(background_id)
 
+    def update(
+        self,
+        *,
+        beat: Beat | None | object = _UNSET,
+        background_id: str | None | object = _UNSET,
+        background_volume: float | None = None,
+    ) -> None:
+        """Atomically apply any subset of beat/background_id/background_volume.
+
+        A single PATCH can change both ``beat`` and ``background_id`` at once (e.g.
+        switching to isochronic while also clearing an active background). Applying
+        those as two separate locked calls would validate against a stale value —
+        checking the new beat against the *not-yet-cleared* background, or vice
+        versa — and reject a combination that's actually fine once both land. This
+        computes what the beat/background will *end up as* and validates that
+        combination once, before mutating either.
+        """
+        with self._lock:
+            new_beat = self.beat if beat is _UNSET else beat
+            new_background_id = self.background_id if background_id is _UNSET else background_id
+            self._check_isochronic_background(new_beat, new_background_id)
+            if beat is not _UNSET:
+                self.beat = beat
+            if background_id is not _UNSET:
+                self._begin_background(background_id)
+            if background_volume is not None:
+                self.background_volume = background_volume
+
+    @staticmethod
+    def _check_isochronic_background(beat: Beat | None, background_id: str | None) -> None:
+        """Isochronic must never be mixed with a background (doc §5) — the pulsing
+        *is* the entrainment signal, and any background reduces its effective
+        modulation depth. Checked at the control plane (when a spec is set) so the
+        invalid combination never reaches the render loop."""
+        if beat is not None and beat.mode == "isochronic" and background_id is not None:
+            raise ValueError("isochronic mode cannot be combined with a background track")
+
     def _begin_background(self, background_id: str | None) -> None:
         """Point the background at a pinned track, silence, or ``SHUFFLE``. Holds lock."""
+        self._check_isochronic_background(self.beat, background_id)
         if background_id == SHUFFLE:
             self.shuffle = True
             self._switch_background(self._random_track())
@@ -240,6 +302,8 @@ class StreamEngine:
     def _render_beat(self, n: int) -> np.ndarray:
         beat = self.beat
         assert beat is not None
+        if beat.mode == "isochronic":
+            return self._render_isochronic(beat, n)
         step = np.arange(1, n + 1, dtype=np.float64) / self.sample_rate
         left_phase = self._left_phase + TWO_PI * beat.carrier_hz * step
         right_phase = self._right_phase + TWO_PI * (beat.carrier_hz + beat.beat_hz) * step
@@ -248,13 +312,35 @@ class StreamEngine:
 
         tone_lo = _oscillator(left_phase, beat.waveform)
         tone_hi = _oscillator(right_phase, beat.waveform)
-        if beat.mode == "diotic":
+        if beat.mode in ("diotic", "monaural"):
             # Both tones summed into both ears (halved to keep the per-ear level near
             # the dichotic case): a real acoustic beat, no binaural difference.
+            # "monaural" is the product-facing name for this exact same signal.
             mono = 0.5 * (tone_lo + tone_hi)
             stereo = np.stack([mono, mono], axis=1).astype(np.float32)
         else:  # dichotic: carrier left, carrier + beat right
             stereo = np.stack([tone_lo, tone_hi], axis=1).astype(np.float32)
+        ramp = np.linspace(self._amp, beat.volume, n, dtype=np.float32)
+        self._amp = beat.volume
+        return stereo * ramp[:, None]
+
+    def _render_isochronic(self, beat: Beat, n: int) -> np.ndarray:
+        """Single gated carrier, identical L/R (isochronic is mono by nature)."""
+        step = np.arange(1, n + 1, dtype=np.float64) / self.sample_rate
+
+        carrier_phase = self._iso_carrier_phase + TWO_PI * beat.carrier_hz * step
+        self._iso_carrier_phase = float(carrier_phase[-1] % TWO_PI)
+        tone = _oscillator(carrier_phase, beat.waveform)
+
+        gate_phase = self._iso_gate_phase + beat.beat_hz * step  # in cycles, not radians
+        self._iso_gate_phase = float(gate_phase[-1] % 1.0)
+        phi = np.mod(gate_phase, 1.0)
+        ramp_frac = min((beat.ramp_ms / 1000.0) * beat.beat_hz, beat.duty / 2, (1 - beat.duty) / 2)
+        gate = _gate_envelope(phi, beat.duty, ramp_frac)
+        env = (1 - beat.depth) + beat.depth * gate
+
+        mono = (tone * env).astype(np.float32)
+        stereo = np.stack([mono, mono], axis=1)
         ramp = np.linspace(self._amp, beat.volume, n, dtype=np.float32)
         self._amp = beat.volume
         return stereo * ramp[:, None]

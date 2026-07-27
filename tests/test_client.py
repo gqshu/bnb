@@ -58,3 +58,11 @@ def test_error_surfaces_detail(client):
     client.stop()
     with pytest.raises(StreamClientError):
         client.set_background("does_not_exist", beat_hz=10)  # unknown background -> 400
+
+
+def test_isochronic_rejects_a_background(client):
+    """doc §5: isochronic must never be mixed with a background — the pulsing is the
+    entrainment signal, and a background reduces its effective modulation depth."""
+    client.stop()
+    with pytest.raises(StreamClientError):
+        client.start(beat={"mode": "isochronic", "carrier_hz": 250}, background_id="anything")

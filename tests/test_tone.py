@@ -4,15 +4,21 @@ import soundfile as sf
 
 from bnb.tone import (
     CARRIER_HZ,
+    ISOCHRONIC_CARRIER_HZ,
     MAX_BEAT_HZ,
     SAMPLE_RATE,
     WAVEFORMS,
+    _gate_envelope,
     render_binaural,
+    render_isochronic,
+    render_monaural,
     write_wav,
 )
 
 BEAT_HZ = 8.0
 DURATION_S = 4.0
+ISO_BEAT_HZ = 10.0
+ISO_DURATION_S = 4.0
 
 
 def dominant_hz(channel: np.ndarray, sample_rate: int) -> float:
@@ -112,3 +118,135 @@ def test_rejects_parameters_outside_the_usable_range(kwargs):
 
     with pytest.raises(ValueError):
         render_binaural(**kwargs)
+
+
+# --- monaural ----------------------------------------------------------------
+
+
+@pytest.fixture
+def monaural_wav_path(tmp_path):
+    """A rendered monaural WAV: the same summed signal in both channels."""
+    path = tmp_path / "monaural_8hz.wav"
+    write_wav(path, render_monaural(beat_hz=BEAT_HZ, duration_s=DURATION_S))
+    return path
+
+
+def test_monaural_channels_are_identical(monaural_wav_path):
+    samples, _ = sf.read(monaural_wav_path)
+    assert np.array_equal(samples[:, 0], samples[:, 1])
+
+
+def test_monaural_spectrum_contains_both_tones(monaural_wav_path):
+    samples, sample_rate = sf.read(monaural_wav_path)
+    mono = samples[:, 0]
+    spectrum = np.abs(np.fft.rfft(mono))
+    freqs = np.fft.rfftfreq(len(mono), 1 / sample_rate)
+    noise_floor = np.median(spectrum)
+
+    def bin_at(freq):
+        return spectrum[np.argmin(np.abs(freqs - freq))]
+
+    # Both symmetric tones should be strong peaks, not just one dominant carrier.
+    assert bin_at(CARRIER_HZ - BEAT_HZ / 2) > 50 * noise_floor
+    assert bin_at(CARRIER_HZ + BEAT_HZ / 2) > 50 * noise_floor
+
+
+def test_monaural_signal_does_not_clip(monaural_wav_path):
+    samples, _ = sf.read(monaural_wav_path)
+    assert np.max(np.abs(samples)) < 1.0
+
+
+def test_monaural_rejects_parameters_outside_the_usable_range():
+    with pytest.raises(ValueError):
+        render_monaural(beat_hz=BEAT_HZ, duration_s=DURATION_S, carrier_hz=1000.0)
+
+
+# --- isochronic ----------------------------------------------------------------
+
+
+@pytest.fixture
+def isochronic_wav_path(tmp_path):
+    """A rendered isochronic WAV: identical L/R, gated at ISO_BEAT_HZ."""
+    path = tmp_path / "isochronic_10hz.wav"
+    write_wav(path, render_isochronic(beat_hz=ISO_BEAT_HZ, duration_s=ISO_DURATION_S))
+    return path
+
+
+def test_isochronic_channels_are_identical(isochronic_wav_path):
+    samples, _ = sf.read(isochronic_wav_path)
+    assert np.array_equal(samples[:, 0], samples[:, 1])
+
+
+def test_isochronic_gate_frequency_matches_beat_hz(isochronic_wav_path):
+    samples, sample_rate = sf.read(isochronic_wav_path)
+    envelope = np.abs(samples[:, 0])  # the gate rate shows up in the rectified envelope
+    spectrum = np.abs(np.fft.rfft(envelope - envelope.mean()))
+    freqs = np.fft.rfftfreq(len(envelope), 1 / sample_rate)
+    assert freqs[np.argmax(spectrum)] == pytest.approx(ISO_BEAT_HZ, abs=0.5)
+
+
+def test_isochronic_carrier_and_sidebands_present():
+    samples = render_isochronic(beat_hz=ISO_BEAT_HZ, duration_s=ISO_DURATION_S)
+    mono = samples[:, 0]
+    spectrum = np.abs(np.fft.rfft(mono))
+    freqs = np.fft.rfftfreq(len(mono), 1 / SAMPLE_RATE)
+    noise_floor = np.median(spectrum)
+
+    def bin_at(freq):
+        return spectrum[np.argmin(np.abs(freqs - freq))]
+
+    assert bin_at(ISOCHRONIC_CARRIER_HZ) > 50 * noise_floor
+    assert bin_at(ISOCHRONIC_CARRIER_HZ - ISO_BEAT_HZ) > 20 * noise_floor
+    assert bin_at(ISOCHRONIC_CARRIER_HZ + ISO_BEAT_HZ) > 20 * noise_floor
+
+
+def test_isochronic_signal_does_not_clip():
+    samples = render_isochronic(beat_hz=ISO_BEAT_HZ, duration_s=ISO_DURATION_S)
+    assert np.max(np.abs(samples)) < 1.0
+
+
+def test_isochronic_depth_zero_means_no_gating():
+    """depth=0 leaves env == 1 always, so the tone is effectively ungated."""
+    samples = render_isochronic(beat_hz=ISO_BEAT_HZ, duration_s=ISO_DURATION_S, depth=0.0, amplitude=0.3)
+    rms = np.sqrt(np.mean(samples[:, 0] ** 2))
+    assert rms == pytest.approx(0.3 / np.sqrt(2), rel=0.05)
+
+
+def test_gate_envelope_ramping_suppresses_harmonics():
+    """doc §4.4/§7: a hard gate spreads energy across many harmonics of the beat
+    frequency; the mandatory raised-cosine ramp should suppress them sharply.
+
+    A duty=0.5 gate has no even harmonics, so this sums energy across a band of
+    higher odd harmonics (5th-15th) rather than a single bin, which would be
+    fragile against incidental near-zero crossings at any one harmonic."""
+    n = 4096
+    phi = (np.arange(n) / n) % 1.0  # one full gate cycle, densely sampled
+    duty = 0.5
+
+    hard = _gate_envelope(phi, duty, ramp_frac=0.0)
+    ramped = _gate_envelope(phi, duty, ramp_frac=0.1)
+
+    def higher_harmonic_energy(gate):
+        spectrum = np.abs(np.fft.rfft(gate - gate.mean()))
+        return sum(spectrum[k] ** 2 for k in range(5, 16, 2))
+
+    assert higher_harmonic_energy(ramped) < 0.2 * higher_harmonic_energy(hard)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"carrier_hz": 50.0},  # below isochronic's usable range
+        {"carrier_hz": 600.0},  # above isochronic's usable range
+        {"depth": 1.5},
+        {"duty": 0.05},
+        {"ramp_ms": 20.0},
+        {"beat_hz": 0.0},
+        {"waveform": "noise"},
+    ],
+)
+def test_isochronic_rejects_parameters_outside_the_usable_range(kwargs):
+    kwargs = {"beat_hz": ISO_BEAT_HZ, "duration_s": ISO_DURATION_S, **kwargs}
+
+    with pytest.raises(ValueError):
+        render_isochronic(**kwargs)

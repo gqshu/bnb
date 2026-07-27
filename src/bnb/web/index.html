@@ -38,6 +38,7 @@
   pre { background: #0d1017; border: 1px solid var(--line); border-radius: 8px; padding: .8rem; overflow-x: auto; color: var(--muted); font-size: .82rem; }
   fieldset { border: 0; padding: 0; margin: 0; }
   fieldset:disabled { opacity: .4; }
+  .iso-only { display: none; }
 </style>
 </head>
 <body>
@@ -57,18 +58,26 @@
 
   <div class="panel">
     <div class="head">
-      <h2>BINAURAL BEAT</h2>
+      <h2>STIMULUS</h2>
       <label class="toggle"><input type="checkbox" id="beatOn" checked /> enabled</label>
     </div>
     <fieldset id="beatControls">
+      <div class="row">
+        <label>Mode</label>
+        <select id="mode">
+          <option value="dichotic" selected>Binaural</option>
+          <option value="monaural">Monaural</option>
+          <option value="isochronic">Isochronic</option>
+        </select>
+      </div>
       <div class="row">
         <label>Carrier</label>
         <input type="range" id="carrier" min="200" max="900" step="1" value="432" />
         <output id="carrierOut">432 Hz</output>
       </div>
       <div class="row">
-        <label>Beat Δ</label>
-        <input type="range" id="beat" min="0.5" max="40" step="0.1" value="10" />
+        <label id="beatLabel">Beat Δ</label>
+        <input type="range" id="beat" min="0" max="40" step="0.1" value="10" />
         <output id="beatOut">10.0 Hz</output>
       </div>
       <div class="row">
@@ -82,28 +91,45 @@
           <option>sine</option><option>triangle</option><option>square</option><option>sawtooth</option>
         </select>
       </div>
+      <div class="row iso-only">
+        <label>Depth</label>
+        <input type="range" id="depth" min="0" max="1" step="0.01" value="1" />
+        <output id="depthOut">1.00</output>
+      </div>
+      <div class="row iso-only">
+        <label>Duty</label>
+        <input type="range" id="duty" min="0.1" max="0.9" step="0.01" value="0.5" />
+        <output id="dutyOut">0.50</output>
+      </div>
+      <div class="row iso-only">
+        <label>Ramp</label>
+        <input type="range" id="rampMs" min="2" max="10" step="0.1" value="5" />
+        <output id="rampMsOut">5.0 ms</output>
+      </div>
     </fieldset>
   </div>
 
   <div class="panel">
     <div class="head"><h2>BACKGROUND</h2></div>
-    <div class="row">
-      <label>Mode</label>
-      <select id="bgMode">
-        <option value="off">(none)</option>
-        <option value="shuffle">🔀 Shuffle — random tracks, forever</option>
-        <option value="repeat">🔁 Repeat — one track, looped</option>
-      </select>
-    </div>
-    <div class="row">
-      <label>Track</label>
-      <select id="background"><option value="">(none)</option></select>
-    </div>
-    <div class="row">
-      <label>Volume</label>
-      <input type="range" id="bgVolume" min="0" max="1" step="0.01" value="1" />
-      <output id="bgVolumeOut">1.00</output>
-    </div>
+    <fieldset id="bgControls">
+      <div class="row">
+        <label>Mode</label>
+        <select id="bgMode">
+          <option value="off">(none)</option>
+          <option value="shuffle">🔀 Shuffle — random tracks, forever</option>
+          <option value="repeat">🔁 Repeat — one track, looped</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Track</label>
+        <select id="background"><option value="">(none)</option></select>
+      </div>
+      <div class="row">
+        <label>Volume</label>
+        <input type="range" id="bgVolume" min="0" max="1" step="0.01" value="1" />
+        <output id="bgVolumeOut">1.00</output>
+      </div>
+    </fieldset>
     <div class="hint" id="bgHint">Only rendered tracks can play; others are greyed out.</div>
   </div>
 
@@ -121,18 +147,39 @@ const player = $("player");
 let running = false;
 
 // --- read the UI into request bodies ---------------------------------------
+// Carrier range depends on mode: isochronic's usable range sits lower than
+// binaural/monaural's (doc: Monaural_and_Isochronic_Beats_Implementation.md §4.2).
+const CARRIER_RANGE = {
+  dichotic: { min: 200, max: 900, value: 432 },
+  monaural: { min: 200, max: 900, value: 432 },
+  isochronic: { min: 100, max: 500, value: 250 },
+};
+function isIsochronic() {
+  return $("mode").value === "isochronic";
+}
 function beatBody() {
   if (!$("beatOn").checked) return null;
-  return {
+  const body = {
     carrier_hz: +$("carrier").value,
     beat_hz: +$("beat").value,
     volume: +$("volume").value,
     waveform: $("waveform").value,
+    mode: $("mode").value,
   };
+  if (isIsochronic()) {
+    body.depth = +$("depth").value;
+    body.duty = +$("duty").value;
+    body.ramp_ms = +$("rampMs").value;
+  }
+  return body;
 }
 // Background mode -> the backend's background_id. "shuffle" is the sentinel for
 // random-forever; a pinned track_id loops itself (that *is* repeat); null = silence.
+// Isochronic never gets a background (the pulsing is the entrainment signal, and any
+// background reduces its modulation depth) — the backend enforces this with a 400,
+// so the UI disables the background panel instead of ever sending one.
 function backgroundId() {
+  if (isIsochronic()) return null;
   const mode = $("bgMode").value;
   if (mode === "shuffle") return "shuffle";
   if (mode === "repeat") return $("background").value || null;
@@ -197,10 +244,34 @@ function patch(partial, immediate = false) {
 
 // --- wire up controls ------------------------------------------------------
 const fmt = { carrier: (v) => v + " Hz", beat: (v) => (+v).toFixed(1) + " Hz",
-              volume: (v) => (+v).toFixed(2), bgVolume: (v) => (+v).toFixed(2) };
+              volume: (v) => (+v).toFixed(2), bgVolume: (v) => (+v).toFixed(2),
+              depth: (v) => (+v).toFixed(2), duty: (v) => (+v).toFixed(2),
+              rampMs: (v) => (+v).toFixed(1) + " ms" };
 function bindOut(id) { const o = $(id + "Out"); if (o) o.textContent = fmt[id]($(id).value); }
 
-["carrier", "beat", "volume"].forEach((id) => {
+// The track picker only applies to repeat; shuffle picks its own. Isochronic disables
+// the whole panel regardless — see backgroundId() for why.
+function syncBgMode() {
+  $("background").disabled = $("bgMode").value !== "repeat";
+  $("bgControls").disabled = isIsochronic();
+  $("bgHint").textContent = isIsochronic()
+    ? "Isochronic mode: background is disabled — a soundscape would mask the pulsing that does the entrainment work."
+    : "Only rendered tracks can play; others are greyed out.";
+}
+
+function syncModeUI() {
+  const range = CARRIER_RANGE[$("mode").value];
+  const carrier = $("carrier");
+  carrier.min = range.min;
+  carrier.max = range.max;
+  if (+carrier.value < range.min || +carrier.value > range.max) carrier.value = range.value;
+  bindOut("carrier");
+  $("beatLabel").textContent = isIsochronic() ? "Rate" : "Beat Δ";
+  document.querySelectorAll(".iso-only").forEach((el) => { el.style.display = isIsochronic() ? "flex" : "none"; });
+  syncBgMode();
+}
+
+["carrier", "beat", "volume", "depth", "duty", "rampMs"].forEach((id) => {
   $(id).addEventListener("input", () => { bindOut(id); patch({ beat: beatBody() }); });
 });
 $("waveform").addEventListener("change", () => patch({ beat: beatBody() }, true));
@@ -208,10 +279,18 @@ $("beatOn").addEventListener("change", () => {
   $("beatControls").disabled = !$("beatOn").checked;
   patch({ beat: beatBody() }, true);
 });
-// The track picker only applies to repeat; shuffle picks its own.
-function syncBgMode() {
-  $("background").disabled = $("bgMode").value !== "repeat";
-}
+$("mode").addEventListener("change", () => {
+  const wasBackgroundActive = $("bgMode").value !== "off";
+  syncModeUI();
+  const partial = { beat: beatBody() };
+  // Switching into isochronic while a background is live would hit the backend's
+  // 400 on the next unrelated edit; clear it proactively instead.
+  if (isIsochronic() && wasBackgroundActive) {
+    $("bgMode").value = "off";
+    partial.background_id = null;
+  }
+  patch(partial, true);
+});
 $("bgMode").addEventListener("change", () => {
   syncBgMode();
   patch({ background_id: backgroundId() }, true);
@@ -224,8 +303,8 @@ $("stopBtn").addEventListener("click", stop);
 
 // --- init ------------------------------------------------------------------
 async function init() {
-  ["carrier", "beat", "volume", "bgVolume"].forEach(bindOut);
-  syncBgMode();
+  ["carrier", "beat", "volume", "bgVolume", "depth", "duty", "rampMs"].forEach(bindOut);
+  syncModeUI();
   try {
     const bgs = await api("GET", "/api/backgrounds");
     const sel = $("background");
