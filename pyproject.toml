@@ -30,3 +30,6 @@ packages = ["src/bnb"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Model renders are minutes-long and download GB-scale weights; opt in with `-m slow`.
+addopts = "-m 'not slow'"
+markers = ["slow: runs a real audio model (needs the stable-audio-3 checkout)"]
