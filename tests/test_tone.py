@@ -366,8 +366,16 @@ def test_am_music_requires_stereo_bed():
         render_am_music(music_bed()[:, 0], beat_hz=AM_BEAT_HZ)
 
 
-def test_load_background_resolves_an_asset_track_id(tmp_path):
-    bed, sample_rate = load_background("lofi_drone_seed47621")
+def test_load_background_resolves_an_asset_track_id():
+    # assets/tracks/ is git-ignored (the masters are regenerable), so this only runs
+    # where the library has actually been rendered.
+    from bnb import assets
+
+    track_id = "lofi_drone_seed47621"
+    if not assets.has_track(track_id):
+        pytest.skip(f"{track_id} not rendered locally")
+
+    bed, sample_rate = load_background(track_id)
     assert sample_rate == 44_100
     assert bed.ndim == 2 and bed.shape[1] == 2
 
