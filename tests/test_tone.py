@@ -4,11 +4,14 @@ import soundfile as sf
 
 from bnb.tone import (
     CARRIER_HZ,
+    MAX_AM_BEAT_HZ,
     ISOCHRONIC_CARRIER_HZ,
     MAX_BEAT_HZ,
     SAMPLE_RATE,
     WAVEFORMS,
     _gate_envelope,
+    load_background,
+    render_am_music,
     render_binaural,
     render_isochronic,
     render_monaural,
@@ -250,3 +253,144 @@ def test_isochronic_rejects_parameters_outside_the_usable_range(kwargs):
 
     with pytest.raises(ValueError):
         render_isochronic(**kwargs)
+
+
+# --- AM music (doc §6) ------------------------------------------------------
+
+AM_BEAT_HZ = 40.0  # the gamma target; AM has no binaural-fusion ceiling to respect
+
+
+def music_bed(seconds: float = 4.0, sample_rate: int = SAMPLE_RATE) -> np.ndarray:
+    """A stand-in for a rendered background: broadband, steady, non-silent."""
+    rng = np.random.default_rng(0)
+    noise = rng.normal(0.0, 0.2, size=(round(seconds * sample_rate), 2))
+    return np.clip(noise, -1.0, 1.0).astype(np.float32)
+
+
+def envelope_hz(channel: np.ndarray, sample_rate: int) -> float:
+    """Dominant frequency of the signal's amplitude envelope."""
+    env = np.abs(channel)
+    env = env - env.mean()
+    return dominant_hz(env, sample_rate)
+
+
+def test_am_music_modulates_at_the_beat_frequency():
+    out = render_am_music(music_bed(), beat_hz=AM_BEAT_HZ, depth=1.0)
+    assert envelope_hz(out[:, 0], SAMPLE_RATE) == pytest.approx(AM_BEAT_HZ, abs=0.5)
+
+
+def test_am_music_depth_sets_the_trough_level():
+    """The envelope spans [1 - depth, 1], so depth alone fixes how far the bed ducks."""
+    bed = music_bed()
+    for depth in (0.25, 0.5, 1.0):
+        out = render_am_music(bed, beat_hz=10.0, depth=depth, modulator="sine")
+        ratio = np.abs(out[:, 0]).max() and out[:, 0] / np.where(bed[:, 0] == 0, np.nan, bed[:, 0])
+        assert np.nanmin(ratio) == pytest.approx(1 - depth, abs=0.02)
+        assert np.nanmax(ratio) == pytest.approx(1.0, abs=0.02)
+
+
+def test_am_music_depth_zero_returns_the_bed_untouched():
+    bed = music_bed()
+    out = render_am_music(bed, beat_hz=AM_BEAT_HZ, depth=0.0)
+    assert np.allclose(out, bed, atol=1e-6)
+
+
+def test_am_music_never_exceeds_the_beds_peak():
+    """Envelope <= 1 everywhere, so modulation can only duck — it can't clip."""
+    bed = music_bed()
+    out = render_am_music(bed, beat_hz=AM_BEAT_HZ, depth=1.0, modulator="gate")
+    assert np.max(np.abs(out)) <= np.max(np.abs(bed)) + 1e-6
+
+
+def test_am_music_loops_a_short_bed_to_fill_the_duration():
+    bed = music_bed(seconds=1.0)
+    out = render_am_music(bed, beat_hz=10.0, duration_s=3.0)
+    assert out.shape[0] == round(3.0 * SAMPLE_RATE)
+
+
+def test_am_music_trims_a_long_bed():
+    out = render_am_music(music_bed(seconds=4.0), beat_hz=10.0, duration_s=1.5)
+    assert out.shape[0] == round(1.5 * SAMPLE_RATE)
+
+
+def test_am_music_gate_modulator_dwells_at_the_extremes():
+    """Same depth, different shape — this is the drive/pleasantness trade.
+
+    A sine modulator sweeps continuously and only touches the trough instantaneously;
+    the gate holds the music near-silent for a whole off-phase and near-full for the
+    on-phase. That dwell is what makes the gate the more audible pulse (and the
+    stronger drive), not a difference in total energy — a duty-0.5 gate actually
+    carries *more* RMS than the sine, since sine spends most of its cycle mid-way.
+    """
+    bed = np.ones((SAMPLE_RATE, 2), dtype=np.float32)  # flat bed: output == envelope
+    depth = 0.8
+    sine = render_am_music(bed, beat_hz=10.0, depth=depth, modulator="sine")[:, 0]
+    gate = render_am_music(bed, beat_hz=10.0, depth=depth, modulator="gate")[:, 0]
+
+    near_trough = lambda env: float(np.mean(env < (1 - depth) + 0.01))
+    near_peak = lambda env: float(np.mean(env > 0.99))
+
+    # gate holds ~50% of the cycle at each extreme; sine passes through in ~7%.
+    assert near_trough(gate) > 4 * near_trough(sine)
+    assert near_peak(gate) > 4 * near_peak(sine)
+
+
+def test_am_music_allows_gamma_above_the_binaural_ceiling():
+    """Binaural fusion caps beats near 30-40 Hz; a physical envelope has no such limit."""
+    out = render_am_music(music_bed(), beat_hz=MAX_AM_BEAT_HZ)
+    assert out.shape[0] == music_bed().shape[0]
+
+    with pytest.raises(ValueError, match="outside"):
+        render_am_music(music_bed(), beat_hz=MAX_AM_BEAT_HZ + 1)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"beat_hz": 0.0},
+        {"depth": 1.5},
+        {"duty": 0.05},
+        {"ramp_ms": 20.0},
+        {"modulator": "noise"},
+        {"duration_s": -1.0},
+    ],
+)
+def test_am_music_rejects_parameters_outside_the_usable_range(kwargs):
+    kwargs = {"beat_hz": AM_BEAT_HZ, **kwargs}
+    with pytest.raises(ValueError):
+        render_am_music(music_bed(), **kwargs)
+
+
+def test_am_music_requires_stereo_bed():
+    with pytest.raises(ValueError, match="stereo"):
+        render_am_music(music_bed()[:, 0], beat_hz=AM_BEAT_HZ)
+
+
+def test_load_background_resolves_an_asset_track_id(tmp_path):
+    bed, sample_rate = load_background("lofi_drone_seed47621")
+    assert sample_rate == 44_100
+    assert bed.ndim == 2 and bed.shape[1] == 2
+
+
+def test_load_background_reads_a_file_path_and_upmixes_mono(tmp_path):
+    path = tmp_path / "mono.wav"
+    sf.write(path, np.zeros(1000, dtype=np.float32) + 0.1, 22_050)
+    bed, sample_rate = load_background(path)
+
+    assert sample_rate == 22_050
+    assert bed.shape == (1000, 2)
+    assert np.allclose(bed[:, 0], bed[:, 1])
+
+
+def test_load_background_resamples_when_asked(tmp_path):
+    path = tmp_path / "bed.wav"
+    sf.write(path, np.zeros((22_050, 2), dtype=np.float32), 22_050)
+    bed, sample_rate = load_background(path, target_sample_rate=44_100)
+
+    assert sample_rate == 44_100
+    assert bed.shape[0] == 44_100
+
+
+def test_load_background_rejects_an_unknown_source():
+    with pytest.raises(FileNotFoundError):
+        load_background("no_such_track_id")
