@@ -82,6 +82,22 @@ def cli_path(backend: str = DEFAULT_BACKEND) -> Path | None:
     return path if path.exists() else None
 
 
+def require_cli(backend: str = DEFAULT_BACKEND) -> Path:
+    """:func:`cli_path`, or a ``RuntimeError`` with setup instructions if it's missing.
+
+    Split out from :func:`build_command` so a caller (e.g. a preflight check) can
+    verify the engine is usable before doing any other work, not just at render time.
+    """
+    executable = cli_path(backend)
+    if executable is None:
+        raise RuntimeError(
+            f"no {backend} CLI found; set up stable-audio-3 next to bnb "
+            f"({'uv sync' if backend == 'torch' else 'optimized/mlx/install.sh'}), "
+            "or set BNB_SA3_CLI / BNB_SA3_MLX_CLI / BNB_SA3_REPO"
+        )
+    return executable
+
+
 def build_command(
     spec: dict[str, Any],
     out_path: Path | str,
@@ -104,14 +120,7 @@ def build_command(
     if duration > limit:
         raise ValueError(f"{model} renders at most {limit}s, got {duration}s")
 
-    executable = cli or cli_path(backend)
-    if executable is None:
-        raise RuntimeError(
-            f"no {backend} CLI found; set up stable-audio-3 next to bnb "
-            f"({'uv sync' if backend == 'torch' else 'optimized/mlx/install.sh'}), "
-            "or set BNB_SA3_CLI / BNB_SA3_MLX_CLI / BNB_SA3_REPO"
-        )
-
+    executable = cli or require_cli(backend)
     steps = default_steps(model) if steps is None else steps
     if backend == "mlx":
         return _mlx_command(spec, out_path, model=model, duration=duration, steps=steps, cfg=cfg, cli=executable)

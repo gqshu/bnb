@@ -4,16 +4,23 @@ This is the provider-agnostic core of the background media library described in
 docs/background_music.md. It turns a (substrate, style) *signature* into the three
 things a render needs:
 
-- the ElevenLabs-shaped prompt built from the §4 base template + style modifier,
-- the composition plan (positive/negative global styles, one loop section),
+- a prose prompt built from the §4 base template + style modifier (both ElevenLabs
+  and Stable Audio 3 read this; :func:`prompt_for_provider` adapts it further),
+- the composition plan (positive/negative global styles, one loop section) —
+  ElevenLabs-specific structure, translated by :func:`composition_plan_for_model`,
 - the per-track metadata record (§3 schema), minus the measured MER vector that
   the objective-feature extraction pipeline fills in after the render.
+
+Alongside the substrate x style grid, :data:`SPECIAL_GROUPS` holds keyword-driven
+categories that sit *outside* the grid entirely (e.g. ``natural_sounds``: a plain
+keyword like "rain" rather than a substrate/style pair). :func:`build_keyword_signature`
+resolves those the same way :func:`build_signature` resolves grid cells.
 
 Scope is down-regulation only, so every continuous MER axis (tempo, energy,
 brightness, harmony, texture, register, nature-bed) is authored biased low. The
 spec is written by scripts/plan_background.py and rendered by
-scripts/render_background.py; nothing here imports the ElevenLabs SDK, so the
-taxonomy stays importable and testable without an API key.
+scripts/render_background.py; nothing here imports the ElevenLabs or Stable Audio
+SDKs, so the taxonomy stays importable and testable without an API key.
 """
 
 from __future__ import annotations
@@ -343,8 +350,11 @@ class Signature:
         """
         return {
             "track_id": self.track_id,
+            "kind": "grid",
             "substrate": self.substrate.name,
             "style": self.style.name,
+            "group": None,
+            "keyword": None,
             "requested_features": self.requested_features,
             "measured_features": None,
             "instrumentation": list(self.instrumentation),
@@ -358,14 +368,16 @@ class Signature:
         }
 
 
-def _seed(style_name: str, substrate_name: str, variant: int = 0) -> int:
+def _seed(key_parts: tuple[str, str], variant: int = 0) -> int:
     """A deterministic per-signature seed so re-renders stay reproducible (§1).
 
-    ``variant`` gives a cell more than one render (the doc wants 3-5 seeds per
-    cell, §5). ``variant == 0`` keeps the original one-seed-per-cell identity so
-    existing track_ids stay stable.
+    ``key_parts`` is whatever identifies the cell — ``(style, substrate)`` for a
+    grid signature, ``(group, keyword)`` for a special one. ``variant`` gives a
+    cell more than one render (the doc wants 3-5 seeds per cell, §5); ``variant
+    == 0`` keeps the original one-seed-per-cell identity so existing track_ids
+    stay stable.
     """
-    key = f"{style_name}:{substrate_name}"
+    key = f"{key_parts[0]}:{key_parts[1]}"
     if variant:
         key = f"{key}:{variant}"
     digest = hashlib.sha256(key.encode()).digest()
@@ -444,7 +456,7 @@ def build_signature(
         substrate=substrate,
         style=style,
         duration_s=duration_s,
-        seed=_seed(style_name, substrate_name, variant),
+        seed=_seed((style_name, substrate_name), variant),
         prompt=build_prompt(substrate, style, body, requested["nature_bed"]),
         negative_prompt=NEGATIVE_PROMPT,
         instrumentation=instrumentation,
@@ -485,6 +497,202 @@ def composition_plan_for_model(spec: dict[str, Any], model_id: str) -> dict[str,
             }
         ]
     }
+
+
+# --- Special cells: keyword-driven categories outside the grid --------------
+#
+# Not every useful bed fits a (substrate, style) pair — a plain "rain" or "ocean"
+# ambience isn't really a *style* of anything. Special groups are a second,
+# independent taxonomy: one keyword, one prompt clause, no substrate/style axis.
+# They still produce the same spec shape (§3) so storage, catalog and rendering
+# don't need to special-case them; only ``kind`` (and ``group``/``keyword`` in
+# place of ``style``/``substrate``) tells them apart.
+
+
+@dataclass(frozen=True)
+class KeywordEntry:
+    """One keyword within a special group.
+
+    ``description`` fills the base template's "Featuring ..." clause. ``instrument``
+    is an AudioSparx ``Instruments:`` tag (see :func:`prompt_for_provider`), set only
+    for keywords the model can hear as a played instrument rather than an ambience.
+    """
+
+    description: str
+    instrument: str | None = None
+
+
+@dataclass(frozen=True)
+class SpecialGroup:
+    """A keyword-driven category, independent of the substrate x style grid."""
+
+    name: str
+    body: str  # the shared prompt shell every keyword in the group layers onto
+    keywords: dict[str, KeywordEntry]
+    global_styles: tuple[str, ...] = ()  # composition-plan styles common to the group
+
+
+SPECIAL_GROUPS: dict[str, SpecialGroup] = {
+    "natural_sounds": SpecialGroup(
+        name="natural_sounds",
+        body=(
+            "Instrumental natural soundscape for deep relaxation. A soft, continuous "
+            "field-recording bed, broadband and pitchless, arrhythmic. Very low energy, "
+            "very soft dynamics. Warm, soft broadband timbre, low spectral brightness. "
+            "No tonal center, continuous texture, full but gentle register. No vocals, "
+            "no music, no percussion hits, no sudden transitions. Seamless, calm, continuous."
+        ),
+        global_styles=("field recording", "nature ambience", "instrumental", "wide stereo"),
+        keywords={
+            "rain": KeywordEntry("soft distant rainfall, gentle raindrops on leaves, no thunder"),
+            "ocean": KeywordEntry("slow distant ocean waves, long gentle swells, calm surf"),
+            "wind": KeywordEntry("faint wind through trees, airy and slow, low whooshing"),
+            "stream": KeywordEntry("quiet flowing stream, soft trickling water"),
+            "forest": KeywordEntry("distant forest ambience, faint birdsong, leaves rustling softly"),
+            "night": KeywordEntry("quiet night ambience, faint crickets, distant and low"),
+            "chimes": KeywordEntry(
+                "distant wind chimes, sparse and soft, gentle metallic shimmer", instrument="Chimes"
+            ),
+        },
+    ),
+}
+
+
+@dataclass(frozen=True)
+class KeywordSignature:
+    """A fully resolved render spec for one (group, keyword, duration) special cell.
+
+    Mirrors :class:`Signature`'s ``track_id``/``spec()`` surface so storage and
+    rendering can treat grid and special signatures identically.
+    """
+
+    group: SpecialGroup
+    keyword: str
+    duration_s: int
+    seed: int
+    prompt: str
+    negative_prompt: str
+    instrumentation: tuple[str, ...]
+    composition_plan: dict[str, Any]
+
+    @property
+    def track_id(self) -> str:
+        return f"{self.group.name}_{self.keyword}_seed{self.seed}"
+
+    def spec(self) -> dict[str, Any]:
+        return {
+            "track_id": self.track_id,
+            "kind": "special",
+            "substrate": None,
+            "style": None,
+            "group": self.group.name,
+            "keyword": self.keyword,
+            "requested_features": None,
+            "measured_features": None,
+            "instrumentation": list(self.instrumentation),
+            "prompt": self.prompt,
+            "negative_prompt": self.negative_prompt,
+            "composition_plan": self.composition_plan,
+            "seed": self.seed,
+            "duration_s": self.duration_s,
+            "loopable": True,
+            "render": None,
+        }
+
+
+def build_keyword_signature(
+    group_name: str, keyword: str, duration_s: int, variant: int = 0
+) -> KeywordSignature:
+    """Resolve a (group, keyword) pair into a full render spec, grid-signature style."""
+    if group_name not in SPECIAL_GROUPS:
+        raise ValueError(f"unknown special group {group_name!r}, expected one of {list(SPECIAL_GROUPS)}")
+    group = SPECIAL_GROUPS[group_name]
+    if keyword not in group.keywords:
+        raise ValueError(
+            f"unknown keyword {keyword!r} for group {group_name!r}, expected one of {list(group.keywords)}"
+        )
+    entry = group.keywords[keyword]
+    instrumentation = (keyword,)
+
+    composition_plan: dict[str, Any] = {
+        "positive_global_styles": _dedupe(group.global_styles + (keyword,)),
+        "negative_global_styles": list(NEGATIVE_GLOBAL_STYLES),
+        "sections": [
+            {
+                "section_name": "loop",
+                "positive_local_styles": list(instrumentation),
+                "negative_local_styles": list(NEGATIVE_GLOBAL_STYLES),
+                "duration_ms": duration_s * 1000,
+                "lines": [],
+            }
+        ],
+    }
+
+    return KeywordSignature(
+        group=group,
+        keyword=keyword,
+        duration_s=duration_s,
+        seed=_seed((group_name, keyword), variant),
+        prompt=f"{group.body} Featuring {entry.description}.",
+        negative_prompt=NEGATIVE_PROMPT,
+        instrumentation=instrumentation,
+        composition_plan=composition_plan,
+    )
+
+
+# --- Provider prompt adaptation ----------------------------------------------
+#
+# ElevenLabs gets its structure from composition_plan (§4), so the stored prose
+# prompt goes through unchanged. Stable Audio 3 has no structured composition
+# input — the closest lever to prompt adherence is naming things in the AudioSparx
+# metadata vocabulary its text encoder was trained on
+# (stable-audio-3/docs/guides/prompting.md, "Helpful AudioSparx Tags"), the same
+# technique scripts/try_stable_audio.py uses for its keyword smoke tests.
+
+AUDIOSPARX_BASE_TAGS = "TrackType: Music, VocalType: Instrumental, Genre: Ambient"
+
+# Internal instrumentation tags -> the AudioSparx Instruments vocabulary. Special-group
+# keywords carry their own KeywordEntry.instrument and bypass this map entirely.
+AUDIOSPARX_INSTRUMENTS: dict[str, str] = {
+    "felt_piano": "Piano",
+    "soft_keys": "Piano",
+    "shakuhachi": "Flute",
+    "solo_instrument": "Flute",
+    "string_pad": "Strings",
+    "tibetan_singing_bowls": "Singing Bowls",
+    "singing_bowl_drone": "Singing Bowls",
+    "singing_bowls": "Singing Bowls",
+    "bells": "Chimes",
+    "distant_temple_bell": "Chimes",
+    "temple_bells": "Chimes",
+    "wind_chime": "Chimes",
+    "warm_pad": "Synthesizer",
+    "sustained_pad": "Synthesizer",
+    "low_drone": "Synthesizer",
+}
+
+
+def _audiosparx_instrument(spec: dict[str, Any]) -> str | None:
+    """The AudioSparx ``Instruments:`` tag for a spec, if its instrumentation names one."""
+    if spec.get("kind") == "special":
+        return SPECIAL_GROUPS[spec["group"]].keywords[spec["keyword"]].instrument
+    for tag in spec.get("instrumentation", ()):
+        if tag in AUDIOSPARX_INSTRUMENTS:
+            return AUDIOSPARX_INSTRUMENTS[tag]
+    return None
+
+
+def prompt_for_provider(spec: dict[str, Any], provider: str) -> str:
+    """Adapt a spec's stored prompt to a provider's prompt surface.
+
+    ``elevenlabs`` (and any other provider that reads the prompt as-is) gets the
+    stored prose unchanged. ``stable_audio`` gets the AudioSparx tag suffix appended.
+    """
+    if provider != "stable_audio":
+        return spec["prompt"]
+    instrument = _audiosparx_instrument(spec)
+    suffix = f", Instruments: {instrument}" if instrument else ""
+    return f"{spec['prompt']} {AUDIOSPARX_BASE_TAGS}{suffix}"
 
 
 # A curated, representative slice of the catalog for sample generation. Mirrors

@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-import bnb.stream as stream_mod
 from bnb.server import app, engine
 from bnb.stream import SHUFFLE, Beat, StreamEngine, to_int16_bytes
 
@@ -75,7 +74,8 @@ def test_patch_updates_beat_and_can_disable_it():
 
 def _fake_library(monkeypatch, eng, tracks, frames=80):
     """Point an engine at a set of tiny in-memory 'rendered' tracks (no disk)."""
-    monkeypatch.setattr(stream_mod.assets, "list_rendered", lambda: list(tracks))
+    entries = [{"track_id": tid, "rendered": True} for tid in tracks]
+    monkeypatch.setattr(eng._categories, "search", lambda **_: list(entries))
     monkeypatch.setattr(eng, "_read_asset",
                         lambda tid: np.full((frames, 2), 0.1, dtype=np.float32))
 

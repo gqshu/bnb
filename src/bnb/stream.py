@@ -21,7 +21,6 @@ common case; a mismatched background is linearly resampled on load.
 
 from __future__ import annotations
 
-import random
 import struct
 from dataclasses import asdict, dataclass
 from threading import Lock
@@ -31,6 +30,7 @@ import numpy as np
 import soundfile as sf
 
 from . import assets
+from .catalog import CategoryManager
 from .tone import CARRIER_HZ, _gate_envelope
 
 STREAM_SAMPLE_RATE = 44_100
@@ -132,6 +132,7 @@ class StreamEngine:
 
     def __init__(self, sample_rate: int = STREAM_SAMPLE_RATE) -> None:
         self.sample_rate = sample_rate
+        self._categories = CategoryManager()
         self._lock = Lock()
         self.running = False
         self.beat: Beat | None = None
@@ -242,9 +243,8 @@ class StreamEngine:
 
     def _random_track(self, exclude: str | None = None) -> str | None:
         """A random rendered track_id, avoiding ``exclude`` when there's a choice."""
-        rendered = assets.list_rendered()
-        pool = [t for t in rendered if t != exclude] or rendered
-        return random.choice(pool) if pool else None
+        entry = self._categories.pick(rendered=True, exclude=exclude)
+        return entry["track_id"] if entry else None
 
     def set_background_volume(self, volume: float) -> None:
         with self._lock:

@@ -24,7 +24,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
-from . import assets
+from .catalog import CategoryManager
 from .stream import Beat, StreamEngine, to_int16_bytes, wav_stream_header
 from .tone import (
     CARRIER_HZ,
@@ -49,6 +49,7 @@ WEB_DIR = Path(__file__).resolve().parent / "web"
 
 app = FastAPI(title="bnb — binaural beat stream")
 engine = StreamEngine()
+categories = CategoryManager()
 
 
 class BeatSpec(BaseModel):
@@ -169,11 +170,10 @@ def update_spec(update: SpecUpdate) -> dict:
 
 @app.get("/api/backgrounds")
 def backgrounds() -> list[dict]:
-    out = []
-    for track_id in assets.list_specs():
-        entry = assets.catalog_entry(assets.load_spec(track_id))
-        out.append({"track_id": entry["track_id"], "summary": entry["summary"], "rendered": entry["rendered"]})
-    return out
+    return [
+        {"track_id": e["track_id"], "summary": e["summary"], "rendered": e["rendered"]}
+        for e in categories.search()
+    ]
 
 
 @app.get("/stream.wav")

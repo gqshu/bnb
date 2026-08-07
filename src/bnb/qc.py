@@ -218,10 +218,11 @@ AUDIO_SUFFIXES = {".wav", ".flac", ".ogg", ".mp3", ".aiff", ".aif"}
 
 
 def check_path(target: Path | str, *, min_duration_s: float = MIN_DURATION_S) -> list[TrackReport]:
-    """Check one file, or every audio file directly inside a directory."""
+    """Check one file, or every audio file anywhere inside a directory (recursively,
+    since assets/tracks/ nests audio one subdirectory per category cell)."""
     target = Path(target)
     if target.is_dir():
-        files = sorted(p for p in target.iterdir() if p.suffix.lower() in AUDIO_SUFFIXES)
+        files = sorted(p for p in target.rglob("*") if p.suffix.lower() in AUDIO_SUFFIXES)
     elif target.exists():
         files = [target]
     else:

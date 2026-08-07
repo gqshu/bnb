@@ -47,47 +47,88 @@ uv run scripts/generate_wavs.py --stimulus isochronic recharge --duration 30
 
 ## Background media library
 
-`src/bnb/background.py` holds the substrate × style taxonomy from
-[docs/background_music.md](docs/background_music.md): it turns a `(substrate, style)`
-signature into the Eleven Music prompt, composition plan, seed, and per-track
-spec record. Two thin CLIs sit over it and the **asset repository**
-(`src/bnb/assets.py`): `scripts/plan_background.py` writes specs offline, and
-`scripts/render_background.py` renders them into audio.
+`src/bnb/background.py` holds the taxonomy from
+[docs/background_music.md](docs/background_music.md): a `(substrate, style)` *grid
+cell* resolves to a prose prompt, an ElevenLabs-shaped composition plan, a seed, and
+a per-track spec record. Alongside the grid, `SPECIAL_GROUPS` holds keyword-driven
+*special cells* — categories with no substrate/style axis, just a keyword — starting
+with `natural_sounds` (rain, ocean, wind, stream, forest, night, chimes). Both kinds
+share one spec schema (`kind`, plus `style`/`substrate` or `group`/`keyword`), so
+storage, catalog and rendering treat them identically.
 
-The asset repo is a *flat, tagged store* rather than a category tree — the bandit
-selects on categorical tags (substrate, style) plus a continuous MER vector, which
-a hierarchy can't express:
+Two providers can turn a spec into audio, selected with `render_background.py
+--provider`: **Stable Audio 3** (self-hosted, `--provider stable_audio` — the
+default; `src/bnb/stable_audio.py` — see that module's docstring for why it shells
+out to a sibling `stable-audio-3` checkout instead of running in-process) and
+**ElevenLabs** (hosted, paid, `--provider elevenlabs`). A spec's stored
+prompt already reads as plain prose that both providers accept; `prompt_for_provider`
+adapts it further per provider — ElevenLabs gets its structure from the composition
+plan, so the prompt passes through unchanged, while Stable Audio 3 has no structured
+composition input, so it gets an AudioSparx metadata-tag suffix instead (the
+vocabulary its text encoder was trained on — see `scripts/try_stable_audio.py`).
+
+### Asset repository: one subdirectory per category cell
+
+`src/bnb/assets.py` is the low-level, cell-aware file layer. Every category —
+`(style, substrate)` for the grid, `(group, keyword)` for a special group — gets its
+own subdirectory holding every seed/provider/variant rendered for it, so a category
+can be browsed, bulk-deleted, or `ls`'d as a unit:
 
 ```
 assets/
-  specs/<track_id>.json    per-track metadata (§3); the source of truth (git-tracked)
-  tracks/<track_id>.wav    rendered audio master (git-ignored: large, costs credits)
-  catalog.json             generated index of compact descriptors for selection
+  specs/<style>/<substrate>/<track_id>.json     grid spec (§3); the source of truth
+  specs/<group>/<keyword>/<track_id>.json       special-cell spec, same shape
+  tracks/<style>/<substrate>/<track_id>.wav     rendered audio (git-ignored: large, costs credits/compute)
+  tracks/<group>/<keyword>/<track_id>.wav
+  catalog.json                                  generated index of compact descriptors
 ```
 
-The selection workflow reads only `catalog.json`; it never opens every spec.
+`track_id` (e.g. `buddhist_meditative_drone_seed81657`) stays the one flat,
+globally-unique identifier everywhere outside `assets.py` — the stream engine, the
+API, the CLIs — only its on-disk location is nested by cell.
 
-**Planning and rendering are two separate scripts.** Spec management is offline
-and free (no API, no key), so you preview the catalog before spending on a paid
-model — and the same specs can be rendered by a local model later. A spec is
-render-independent; the renderer fills its `render` block (provider, model,
-format, provenance, audio file).
+`src/bnb/catalog.py`'s `CategoryManager` is the interface everything else actually
+uses — the stream engine, the demo API, and both CLIs below go through it rather than
+poking `assets` functions directly:
+
+- **add** — `add_spec(spec)`, `add_render(spec, data, ...)` (bytes, e.g. ElevenLabs),
+  `attach_render(spec, path, ...)` (a file a provider already wrote, e.g. Stable Audio)
+- **delete** — `delete(track_id)`, `delete_cell((outer, inner))` (wipe a whole category)
+- **search** — `search(style=..., substrate=..., group=..., keyword=..., kind=...,
+  cell=..., rendered=..., provider=...)`, any combination, unset filters ignored
+- **pick** — `pick(**filters, exclude=track_id)` — one random match, excluding a
+  track_id when there's an alternative (what shuffle playback uses)
+
+`CategoryManager(root=...)` points a whole session at a different asset repository
+(e.g. a `tmp_path` in tests) instead of the real `assets/`.
+
+### Planning and rendering are two separate scripts
+
+Spec management is offline and free (no API, no key), so you preview the catalog
+before spending on a paid model or a slow local render — and the same specs can be
+rendered by either provider, or re-rendered by the other one later. A spec is
+render-independent; the renderer fills its `render` block (provider, model, format,
+provenance, audio file).
 
 `scripts/plan_background.py` — write/inspect specs (free, offline):
 
 ```bash
-uv run scripts/plan_background.py --list             # print the taxonomy axes + sample set
+uv run scripts/plan_background.py --list             # print the taxonomy axes, sample set, special groups
 uv run scripts/plan_background.py --coverage         # print the substrate × style count matrix
 uv run scripts/plan_background.py                    # write the curated sample set
 uv run scripts/plan_background.py buddhist_meditative:drone --duration 90
+uv run scripts/plan_background.py natural_sounds:rain natural_sounds:ocean   # special cells
 uv run scripts/plan_background.py --only-new         # skip pairs whose spec already exists
 uv run scripts/plan_background.py --rebuild-catalog  # rebuild catalog.json from specs
 ```
 
+Grid pairs are `STYLE:SUBSTRATE`; special-cell pairs are `GROUP:KEYWORD` — same
+syntax, disambiguated by whether the left side names a style or a special group.
+
 Grow the library by coverage guide — place the next specs so the substrate × style
-grid fills evenly (which also levels the per-substrate and per-style marginals).
-Each repeat of a cell advances the seed (`variant`), matching the doc's "3–5 seeds
-per cell" (§5):
+grid fills evenly (which also levels the per-substrate and per-style marginals; special
+cells sit outside this grid by design, so they're unaffected). Each repeat of a cell
+advances the seed (`variant`), matching the doc's "3–5 seeds per cell" (§5):
 
 ```bash
 uv run scripts/plan_background.py --fill 10          # next 10 specs, evenly distributed
@@ -95,20 +136,36 @@ uv run scripts/plan_background.py --per-cell 2       # top every cell up to 2 tr
 uv run scripts/plan_background.py --fill 6 --styles buddhist_meditative,neutral   # restrict the grid
 ```
 
-`scripts/render_background.py` — turn specs into audio (paid / heavyweight):
+`scripts/render_background.py` — turn specs into audio; provider defaults to
+`stable_audio`:
 
 ```bash
-export ELEVENLABS_API_KEY=...
-uv run scripts/render_background.py --dry-run        # list what would render, no API call
-uv run scripts/render_background.py                  # render every spec still missing audio
+uv run scripts/render_background.py                  # render everything missing audio (Stable Audio 3)
+uv run scripts/render_background.py --dry-run        # preflight the provider + list what would render
 uv run scripts/render_background.py buddhist_meditative_drone_seed81657   # render specific track(s)
 uv run scripts/render_background.py --force <track_id>    # re-render an existing track
+uv run scripts/render_background.py --sa3-backend mlx --sa3-model medium  # the 1.4B model, Metal-backed
+uv run scripts/render_background.py --sa3-cfg 5      # turn on classifier-free guidance
+
+export ELEVENLABS_API_KEY=...
+uv run scripts/render_background.py --provider elevenlabs
+uv run scripts/render_background.py --provider elevenlabs --output-format mp3_44100_192 --model-id music_v1
 ```
 
+Every run — `--dry-run` included — starts with a **preflight check** that the
+selected provider is actually usable (the SA3 CLI is discoverable / the API key is
+set) and exits with setup instructions if not, before touching any spec. That also
+covers the case where every target track is already rendered and `--dry-run` would
+otherwise never reach the provider at all.
+
 Rendering is credit-safe: specs that already have audio are skipped unless you pass
-`--force`. Provider is pluggable (`--provider`); only ElevenLabs is wired today. These
-samples are for the Stage 1 provider bake-off; the measured-MER extraction pipeline
-lands in Stage 2.
+`--force`. The Stable Audio path needs the sibling `stable-audio-3` checkout set up
+(see `src/bnb/stable_audio.py`'s docstring — torch has no Python 3.14 wheels, so it
+runs out of process); `scripts/try_stable_audio.py` is a spec-free smoke test of that
+path alone (no catalog writes) if you just want to ear-check the model.
+`scripts/check_background.py` runs basic listenability checks (silence, clipping,
+noise) over rendered audio — point it at `assets/tracks/` (the default) or any
+directory, recursively.
 
 ## Live stream service
 
@@ -219,18 +276,23 @@ helpers read the current beat, change one field, and send it back.
 ## Layout
 
 - `src/bnb/tone.py` — offline binaural/monaural/isochronic tone rendering and WAV output
-- `src/bnb/background.py` — background-media substrate × style taxonomy and prompts
-- `src/bnb/assets.py` — the background asset repository (specs, tracks, catalog)
+- `src/bnb/background.py` — background-media taxonomy (substrate × style grid + special groups) and prompts
+- `src/bnb/assets.py` — the cell-aware asset file layer (specs, tracks, catalog)
+- `src/bnb/catalog.py` — `CategoryManager`: add/delete/search/pick over the asset repository
+- `src/bnb/stable_audio.py` — self-hosted Stable Audio 3 render backend (out-of-process)
+- `src/bnb/qc.py` — listenability checks (silence, clipping, noise) for rendered audio
 - `src/bnb/stream.py` — the live stream engine (phase-continuous beat + background mix)
 - `src/bnb/server.py` — FastAPI service and endpoints
 - `src/bnb/client.py` — control client for the stream service
 - `src/bnb/web/index.html` — the demo portal
 - `scripts/plan_background.py` — write/inspect background specs (offline, free)
-- `scripts/render_background.py` — render specs into audio via a provider
+- `scripts/render_background.py` — render specs into audio (ElevenLabs or Stable Audio 3)
+- `scripts/check_background.py` — QC pass over rendered tracks
+- `scripts/try_stable_audio.py` — spec-free Stable Audio 3 smoke test
 - `scripts/serve.py` — run the stream service
 - `scripts/control.py` — command-line control client
 - `scripts/` — dev utilities, not shipped
 - `tests/` — test suite
 - `docs/` — product and feasibility docs
-- `assets/` — background-media asset repo (specs + catalog tracked, audio ignored)
+- `assets/` — background-media asset repo, one subdirectory per category cell (specs + catalog tracked, audio ignored)
 - `run/` — binaural ear-check renders, git-ignored
