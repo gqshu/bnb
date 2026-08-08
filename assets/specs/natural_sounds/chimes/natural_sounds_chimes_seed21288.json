@@ -1,0 +1,58 @@
+{
+  "track_id": "natural_sounds_chimes_seed21288",
+  "kind": "special",
+  "substrate": null,
+  "style": null,
+  "group": "natural_sounds",
+  "keyword": "chimes",
+  "requested_features": null,
+  "measured_features": null,
+  "instrumentation": [
+    "chimes"
+  ],
+  "prompt": "Wind chimes turning in a light breeze on a porch, two or three soft metallic notes at a time with long shimmering decays, then quiet garden air until the next gust. Restrained and uncrowded: at most one or two things sounding at any moment, occasional and far apart, with long stretches of near-stillness between them. Calm and unhurried, with no sudden events and no build. Natural stereo field recording, unprocessed, no music, no instruments, no voices.",
+  "negative_prompt": "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions, hiss, static, white noise, busy, cluttered, dense, chattering",
+  "composition_plan": {
+    "positive_global_styles": [
+      "field recording",
+      "nature ambience",
+      "instrumental",
+      "wide stereo",
+      "chimes"
+    ],
+    "negative_global_styles": [
+      "bright",
+      "aggressive",
+      "drums",
+      "vocals",
+      "fast",
+      "buildup",
+      "hiss",
+      "white noise"
+    ],
+    "sections": [
+      {
+        "section_name": "loop",
+        "positive_local_styles": [
+          "chimes"
+        ],
+        "negative_local_styles": [
+          "bright",
+          "aggressive",
+          "drums",
+          "vocals",
+          "fast",
+          "buildup",
+          "hiss",
+          "white noise"
+        ],
+        "duration_ms": 60000,
+        "lines": []
+      }
+    ]
+  },
+  "seed": 21288,
+  "duration_s": 60,
+  "loopable": true,
+  "render": null
+}

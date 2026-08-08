@@ -15,8 +15,11 @@ def client():
 
 
 def test_list_backgrounds(client):
+    # Reads the real asset repo, which is legitimately empty mid-replan (deleting specs
+    # is how a prompt change is rolled out), so assert the shape, not the count — the
+    # same guard test_stream.py uses for the same reason.
     rows = client.list_backgrounds()
-    assert rows and all({"track_id", "summary", "rendered"} <= r.keys() for r in rows)
+    assert all({"track_id", "summary", "rendered"} <= r.keys() for r in rows)
 
 
 def test_get_background_reports_selection(client):

@@ -47,6 +47,8 @@ class CategoryManager:
         license: str,
         generated_at: str,
         watermark: str | None = None,
+        seed: int | None = None,
+        qc: dict[str, Any] | None = None,
         rebuild: bool = True,
     ) -> Path:
         """Write in-memory audio ``data`` for ``spec`` into its cell, fill the spec's
@@ -68,6 +70,8 @@ class CategoryManager:
             license=license,
             generated_at=generated_at,
             watermark=watermark,
+            seed=seed,
+            qc=qc,
             rebuild=rebuild,
         )
         return path
@@ -83,6 +87,8 @@ class CategoryManager:
         generated_at: str,
         output_format: str | None = None,
         watermark: str | None = None,
+        seed: int | None = None,
+        qc: dict[str, Any] | None = None,
         rebuild: bool = True,
     ) -> Path:
         """Move an already-written audio file (e.g. Stable Audio, which renders
@@ -105,6 +111,8 @@ class CategoryManager:
             license=license,
             generated_at=generated_at,
             watermark=watermark,
+            seed=seed,
+            qc=qc,
             rebuild=rebuild,
         )
         return path
@@ -150,6 +158,18 @@ class CategoryManager:
         if not path.exists():
             return self.rebuild()
         return json.loads(path.read_text())
+
+    def spec_ids(self) -> set[str]:
+        """Every track_id with a spec on disk *right now*.
+
+        Disk truth rather than :meth:`catalog`, so a spec deleted by hand since the
+        last rebuild counts as gone — which is what "delete a spec to replan it"
+        relies on."""
+        return set(assets.list_specs(self.root))
+
+    def orphan_tracks(self) -> list[Path]:
+        """Rendered audio left behind by a deleted spec (see :func:`assets.orphan_tracks`)."""
+        return assets.orphan_tracks(self.root)
 
     @staticmethod
     def _cell_of(entry: dict[str, Any]) -> tuple[str, str]:

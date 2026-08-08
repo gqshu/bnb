@@ -1,0 +1,58 @@
+{
+  "track_id": "natural_sounds_night_seed84194",
+  "kind": "special",
+  "substrate": null,
+  "style": null,
+  "group": "natural_sounds",
+  "keyword": "night",
+  "requested_features": null,
+  "measured_features": null,
+  "instrumentation": [
+    "night"
+  ],
+  "prompt": "A quiet summer night in open country, one even layer of faint distant crickets and still air, nothing close and nothing in the foreground. Even and unbroken throughout, one continuous texture with nothing stepping forward out of it, no separate events and no layering. Calm and unhurried, with no sudden events and no build. Natural stereo field recording, unprocessed, no music, no instruments, no voices.",
+  "negative_prompt": "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions, hiss, static, white noise, busy, cluttered, dense, chattering",
+  "composition_plan": {
+    "positive_global_styles": [
+      "field recording",
+      "nature ambience",
+      "instrumental",
+      "wide stereo",
+      "night"
+    ],
+    "negative_global_styles": [
+      "bright",
+      "aggressive",
+      "drums",
+      "vocals",
+      "fast",
+      "buildup",
+      "hiss",
+      "white noise"
+    ],
+    "sections": [
+      {
+        "section_name": "loop",
+        "positive_local_styles": [
+          "night"
+        ],
+        "negative_local_styles": [
+          "bright",
+          "aggressive",
+          "drums",
+          "vocals",
+          "fast",
+          "buildup",
+          "hiss",
+          "white noise"
+        ],
+        "duration_ms": 60000,
+        "lines": []
+      }
+    ]
+  },
+  "seed": 84194,
+  "duration_s": 60,
+  "loopable": true,
+  "render": null
+}

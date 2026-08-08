@@ -8,9 +8,13 @@ from bnb.background import (
     build_signature,
     composition_plan_for_model,
     coverage_report,
+    fill_special_to_per_cell,
     fill_to_per_cell,
     plan_coverage,
+    plan_special_coverage,
     prompt_for_provider,
+    special_cells,
+    special_coverage_report,
 )
 
 BASELINE = [
@@ -76,6 +80,63 @@ def test_coverage_can_restrict_to_subsets():
 def test_unknown_axis_names_rejected():
     with pytest.raises(ValueError):
         plan_coverage(1, 60, substrates=["gong"])
+
+
+# --- coverage over special groups ------------------------------------------------
+
+NATURAL = list(SPECIAL_GROUPS["natural_sounds"].keywords)
+
+
+def _cells(sigs):
+    return [(s.group.name, s.keyword) for s in sigs]
+
+
+def test_special_cells_enumerates_every_keyword():
+    assert special_cells(["natural_sounds"]) == [("natural_sounds", k) for k in NATURAL]
+    assert special_cells() == special_cells(["natural_sounds"])  # only group, for now
+
+
+def test_plan_special_coverage_spreads_across_keywords():
+    sigs = plan_special_coverage(len(NATURAL), 60)
+    assert sorted(k for _, k in _cells(sigs)) == sorted(NATURAL)
+
+
+def test_plan_special_coverage_tops_up_the_thinnest_keywords_first():
+    existing = [("natural_sounds", "rain")] * 2
+    sigs = plan_special_coverage(len(NATURAL) - 1, 60, existing_cells=existing)
+    assert "rain" not in [k for _, k in _cells(sigs)]
+
+
+def test_plan_special_coverage_advances_the_seed_per_keyword():
+    # The only route to more than one track per keyword: variant 0 is what a plain
+    # GROUP:KEYWORD target always produces.
+    sigs = plan_special_coverage(len(NATURAL) * 3, 60)
+    assert len({s.track_id for s in sigs}) == len(sigs)
+    assert len({s.seed for s in sigs}) == len(sigs)
+    assert build_keyword_signature("natural_sounds", "rain", 60).track_id in {s.track_id for s in sigs}
+
+
+def test_plan_special_coverage_avoids_used_track_ids():
+    used = {build_keyword_signature("natural_sounds", "rain", 60).track_id}
+    sig = plan_special_coverage(1, 60, used_track_ids=used, groups=["natural_sounds"])[0]
+    assert sig.track_id not in used
+
+
+def test_fill_special_to_per_cell_reaches_target():
+    sigs = fill_special_to_per_cell(3, 60, existing_cells=[("natural_sounds", "rain")])
+    report = special_coverage_report([("natural_sounds", "rain")] + _cells(sigs))
+    assert set(report["per_cell"].values()) == {3}
+    assert report["per_group"]["natural_sounds"] == 3 * len(NATURAL)
+
+
+def test_special_coverage_report_ignores_cells_outside_the_selection():
+    report = special_coverage_report([("natural_sounds", "rain"), ("other_group", "x")])
+    assert report["total"] == 1
+
+
+def test_unknown_special_group_rejected():
+    with pytest.raises(ValueError, match="unknown special group"):
+        plan_special_coverage(1, 60, groups=["birdsong"])
 
 
 def test_composition_plan_v1_is_sections():
@@ -172,7 +233,51 @@ def test_prompt_for_provider_stable_audio_omits_instruments_when_unmapped():
     assert "Instruments:" not in adapted
 
 
-def test_prompt_for_provider_stable_audio_uses_keyword_entry_instrument():
-    spec = build_keyword_signature("natural_sounds", "chimes", 60).spec()
+def test_prompt_for_provider_stable_audio_slates_special_cells_as_sfx():
+    # A field recording is a sound effect, not music: the music tags are what made the
+    # first natural_sounds renders come back as ambient drones.
+    spec = build_keyword_signature("natural_sounds", "rain", 60).spec()
     adapted = prompt_for_provider(spec, "stable_audio")
-    assert "Instruments: Chimes" in adapted
+    assert adapted.endswith("TrackType: SFX")
+    assert "TrackType: Music" not in adapted
+    assert "Genre: Ambient" not in adapted
+
+
+def test_special_prompts_lead_with_the_subject():
+    # The keyword, not 50 words of MER vocabulary, is the first thing the encoder sees.
+    for keyword in SPECIAL_GROUPS["natural_sounds"].keywords:
+        prompt = build_keyword_signature("natural_sounds", keyword, 60).prompt
+        assert "no music" in prompt
+        assert prompt.split(",")[0].strip()  # opens on the source, not a genre label
+    assert build_keyword_signature("natural_sounds", "rain", 60).prompt.startswith("Steady soft rainfall")
+
+
+def test_every_prompt_bounds_how_busy_it_can_get():
+    # The failure this guards: "forest" arriving as a full dawn chorus. Density is
+    # capped in the positive prompt because the negative one only reaches the model
+    # under guidance, which the distilled checkpoints don't use.
+    # Event-driven sounds are told to space events out...
+    for prompt in (
+        build_signature("percussive_with_tail", "buddhist_meditative", 60).prompt,
+        build_keyword_signature("natural_sounds", "forest", 60).prompt,
+    ):
+        assert "at most one or two things sounding" in prompt
+    # ...while a continuous bed is told to stay even, because asking a cricket wash for
+    # "long stretches of near-stillness" breaks it into discrete chirps instead.
+    for prompt in (
+        build_signature("noise_texture", "neutral", 60).prompt,
+        build_keyword_signature("natural_sounds", "rain", 60).prompt,
+        build_keyword_signature("natural_sounds", "night", 60).prompt,
+    ):
+        assert "Even and unbroken throughout" in prompt
+        assert "near-stillness" not in prompt
+    assert "no dawn chorus" in build_keyword_signature("natural_sounds", "forest", 60).prompt
+
+
+def test_grid_prompts_carry_motion_and_recording_character():
+    # What keeps a 60-minute listen from going flat — and the axes stay untouched.
+    prompt = build_signature("drone", "lofi", 60).prompt
+    assert "evolves slowly" in prompt
+    assert "tape saturation" in prompt  # the lofi style's character clause
+    assert "very low energy" in prompt  # the MER axes still there
+    assert "No vocals, no percussion hits" in prompt

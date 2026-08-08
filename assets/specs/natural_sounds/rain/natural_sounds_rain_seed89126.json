@@ -1,0 +1,58 @@
+{
+  "track_id": "natural_sounds_rain_seed89126",
+  "kind": "special",
+  "substrate": null,
+  "style": null,
+  "group": "natural_sounds",
+  "keyword": "rain",
+  "requested_features": null,
+  "measured_features": null,
+  "instrumentation": [
+    "rain"
+  ],
+  "prompt": "Steady soft rainfall on leaves and wet ground, fine even patter, no thunder and no wind gusts, recorded from under a porch a few feet away. Even and unbroken throughout, one continuous texture with nothing stepping forward out of it, no separate events and no layering. Calm and unhurried, with no sudden events and no build. Natural stereo field recording, unprocessed, no music, no instruments, no voices.",
+  "negative_prompt": "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions, hiss, static, white noise, busy, cluttered, dense, chattering",
+  "composition_plan": {
+    "positive_global_styles": [
+      "field recording",
+      "nature ambience",
+      "instrumental",
+      "wide stereo",
+      "rain"
+    ],
+    "negative_global_styles": [
+      "bright",
+      "aggressive",
+      "drums",
+      "vocals",
+      "fast",
+      "buildup",
+      "hiss",
+      "white noise"
+    ],
+    "sections": [
+      {
+        "section_name": "loop",
+        "positive_local_styles": [
+          "rain"
+        ],
+        "negative_local_styles": [
+          "bright",
+          "aggressive",
+          "drums",
+          "vocals",
+          "fast",
+          "buildup",
+          "hiss",
+          "white noise"
+        ],
+        "duration_ms": 60000,
+        "lines": []
+      }
+    ]
+  },
+  "seed": 89126,
+  "duration_s": 60,
+  "loopable": true,
+  "render": null
+}

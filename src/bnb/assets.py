@@ -19,6 +19,10 @@ separate id -> path index, and ``catalog.json`` already caches the resolved path
 the hot selection path. The selection workflow reads only ``catalog.json``; it never
 has to open every spec. Regenerate it with :func:`rebuild_catalog` after writing specs.
 
+``catalog.json`` is *derived* state, never authored: the spec tree is the source of
+truth, so removing a spec file or a whole cell directory by hand is the supported way
+to drop tracks, and the next rebuild simply won't see them.
+
 Every function here takes an optional ``root`` (default :data:`ASSETS_DIR`) so callers
 — chiefly ``bnb.catalog.CategoryManager`` — can point a whole session at a different
 asset repository, e.g. a ``tmp_path`` in tests.
@@ -122,17 +126,107 @@ def load_spec(track_id: str, root: Path = ASSETS_DIR) -> dict[str, Any]:
     return json.loads(path.read_text())
 
 
+def spec_files(root: Path = ASSETS_DIR) -> list[Path]:
+    """Every spec file under ``specs/``, wherever in the cell tree it sits, sorted."""
+    d = specs_dir(root)
+    return sorted(d.rglob("*.json")) if d.exists() else []
+
+
+def track_files(root: Path = ASSETS_DIR) -> dict[str, Path]:
+    """Every rendered audio file under ``tracks/``, keyed by track_id.
+
+    One scan, so the catalog rebuild resolves audio for the whole library without
+    an rglob per track. Ties (same id, two formats) resolve like :func:`find_track`:
+    first in sorted order wins.
+    """
+    d = tracks_dir(root)
+    index: dict[str, Path] = {}
+    if d.exists():
+        for path in sorted(d.rglob("*.*")):
+            index.setdefault(path.stem, path)
+    return index
+
+
+def load_all_specs(root: Path = ASSETS_DIR) -> dict[str, tuple[Path, dict[str, Any]]]:
+    """Every spec on disk, keyed by track_id — the single scan the catalog is built from.
+
+    Raises ``ValueError`` on anything that would make the catalog disagree with the
+    disk rather than quietly picking a winner: an unreadable or track_id-less record,
+    or two files claiming the same track_id.
+    """
+    specs: dict[str, tuple[Path, dict[str, Any]]] = {}
+    problems: list[str] = []
+    for path in spec_files(root):
+        rel = path.relative_to(root)
+        try:
+            spec = json.loads(path.read_text())
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            problems.append(f"{rel}: not a readable spec ({exc})")
+            continue
+        track_id = spec.get("track_id") if isinstance(spec, dict) else None
+        if not track_id:
+            problems.append(f"{rel}: no track_id — not a spec; move or delete it")
+            continue
+        if track_id in specs:
+            problems.append(f"{rel}: duplicate track_id {track_id!r} (also {specs[track_id][0].relative_to(root)}); delete one")
+            continue
+        specs[track_id] = (path, spec)
+    if problems:
+        raise ValueError("inconsistent spec tree:\n  " + "\n  ".join(problems))
+    return specs
+
+
 def list_specs(root: Path = ASSETS_DIR) -> list[str]:
     """Every track_id with a spec on disk, sorted."""
-    d = specs_dir(root)
-    if not d.exists():
-        return []
-    return sorted(p.stem for p in d.rglob("*.json"))
+    return sorted(load_all_specs(root))
 
 
 def list_rendered(root: Path = ASSETS_DIR) -> list[str]:
     """Every track_id that has rendered audio on disk (i.e. is playable), sorted."""
-    return [tid for tid in list_specs(root) if has_track(tid, root)]
+    tracks = track_files(root)
+    return [tid for tid in list_specs(root) if tid in tracks]
+
+
+def orphan_tracks(root: Path = ASSETS_DIR) -> list[Path]:
+    """Rendered audio whose spec is gone — the residue of a manual spec delete.
+
+    Invisible to the catalog (which is spec-derived), but worth surfacing: seeds are
+    deterministic, so replanning the same cell regenerates the *same* track_id and
+    would adopt the stale audio as its render.
+    """
+    specs = set(load_all_specs(root))
+    return [path for tid, path in sorted(track_files(root).items()) if tid not in specs]
+
+
+def normalize_layout(root: Path = ASSETS_DIR) -> list[tuple[Path, Path]]:
+    """Move every spec that isn't at :func:`spec_path` into its cell directory.
+
+    Covers both ways a spec can drift from the layout — a stale directory (e.g. the
+    old flat ``specs/<track_id>.json``) and a filename that isn't ``<track_id>.json``
+    — since the canonical path fixes both. Returns the (from, to) pairs moved.
+    """
+    moved: list[tuple[Path, Path]] = []
+    for track_id, (path, spec) in load_all_specs(root).items():
+        target = spec_path(spec, root)
+        if path == target:
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        path.rename(target)
+        moved.append((path, target))
+    prune_empty_dirs(specs_dir(root))
+    return moved
+
+
+def prune_empty_dirs(base: Path) -> None:
+    """Remove directories under ``base`` that hold no files at any depth.
+
+    Deleting specs (a file, or a whole cell) is the supported way to drop tracks, so
+    the empty cell directories left behind are expected debris, not state."""
+    if not base.exists():
+        return
+    for d in sorted(base.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        if d.is_dir() and not any(d.iterdir()):
+            d.rmdir()
 
 
 def write_pcm_wav(path: Path, pcm: bytes, sample_rate: int, channels: int = 2) -> None:
@@ -159,8 +253,16 @@ def record_render(
     audio_file: str,
     generated_at: str,
     watermark: str | None = None,
+    seed: int | None = None,
+    qc: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Fill a spec's ``render`` block after audio has been produced."""
+    """Fill a spec's ``render`` block after audio has been produced.
+
+    ``seed`` is the seed that actually produced this audio. It is normally the spec's
+    own, but a render retried past a QC failure uses a fresh one, and then the spec's
+    seed no longer describes the file on disk — so provenance records what was used.
+    ``qc`` carries the integrity verdict that let the render through (:mod:`bnb.qc`).
+    """
     spec["render"] = {
         "provider": provider,
         "model_version": model_version,
@@ -169,6 +271,8 @@ def record_render(
         "generated_at": generated_at,
         "audio_file": audio_file,
         "watermark": watermark,
+        "seed": spec.get("seed") if seed is None else seed,
+        "qc": qc,
     }
     return spec
 
@@ -185,8 +289,14 @@ def _summary(spec: dict[str, Any]) -> str:
 
 def catalog_entry(spec: dict[str, Any], root: Path = ASSETS_DIR) -> dict[str, Any]:
     """The compact, selectable descriptor for one track (what the workflow reads)."""
-    audio = find_track(spec["track_id"], root)
-    spec_file = find_spec(spec["track_id"], root)
+    return _entry(spec, find_spec(spec["track_id"], root), find_track(spec["track_id"], root), root)
+
+
+def _entry(
+    spec: dict[str, Any], spec_file: Path | None, audio: Path | None, root: Path
+) -> dict[str, Any]:
+    """:func:`catalog_entry` with both file lookups already resolved — what the
+    rebuild uses, so a whole-library scan costs two directory walks, not two per track."""
     render = spec.get("render") or {}
     return {
         "track_id": spec["track_id"],
@@ -209,8 +319,21 @@ def catalog_entry(spec: dict[str, Any], root: Path = ASSETS_DIR) -> dict[str, An
 
 
 def rebuild_catalog(root: Path = ASSETS_DIR) -> dict[str, Any]:
-    """Scan ``specs/`` and (re)write ``catalog.json``; return the catalog dict."""
-    entries = [catalog_entry(load_spec(tid, root), root) for tid in list_specs(root)]
+    """Scan ``specs/`` and (re)write ``catalog.json``; return the catalog dict.
+
+    The catalog is a pure function of the spec tree: whatever is on disk at this
+    moment is exactly what lands in it, so deleting a spec file (or a whole cell
+    directory) is all it takes to drop a track — nothing else caches the fact that it
+    existed. The scan first normalizes the tree (:func:`normalize_layout`) and refuses
+    to index a state it can't read unambiguously (:func:`load_all_specs` raises), so a
+    stale catalog can't outlive the specs it describes.
+    """
+    normalize_layout(root)
+    tracks = track_files(root)
+    entries = [
+        _entry(spec, path, tracks.get(track_id), root)
+        for track_id, (path, spec) in sorted(load_all_specs(root).items())
+    ]
     catalog = {
         "count": len(entries),
         "tracks": entries,

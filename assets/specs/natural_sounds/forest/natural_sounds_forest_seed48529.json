@@ -1,0 +1,58 @@
+{
+  "track_id": "natural_sounds_forest_seed48529",
+  "kind": "special",
+  "substrate": null,
+  "style": null,
+  "group": "natural_sounds",
+  "keyword": "forest",
+  "requested_features": null,
+  "measured_features": null,
+  "instrumentation": [
+    "forest"
+  ],
+  "prompt": "A still forest clearing at dawn, mostly quiet air and the faint rustle of leaves, with a single distant bird calling once in a while and long silences in between, no dawn chorus and no flocks. Restrained and uncrowded: at most one or two things sounding at any moment, occasional and far apart, with long stretches of near-stillness between them. Calm and unhurried, with no sudden events and no build. Natural stereo field recording, unprocessed, no music, no instruments, no voices.",
+  "negative_prompt": "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions, hiss, static, white noise, busy, cluttered, dense, chattering",
+  "composition_plan": {
+    "positive_global_styles": [
+      "field recording",
+      "nature ambience",
+      "instrumental",
+      "wide stereo",
+      "forest"
+    ],
+    "negative_global_styles": [
+      "bright",
+      "aggressive",
+      "drums",
+      "vocals",
+      "fast",
+      "buildup",
+      "hiss",
+      "white noise"
+    ],
+    "sections": [
+      {
+        "section_name": "loop",
+        "positive_local_styles": [
+          "forest"
+        ],
+        "negative_local_styles": [
+          "bright",
+          "aggressive",
+          "drums",
+          "vocals",
+          "fast",
+          "buildup",
+          "hiss",
+          "white noise"
+        ],
+        "duration_ms": 60000,
+        "lines": []
+      }
+    ]
+  },
+  "seed": 48529,
+  "duration_s": 60,
+  "loopable": true,
+  "render": null
+}

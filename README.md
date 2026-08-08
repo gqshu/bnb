@@ -65,7 +65,26 @@ prompt already reads as plain prose that both providers accept; `prompt_for_prov
 adapts it further per provider — ElevenLabs gets its structure from the composition
 plan, so the prompt passes through unchanged, while Stable Audio 3 has no structured
 composition input, so it gets an AudioSparx metadata-tag suffix instead (the
-vocabulary its text encoder was trained on — see `scripts/try_stable_audio.py`).
+vocabulary its text encoder was trained on — see `scripts/try_stable_audio.py`):
+`TrackType: Music, …` for grid cells, `TrackType: SFX` for special ones.
+
+A prompt carries three things beyond the taxonomy axes, all of them because a bed you
+sit with for an hour has to stay interesting without ever becoming eventful: a **motion**
+clause (slow swells, faint timbral drift, "never builds, resolves, or arrives anywhere"),
+the style's **character** — the room, the gear, the grain, e.g. lofi's tape wow and vinyl
+noise floor against buddhist_meditative's stone hall and audible air — and a **density**
+limit. The axes stay biased low regardless; motion and character move the *texture*, not
+the MER coordinate, which is what the down-regulation scope actually constrains.
+
+Density is stated countably ("at most one or two things sounding at any moment") because
+"very sparse" reads to these models as timbre, and it is stated in the *positive* prompt
+because the negative one only reaches the model under guidance (`--sa3-cfg`), which the
+distilled checkpoints run without. Which limit a sound gets depends on how it's made —
+`event_driven` on the substrate or keyword. Sounds built from separate events (singing
+bowls, a solo line, forest birds, chimes) are told to space them out; continuous beds
+(drones, noise, rain, crickets) are told to stay even. Getting that backwards is worse
+than saying nothing: asking a cricket wash for "long stretches of near-stillness" doesn't
+quiet it, it breaks the smooth bed into discrete chirps with gaps.
 
 ### Asset repository: one subdirectory per category cell
 
@@ -98,6 +117,9 @@ poking `assets` functions directly:
   cell=..., rendered=..., provider=...)`, any combination, unset filters ignored
 - **pick** — `pick(**filters, exclude=track_id)` — one random match, excluding a
   track_id when there's an alternative (what shuffle playback uses)
+- **sync** — `rebuild()` re-derives `catalog.json` from the spec tree (normalizing
+  stray spec locations and refusing ambiguous ones); `spec_ids()` is disk truth even
+  when the catalog is stale, `orphan_tracks()` lists audio whose spec is gone
 
 `CategoryManager(root=...)` points a whole session at a different asset repository
 (e.g. a `tmp_path` in tests) instead of the real `assets/`.
@@ -117,23 +139,56 @@ uv run scripts/plan_background.py --list             # print the taxonomy axes, 
 uv run scripts/plan_background.py --coverage         # print the substrate × style count matrix
 uv run scripts/plan_background.py                    # write the curated sample set
 uv run scripts/plan_background.py buddhist_meditative:drone --duration 90
-uv run scripts/plan_background.py natural_sounds:rain natural_sounds:ocean   # special cells
-uv run scripts/plan_background.py --only-new         # skip pairs whose spec already exists
+uv run scripts/plan_background.py natural_sounds            # every keyword in the group
+uv run scripts/plan_background.py natural_sounds:rain natural_sounds:ocean   # single special cells
 uv run scripts/plan_background.py --rebuild-catalog  # rebuild catalog.json from specs
 ```
 
-Grid pairs are `STYLE:SUBSTRATE`; special-cell pairs are `GROUP:KEYWORD` — same
-syntax, disambiguated by whether the left side names a style or a special group.
+A target is a grid cell (`STYLE:SUBSTRATE`), a special cell (`GROUP:KEYWORD` — same
+syntax, disambiguated by whether the left side names a style or a special group), or a
+bare special group (`GROUP`), which plans every keyword in it. `natural_sounds` is the
+only group for now.
 
-Grow the library by coverage guide — place the next specs so the substrate × style
-grid fills evenly (which also levels the per-substrate and per-style marginals; special
-cells sit outside this grid by design, so they're unaffected). Each repeat of a cell
-advances the seed (`variant`), matching the doc's "3–5 seeds per cell" (§5):
+**Planning never overwrites.** Seeds are deterministic, so a target whose spec is
+already on disk is reported and skipped — runs are idempotent and safe to repeat.
+Replanning is a deliberate, manual act: delete the spec file (or the whole cell
+directory) and run again. That's also how you change an existing spec's `--duration`
+or pick up a prompt-template edit. `catalog.json` is derived state, rebuilt from the
+spec tree at the start of every run, so a hand-deleted spec is simply gone; misplaced
+specs are moved back into their cell and duplicate `track_id`s are a hard error rather
+than a silent winner. Deleting a spec whose audio was already rendered leaves the
+`.wav` orphaned — the script warns, because replanning that cell reproduces the same
+`track_id` and would adopt the stale audio.
+
+Grow the library by coverage guide — place the next specs so the cells fill evenly.
+On the grid that also levels the per-substrate and per-style marginals. Each repeat of
+a cell advances the seed (`variant`), matching the doc's "3–5 seeds per cell" (§5):
 
 ```bash
 uv run scripts/plan_background.py --fill 10          # next 10 specs, evenly distributed
 uv run scripts/plan_background.py --per-cell 2       # top every cell up to 2 tracks
 uv run scripts/plan_background.py --fill 6 --styles buddhist_meditative,neutral   # restrict the grid
+
+uv run scripts/plan_background.py --per-cell 3 --groups natural_sounds   # 3 seeds per keyword
+uv run scripts/plan_background.py --fill 4 --groups natural_sounds
+```
+
+`--groups` points the same guides at special cells instead of the grid — the two
+taxonomies share no axis, so a run fills one or the other (`--groups` with
+`--substrates`/`--styles` is an error). It's also the **only** way to plan more than one
+track per keyword: a plain `GROUP:KEYWORD` target always resolves to the cell's first
+seed. `--coverage` reports both taxonomies — the substrate × style matrix and a
+per-keyword row for each special group — unless an axis filter narrows it to one:
+
+```
+                       drone melodic   field   noise   bowls       Σ
+neutral                    6       6       6       6       6      30
+...
+Σ                         30      30      30      30      30     150
+
+Special groups (outside the grid):
+                  rain  ocean   wind stream forest  night chimes      Σ
+natural_sounds       3      3      3      2      2      2      2     17
 ```
 
 `scripts/render_background.py` — turn specs into audio; provider defaults to
@@ -146,6 +201,9 @@ uv run scripts/render_background.py buddhist_meditative_drone_seed81657   # rend
 uv run scripts/render_background.py --force <track_id>    # re-render an existing track
 uv run scripts/render_background.py --sa3-backend mlx --sa3-model medium  # the 1.4B model, Metal-backed
 uv run scripts/render_background.py --sa3-cfg 5      # turn on classifier-free guidance
+uv run scripts/render_background.py --max-retry 5    # try harder on a cell that keeps failing QC
+uv run scripts/render_background.py --no-qc          # keep whatever comes back, unchecked
+uv run scripts/render_background.py --no-worker      # one process per track, reloading each time
 
 export ELEVENLABS_API_KEY=...
 uv run scripts/render_background.py --provider elevenlabs
@@ -157,6 +215,70 @@ selected provider is actually usable (the SA3 CLI is discoverable / the API key 
 set) and exits with setup instructions if not, before touching any spec. That also
 covers the case where every target track is already rendered and `--dry-run` would
 otherwise never reach the provider at all.
+
+**The default engine is `medium` on MLX.** It's the only checkpoint that covers both
+halves of the taxonomy — `small-music` cannot render sound effects at all — and on the
+music cells it measures visibly livelier: frame-level variation roughly doubled on the
+same seed and prompt (5.3 → 9.3 dB on singing bowls, 5.6 → 10.3 dB on the noise bed).
+It costs ~3× the sampling time (7.5s vs 2.4s for a 60s track) and ~4 GB peak RAM.
+
+On Apple Silicon that means MLX: `medium` wants Flash Attention 2 under torch and the
+prebuilt wheels are CUDA/Linux only, so it runs Metal-backed through `optimized/mlx/sa3`
+at ~8× realtime, using the `dit_medium_f16.npz` weights from the `stable-audio-3-optimized`
+bundle.
+
+**On a CUDA box, `--sa3-backend torch` is the only flag you need.** The SFX backend
+follows the run's backend unless overridden (only the *model* differs per cell), so one
+flag moves the whole library. Flash Attention is worth installing but is not a hard
+requirement: `medium`'s config sets `sliding_window`, and `transformer.py` degrades
+through a documented cascade when `flash_attn` won't import — flex-attention band mask,
+then chunked-halo masked SDPA ("math-equivalent, ~30× faster than tier 4"), then a full
+N×N masked SDPA that the vendor itself calls high-memory. Same audio, worse throughput,
+with the tier you land on depending on whether `torch.compile` works in your image. The
+torch path also unlocks the resident-model Worker, which matters more for medium than it
+did for small-music — one checkpoint load for the whole batch instead of one per track.
+
+**The model is loaded once per run where the backend allows it.** Loading `small-music`
+under torch takes eight seconds against about one second of sampling, and the upstream
+CLI pays it on every invocation — so that path runs against a resident model instead.
+`bnb.stable_audio.Worker` starts `src/bnb/sa3_worker.py` with the sibling checkout's
+interpreter (bnb's own venv can't import torch), keeps it open for the whole run, and
+sends one JSON request per track over a pipe. Each request is an independent seeded
+`generate` call, so the audio is what the one-shot CLI would have produced. It's `torch`
+only — the MLX entry point's sampling loop lives inline in its `main()` with no importable
+generate step, and a divergent copy of someone else's sampler is a worse trade than
+reloading — so the default MLX path reloads per track and absorbs the ~1s cost. Reach for
+it with `--sa3-model small-music --sa3-backend torch` when you want speed over quality.
+
+**Each spec goes to a checkpoint that can render it.** Special cells are field
+recordings, not music, and `small-music` has *no* SFX capability — the vendor's own
+compatibility table says so, and the first `natural_sounds` renders proved it: "rain"
+came back with a **150 Hz spectral centroid** (a bass drone; real rainfall sits nearer
+5 kHz). The default `medium` covers both, so one engine renders the whole run; the
+routing matters when you trade down. Special cells take `--sa3-sfx-model` /
+`--sa3-sfx-backend` (default `medium` / `mlx`) independently of `--sa3-model`, so
+`--sa3-model small-music --sa3-backend torch` renders the grid on the small checkpoint
+and still sends the field recordings to medium — two engine groups, loaded in turn.
+Pointing the SFX model at a music checkpoint is refused up front rather than rendering
+plausible nonsense. Special-cell prompts also get the guide's SFX slate —
+`TrackType: SFX`, subject first — instead of the music tags that were telling the
+encoder to make ambient music.
+
+**Every render is checked before it enters the library.** Generative engines fail
+bluntly and at random — silent, clipped, a dead constant buffer — so each result goes
+straight through `bnb.qc` while the model is still loaded, and a failure is re-rendered
+on the spot with a fresh seed (`--max-retry`, default 3; retrying the *same* seed would
+mostly reproduce the same broken audio). A track that never passes is left unrendered
+rather than shipped broken, and the run exits non-zero so a pipeline notices. The
+render block records what actually happened:
+
+```json
+"seed": 41654,
+"qc": {"attempts": 1, "seed": 41654, "verdict": "ok", "warnings": [], "metrics": {...}}
+```
+
+`render.seed` matters because it can differ from the spec's: a retried render is no
+longer reproducible from `spec.seed`, so provenance records the seed that made the file.
 
 Rendering is credit-safe: specs that already have audio are skipped unless you pass
 `--force`. The Stable Audio path needs the sibling `stable-audio-3` checkout set up

@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import hashlib
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -35,8 +35,9 @@ from typing import Any
 # discrete style tags (composition plan) because ElevenLabs consumes both.
 NEGATIVE_PROMPT = (
     "bright, harsh, energetic, fast, distorted, drums, buildup, EDM, sudden transitions, "
-    "hiss, static, white noise"
+    "hiss, static, white noise, busy, cluttered, dense, chattering"
 )
+
 NEGATIVE_GLOBAL_STYLES: tuple[str, ...] = (
     "bright",
     "aggressive",
@@ -47,6 +48,31 @@ NEGATIVE_GLOBAL_STYLES: tuple[str, ...] = (
     "hiss",
     "white noise",
 )
+
+# Density is the axis a generative engine overshoots on its own: asked for a forest it
+# writes a dawn chorus. The MER axes already say "very sparse", but that is a texture
+# word the models read as timbre, so the limit is stated countably instead — and in the
+# *positive* prompt, since the negative one only reaches the model under guidance (cfg),
+# which the distilled checkpoints run without.
+#
+# Which limit depends on how the sound is made, and getting this wrong is worse than
+# saying nothing: "long stretches of near-stillness" applied to a continuous cricket bed
+# doesn't quiet it, it breaks the smooth wash into discrete chirps with gaps — measurably
+# *more* eventful. So a bed is told to stay even, and only sounds built from separate
+# events are told to space them out.
+RESTRAINT = (
+    "Restrained and uncrowded: at most one or two things sounding at any moment, "
+    "occasional and far apart, with long stretches of near-stillness between them"
+)
+STEADINESS = (
+    "Even and unbroken throughout, one continuous texture with nothing stepping forward "
+    "out of it, no separate events and no layering"
+)
+
+
+def density_clause(event_driven: bool) -> str:
+    """The density limit that suits how this sound is produced."""
+    return RESTRAINT if event_driven else STEADINESS
 
 
 # --- Axis A: substrate (what the sound physically is) -----------------------
@@ -74,6 +100,7 @@ class Substrate:
     texture: str
     register: str
     requested: dict[str, Any]
+    event_driven: bool = False  # built from separate strikes/notes rather than one wash
 
 
 SUBSTRATES: dict[str, Substrate] = {
@@ -111,6 +138,7 @@ SUBSTRATES: dict[str, Substrate] = {
         harmony="simple, consonant",
         texture="sparse",
         register="mid",
+        event_driven=True,
         requested={
             "tempo_bpm": 50,
             "energy": "low",
@@ -183,6 +211,7 @@ SUBSTRATES: dict[str, Substrate] = {
         harmony="inharmonic partials",
         texture="sparse",
         register="low-mid",
+        event_driven=True,
         requested={
             "tempo_bpm": None,
             "energy": "very_low",
@@ -220,6 +249,7 @@ class Style:
     name: str
     descriptor: str  # fills the "[style-descriptor]" slot of the base template
     global_styles: tuple[str, ...]
+    character: str = ""  # recording space, gear and grain — the §4 "production" slot
     overrides: dict[str, StyleSubstrate] = field(default_factory=dict)
     mode_override: str | None = None  # e.g. buddhist -> just_intonation
     nature_bed_override: str | None = None  # e.g. nature_ambient -> present
@@ -230,6 +260,10 @@ STYLES: dict[str, Style] = {
         name="neutral",
         descriptor="ambient",
         global_styles=("instrumental", "ambient", "calm", "minimal"),
+        character=(
+            "Recorded close and clean with soft analogue warmth, a wide still stereo "
+            "image and a gentle hall reverb behind it"
+        ),
     ),
     # One coherent tradition per track, wordless by default (§6 guardrails):
     # the drone override uses a *wordless* hum, never a mantra with real text.
@@ -237,6 +271,10 @@ STYLES: dict[str, Style] = {
         name="buddhist_meditative",
         descriptor="meditative",
         global_styles=("meditative", "just intonation", "instrumental", "very sparse", "low register"),
+        character=(
+            "Recorded in a large stone hall, long natural reverb tails, faint room tone "
+            "and air audible in the silences between sounds"
+        ),
         mode_override="just_intonation",
         overrides={
             "percussive_with_tail": StyleSubstrate(
@@ -275,6 +313,10 @@ STYLES: dict[str, Style] = {
         name="neoclassical",
         descriptor="neoclassical",
         global_styles=("neoclassical", "felt piano", "strings", "warm", "intimate"),
+        character=(
+            "Close-mic'd in a small wooden room, felt and key mechanics faintly audible, "
+            "warm tape saturation and a soft intimate sustain"
+        ),
         overrides={
             "melodic_instrument": StyleSubstrate(
                 body="Solo felt piano, soft close-mic, sparse tonal phrases with gentle sustain",
@@ -290,6 +332,10 @@ STYLES: dict[str, Style] = {
         name="lofi",
         descriptor="lo-fi",
         global_styles=("lofi", "tape texture", "soft keys", "warm", "filtered highs"),
+        character=(
+            "Warm tape saturation with slow wow and flutter, a dusty vinyl noise floor "
+            "and filtered highs, like a worn cassette played late at night"
+        ),
         overrides={
             "melodic_instrument": StyleSubstrate(
                 body="Soft lo-fi keys with tape hiss and filtered highs, gentle and unhurried",
@@ -301,6 +347,10 @@ STYLES: dict[str, Style] = {
         name="nature_ambient",
         descriptor="nature-ambient",
         global_styles=("nature ambient", "field recording", "wide stereo", "water", "wind"),
+        character=(
+            "Wide open natural stereo, recorded outdoors at dawn with real depth and "
+            "distance, the space itself audible around the sound"
+        ),
         nature_bed_override="present",
         overrides={
             "field_recording": StyleSubstrate(
@@ -384,17 +434,48 @@ def _seed(key_parts: tuple[str, str], variant: int = 0) -> int:
     return int.from_bytes(digest[:4], "big") % 100_000
 
 
+def retry_seed(track_id: str, attempt: int) -> int:
+    """A fresh seed for re-rendering a track whose first render failed QC.
+
+    Retrying with the spec's own seed would mostly reproduce the same broken audio —
+    a dead or silent render is a property of that point in the noise space, not of
+    luck. Derived from the track_id so the Nth retry is still reproducible, and kept
+    out of the cell-variant space (:func:`_seed` over ``(style, substrate)``) so it
+    can't collide with another track's planned seed.
+    """
+    return _seed((track_id, "qc-retry"), attempt)
+
+
 def _dedupe(tags: tuple[str, ...]) -> list[str]:
     """Order-preserving dedupe for style-tag lists."""
     return list(dict.fromkeys(tags))
 
 
+# Every track is a bed you sit with for tens of minutes, and the first library came
+# back *correct but plain*: the axes were on target and nothing moved. These two
+# clauses are the fix, and they're deliberately the only thing loosened — motion at
+# the timescale of a breath is what makes a drone worth staying with, and it costs
+# nothing on the MER axes because the mean level, brightness and density don't move.
+# The engines also simply respond better to this register: the SA3 prompt guide's own
+# examples are evocative prose about rooms and gear, not lists of adjectives.
+MOTION = (
+    "It evolves slowly over minutes — long soft swells that rise and fall like breathing, "
+    "faint timbral drift, quiet detail appearing and receding — but it never builds, "
+    "resolves, or arrives anywhere"
+)
+
+
 def build_prompt(substrate: Substrate, style: Style, body: str, nature_bed: str) -> str:
-    """Fill the §4 base template: substrate body + style descriptor + MER axes."""
+    """Fill the §4 base template: substrate body, style descriptor and character, the
+    MER axes, and the slow-motion clause that keeps a long listen from going flat."""
     nature = "" if nature_bed == "none" else "A soft natural bed blended gently underneath. "
+    character = f"{style.character}. " if style.character else ""
     return (
         f"Instrumental {style.descriptor} soundscape for deep relaxation. "
         f"{body}. "
+        f"{MOTION}. "
+        f"{density_clause(substrate.event_driven)}. "
+        f"{character}"
         f"Tempo {substrate.tempo}, {substrate.energy} energy, very soft dynamics. "
         f"{substrate.timbre} timbre, warm and dark, low spectral brightness. "
         f"{substrate.harmony} harmony, {substrate.texture} texture, {substrate.register} register. "
@@ -513,13 +594,18 @@ def composition_plan_for_model(spec: dict[str, Any], model_id: str) -> dict[str,
 class KeywordEntry:
     """One keyword within a special group.
 
-    ``description`` fills the base template's "Featuring ..." clause. ``instrument``
-    is an AudioSparx ``Instruments:`` tag (see :func:`prompt_for_provider`), set only
-    for keywords the model can hear as a played instrument rather than an ambience.
+    ``description`` *opens* the prompt and carries the whole subject: the SA3 prompt
+    guide's SFX section asks for the core source, the action, and the production
+    (mic placement, room), so these read as a recordist's slate rather than a mood.
+
+    ``event_driven`` says whether the sound is made of separate events (a bird call, a
+    chime strike) or is one continuous bed (rain, wind) — which decides the density
+    limit it gets, since telling a bed to leave gaps makes it *more* eventful, not less
+    (:func:`density_clause`).
     """
 
     description: str
-    instrument: str | None = None
+    event_driven: bool = False
 
 
 @dataclass(frozen=True)
@@ -535,23 +621,55 @@ class SpecialGroup:
 SPECIAL_GROUPS: dict[str, SpecialGroup] = {
     "natural_sounds": SpecialGroup(
         name="natural_sounds",
+        # The keyword's own description comes *first* and this is the tail, because a
+        # field recording is a sound effect, not music: the earlier phrasing opened
+        # with "Instrumental natural soundscape ... very low energy, warm-dark timbre"
+        # and buried the actual subject after 50 words of MER vocabulary, which read to
+        # the text encoder as an instruction to make an ambient music bed. It duly did
+        # — the first rain renders measured a 150 Hz spectral centroid (a bass drone;
+        # real rainfall lands nearer 5 kHz). Everything the grid says about tempo,
+        # harmony and register is meaningless here and is gone.
         body=(
-            "Instrumental natural soundscape for deep relaxation. A soft, continuous "
-            "field-recording bed, broadband and pitchless, arrhythmic. Very low energy, "
-            "very soft dynamics. Warm, soft broadband timbre, low spectral brightness. "
-            "No tonal center, continuous texture, full but gentle register. No vocals, "
-            "no music, no percussion hits, no sudden transitions. Seamless, calm, continuous."
+            "Calm and unhurried, with no sudden events and no build. Natural stereo "
+            "field recording, unprocessed, no music, no instruments, no voices."
         ),
         global_styles=("field recording", "nature ambience", "instrumental", "wide stereo"),
         keywords={
-            "rain": KeywordEntry("soft distant rainfall, gentle raindrops on leaves, no thunder"),
-            "ocean": KeywordEntry("slow distant ocean waves, long gentle swells, calm surf"),
-            "wind": KeywordEntry("faint wind through trees, airy and slow, low whooshing"),
-            "stream": KeywordEntry("quiet flowing stream, soft trickling water"),
-            "forest": KeywordEntry("distant forest ambience, faint birdsong, leaves rustling softly"),
-            "night": KeywordEntry("quiet night ambience, faint crickets, distant and low"),
+            "rain": KeywordEntry(
+                "Steady soft rainfall on leaves and wet ground, fine even patter, "
+                "no thunder and no wind gusts, recorded from under a porch a few feet away"
+            ),
+            "ocean": KeywordEntry(
+                "Slow ocean waves washing onto a sandy shore, long gentle swells and "
+                "receding foam, distant calm surf recorded from up the beach"
+            ),
+            "wind": KeywordEntry(
+                "Soft wind moving through pine trees, airy and slow, needles and leaves "
+                "rustling, no howling, recorded outdoors at a distance"
+            ),
+            "stream": KeywordEntry(
+                "A small stream trickling over rocks, steady flowing water with soft "
+                "gurgles, recorded close to the bank"
+            ),
+            # The event-driven keywords are where an engine reaches for a dawn chorus,
+            # so each one names how *few* events it wants, not just which ones.
+            "forest": KeywordEntry(
+                "A still forest clearing at dawn, mostly quiet air and the faint rustle "
+                "of leaves, with a single distant bird calling once in a while and long "
+                "silences in between, no dawn chorus and no flocks",
+                event_driven=True,
+            ),
+            # Kept close to the original wording: every rewrite measured busier, and a
+            # cricket bed is a continuous wash, so it takes the steadiness clause.
+            "night": KeywordEntry(
+                "A quiet summer night in open country, one even layer of faint distant "
+                "crickets and still air, nothing close and nothing in the foreground"
+            ),
             "chimes": KeywordEntry(
-                "distant wind chimes, sparse and soft, gentle metallic shimmer", instrument="Chimes"
+                "Wind chimes turning in a light breeze on a porch, two or three soft "
+                "metallic notes at a time with long shimmering decays, then quiet garden "
+                "air until the next gust",
+                event_driven=True,
             ),
         },
     ),
@@ -633,7 +751,7 @@ def build_keyword_signature(
         keyword=keyword,
         duration_s=duration_s,
         seed=_seed((group_name, keyword), variant),
-        prompt=f"{group.body} Featuring {entry.description}.",
+        prompt=f"{entry.description}. {density_clause(entry.event_driven)}. {group.body}",
         negative_prompt=NEGATIVE_PROMPT,
         instrumentation=instrumentation,
         composition_plan=composition_plan,
@@ -650,6 +768,12 @@ def build_keyword_signature(
 # technique scripts/try_stable_audio.py uses for its keyword smoke tests.
 
 AUDIOSPARX_BASE_TAGS = "TrackType: Music, VocalType: Instrumental, Genre: Ambient"
+
+# Special cells are field recordings, so they take the guide's SFX slate instead —
+# "TrackType: SFX ... tends to produce more semantically reasonable sound effects".
+# The music tags were actively harmful here: labelling rain as Genre: Ambient music is
+# how the first renders came back as drones.
+AUDIOSPARX_SFX_TAGS = "TrackType: SFX"
 
 # Internal instrumentation tags -> the AudioSparx Instruments vocabulary. Special-group
 # keywords carry their own KeywordEntry.instrument and bypass this map entirely.
@@ -674,8 +798,6 @@ AUDIOSPARX_INSTRUMENTS: dict[str, str] = {
 
 def _audiosparx_instrument(spec: dict[str, Any]) -> str | None:
     """The AudioSparx ``Instruments:`` tag for a spec, if its instrumentation names one."""
-    if spec.get("kind") == "special":
-        return SPECIAL_GROUPS[spec["group"]].keywords[spec["keyword"]].instrument
     for tag in spec.get("instrumentation", ()):
         if tag in AUDIOSPARX_INSTRUMENTS:
             return AUDIOSPARX_INSTRUMENTS[tag]
@@ -686,10 +808,13 @@ def prompt_for_provider(spec: dict[str, Any], provider: str) -> str:
     """Adapt a spec's stored prompt to a provider's prompt surface.
 
     ``elevenlabs`` (and any other provider that reads the prompt as-is) gets the
-    stored prose unchanged. ``stable_audio`` gets the AudioSparx tag suffix appended.
+    stored prose unchanged. ``stable_audio`` gets the AudioSparx tag suffix appended —
+    the music slate for grid cells, the SFX slate for special ones.
     """
     if provider != "stable_audio":
         return spec["prompt"]
+    if spec.get("kind") == "special":
+        return f"{spec['prompt']} {AUDIOSPARX_SFX_TAGS}"
     instrument = _audiosparx_instrument(spec)
     suffix = f", Instruments: {instrument}" if instrument else ""
     return f"{spec['prompt']} {AUDIOSPARX_BASE_TAGS}{suffix}"
@@ -756,14 +881,37 @@ def coverage_report(
     }
 
 
-def _next_signature(substrate: str, style: str, duration_s: int, used: set[str]) -> Signature:
-    """The lowest-variant signature for a cell whose track_id isn't taken yet."""
-    variant = 0
-    while True:
-        sig = build_signature(substrate, style, duration_s, variant)
-        if sig.track_id not in used:
-            return sig
-        variant += 1
+def _fill_cells(
+    n: int,
+    cells: Sequence[Cell],
+    counts: Counter[Cell],
+    used: set[str],
+    build: Callable[[Cell, int], Any],
+    priority: Callable[[Cell], tuple[Any, ...]],
+) -> list[Any]:
+    """Greedily place ``n`` signatures, each into the currently least-covered cell.
+
+    The shared core of both coverage guides: they differ only in what a cell is and
+    how ties break (``priority``, re-evaluated every step because ``counts`` moves),
+    and in how a cell becomes a signature (``build(cell, variant)``). The variant
+    advances until the track_id is free, so repeated picks of one cell are distinct
+    renders rather than collisions with what's already planned.
+    """
+    picked: list[Any] = []
+    if not cells:
+        return picked
+    for _ in range(max(0, n)):
+        cell = min(cells, key=priority)
+        variant = 0
+        while True:
+            sig = build(cell, variant)
+            if sig.track_id not in used:
+                break
+            variant += 1
+        picked.append(sig)
+        used.add(sig.track_id)
+        counts[cell] += 1
+    return picked
 
 
 def plan_coverage(
@@ -785,29 +933,27 @@ def plan_coverage(
     if n <= 0:
         return []
     subs, stys = _resolve_axes(substrates, styles)
-    grid = {(sub, sty) for sub in subs for sty in stys}
-    counts = Counter(cell for cell in existing_cells if cell in grid)
-    used = set(used_track_ids)
+    grid = [(sub, sty) for sub in subs for sty in stys]
+    counts = Counter(cell for cell in existing_cells if cell in set(grid))
 
-    signatures: list[Signature] = []
-    for _ in range(n):
-        sub_marginal = {sub: sum(counts[(sub, sty)] for sty in stys) for sub in subs}
-        sty_marginal = {sty: sum(counts[(sub, sty)] for sub in subs) for sty in stys}
-        sub, sty = min(
-            grid,
-            key=lambda cell: (
-                counts[cell],
-                sub_marginal[cell[0]],
-                sty_marginal[cell[1]],
-                subs.index(cell[0]),
-                stys.index(cell[1]),
-            ),
+    def priority(cell: Cell) -> tuple[Any, ...]:
+        sub, sty = cell
+        return (
+            counts[cell],
+            sum(counts[(sub, s)] for s in stys),  # substrate marginal
+            sum(counts[(u, sty)] for u in subs),  # style marginal
+            subs.index(sub),
+            stys.index(sty),
         )
-        sig = _next_signature(sub, sty, duration_s, used)
-        signatures.append(sig)
-        used.add(sig.track_id)
-        counts[(sub, sty)] += 1
-    return signatures
+
+    return _fill_cells(
+        n,
+        grid,
+        counts,
+        set(used_track_ids),
+        lambda cell, variant: build_signature(cell[0], cell[1], duration_s, variant),
+        priority,
+    )
 
 
 def fill_to_per_cell(
@@ -831,4 +977,92 @@ def fill_to_per_cell(
         used_track_ids=used_track_ids,
         substrates=substrates,
         styles=styles,
+    )
+
+
+# --- Coverage over special groups -------------------------------------------
+#
+# Special cells get the same treatment, one axis lighter: a keyword belongs to
+# exactly one group, so the cells are a ragged list rather than a product, and
+# "evenly covered" just means level per-keyword counts (ties to the thinnest group).
+# This is the only way to plan more than one seed of a keyword — plain
+# ``natural_sounds:rain`` targets are always variant 0.
+
+SpecialCell = Cell  # (group, keyword)
+
+
+def special_cells(groups: Sequence[str] | None = None) -> list[SpecialCell]:
+    """Every (group, keyword) cell in the named special groups (default: all of them)."""
+    names = list(groups) if groups is not None else list(SPECIAL_GROUPS)
+    for name in names:
+        if name not in SPECIAL_GROUPS:
+            raise ValueError(f"unknown special group {name!r}, expected one of {list(SPECIAL_GROUPS)}")
+    return [(name, keyword) for name in names for keyword in SPECIAL_GROUPS[name].keywords]
+
+
+def special_coverage_report(
+    existing_cells: Iterable[SpecialCell], groups: Sequence[str] | None = None
+) -> dict[str, Any]:
+    """Count how many tracks each special cell / group currently has."""
+    cells = special_cells(groups)
+    counts = Counter(cell for cell in existing_cells if cell in set(cells))
+    names = list(dict.fromkeys(group for group, _ in cells))
+    return {
+        "total": sum(counts.values()),
+        "per_cell": {f"{g}:{k}": counts[(g, k)] for g, k in cells},
+        "per_group": {name: sum(counts[c] for c in cells if c[0] == name) for name in names},
+        "keywords": {name: [k for g, k in cells if g == name] for name in names},
+    }
+
+
+def plan_special_coverage(
+    n: int,
+    duration_s: int,
+    *,
+    existing_cells: Iterable[SpecialCell] = (),
+    used_track_ids: Iterable[str] = (),
+    groups: Sequence[str] | None = None,
+) -> list[KeywordSignature]:
+    """Pick the next ``n`` keyword signatures that most evenly fill the special groups."""
+    if n <= 0:
+        return []
+    cells = special_cells(groups)
+    counts = Counter(cell for cell in existing_cells if cell in set(cells))
+
+    def priority(cell: SpecialCell) -> tuple[Any, ...]:
+        group, _ = cell
+        return (
+            counts[cell],
+            sum(counts[c] for c in cells if c[0] == group),  # group marginal
+            cells.index(cell),
+        )
+
+    return _fill_cells(
+        n,
+        cells,
+        counts,
+        set(used_track_ids),
+        lambda cell, variant: build_keyword_signature(cell[0], cell[1], duration_s, variant),
+        priority,
+    )
+
+
+def fill_special_to_per_cell(
+    target: int,
+    duration_s: int,
+    *,
+    existing_cells: Iterable[SpecialCell] = (),
+    used_track_ids: Iterable[str] = (),
+    groups: Sequence[str] | None = None,
+) -> list[KeywordSignature]:
+    """Coverage guide: bring every keyword of the selected groups up to ``target`` tracks."""
+    cells = special_cells(groups)
+    counts = Counter(cell for cell in existing_cells if cell in set(cells))
+    needed = sum(max(0, target - counts[cell]) for cell in cells)
+    return plan_special_coverage(
+        needed,
+        duration_s,
+        existing_cells=existing_cells,
+        used_track_ids=used_track_ids,
+        groups=groups,
     )
