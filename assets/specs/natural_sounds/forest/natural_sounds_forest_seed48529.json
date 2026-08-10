@@ -54,5 +54,34 @@
   "seed": 48529,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:35:11.445754+00:00",
+    "audio_file": "tracks/natural_sounds/forest/natural_sounds_forest_seed48529.wav",
+    "watermark": null,
+    "seed": 48529,
+    "qc": {
+      "attempts": 1,
+      "seed": 48529,
+      "verdict": "warn",
+      "warnings": [
+        "quiet: -40.8 dBFS RMS"
+      ],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.1604,
+        "rms_dbfs": -40.8,
+        "silent_fraction": 0.0,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0001,
+        "level_variation_db": 2.93,
+        "spectral_flatness": 0.028
+      }
+    }
+  }
 }

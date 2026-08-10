@@ -66,5 +66,32 @@
   "seed": 81657,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:28:44.650447+00:00",
+    "audio_file": "tracks/buddhist_meditative/drone/buddhist_meditative_drone_seed81657.wav",
+    "watermark": null,
+    "seed": 81657,
+    "qc": {
+      "attempts": 1,
+      "seed": 81657,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.468,
+        "rms_dbfs": -26.9,
+        "silent_fraction": 0.052,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 11.18,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
 }

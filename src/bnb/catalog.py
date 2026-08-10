@@ -186,6 +186,7 @@ class CategoryManager:
         *,
         substrate: str | None = None,
         style: str | None = None,
+        goal: str | None = None,
         group: str | None = None,
         keyword: str | None = None,
         kind: str | None = None,
@@ -193,7 +194,12 @@ class CategoryManager:
         rendered: bool | None = None,
         provider: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Filter the catalog by any combination of tags; unset filters are ignored."""
+        """Filter the catalog by any combination of tags; unset filters are ignored.
+
+        ``goal`` only ever matches grid entries (``relax``/``focus``) — special-group
+        entries carry no goal (§ :func:`bnb.assets.catalog_entry`), so a goal filter
+        naturally excludes them rather than needing a ``kind`` filter alongside it.
+        """
         entries = self.catalog()["tracks"]
         if cell is not None:
             entries = [e for e in entries if self._cell_of(e) == tuple(cell)]
@@ -201,6 +207,8 @@ class CategoryManager:
             entries = [e for e in entries if e["substrate"] == substrate]
         if style is not None:
             entries = [e for e in entries if e["style"] == style]
+        if goal is not None:
+            entries = [e for e in entries if e.get("goal") == goal]
         if group is not None:
             entries = [e for e in entries if e["group"] == group]
         if keyword is not None:

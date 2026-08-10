@@ -67,5 +67,32 @@
   "seed": 31991,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:27:43.925907+00:00",
+    "audio_file": "tracks/buddhist_meditative/percussive_with_tail/buddhist_meditative_bowls_seed31991.wav",
+    "watermark": null,
+    "seed": 31991,
+    "qc": {
+      "attempts": 1,
+      "seed": 31991,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.8052,
+        "rms_dbfs": -30.8,
+        "silent_fraction": 0.006,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 7.45,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
 }

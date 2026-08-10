@@ -92,6 +92,31 @@ That's it. Two semantic sliders + a named state give combinatorially richer goal
 - **Not** raw frequency, not band ratios, not the state vector. Those are internal.
 - A post-session summary in plain language ("You reached deep calm in 8 minutes and stayed there for 12") — the History/Session-Results surface already in the UX flow.
 
+### 3.6 Focus goal: named presets, no closed loop
+
+Everything above (§§1–3.5) is the down-regulation control loop: EEG-gated, `relaxationDepth`-
+driven, adaptive. The new **focus** goal is a deliberately simpler, open-loop sibling — it
+does not read the state vector or gate on depth at all, and that's a scope choice, not an
+oversight: this doc's own scientific assessment already ruled closed-loop gamma/up-regulation
+sensing out on this hardware (Fp1 is the worst location for gamma; no independent study
+validates NeuroSky gamma detection). Reintroducing an EEG-gated up-regulation claim here would
+undercut that finding.
+
+Instead, focus follows the *same UX principle* as §3.3 (named states, not raw parameters) over
+a different, non-EEG mechanism: a live amplitude-modulation (AM) pulse applied to a
+`goal=focus` background track (`background_music.md` §7.3; `stream.py`'s `am_music` beat mode).
+The user picks a name; the pulse rate/depth/modulator are internal and never surfaced as Hz:
+
+| User picks | Internal target (`FOCUS_PRESETS`, `server.py`) |
+|---|---|
+| "Deep Work" | slower, gentler pulse — for a longer session |
+| "Quick Focus" | brisker pulse — for a short session |
+
+No `relaxationDepth`, no descent shape, no baseline gate — the focus preset is a fixed
+(beat_hz, depth, modulator) triple for the session's duration. If closed-loop focus is
+revisited later, it needs its own hardware-adequacy assessment first (§5 of the research
+doc), not a reuse of the relax control loop's assumptions.
+
 ---
 
 ## 4. Mapping summary (internal ↔ surface)

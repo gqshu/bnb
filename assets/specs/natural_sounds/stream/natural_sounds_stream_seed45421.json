@@ -54,5 +54,34 @@
   "seed": 45421,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:37:54.301864+00:00",
+    "audio_file": "tracks/natural_sounds/stream/natural_sounds_stream_seed45421.wav",
+    "watermark": null,
+    "seed": 45421,
+    "qc": {
+      "attempts": 1,
+      "seed": 45421,
+      "verdict": "warn",
+      "warnings": [
+        "quiet: -41.4 dBFS RMS"
+      ],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.3042,
+        "rms_dbfs": -41.4,
+        "silent_fraction": 0.0,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 2.99,
+        "spectral_flatness": 0.062
+      }
+    }
+  }
 }

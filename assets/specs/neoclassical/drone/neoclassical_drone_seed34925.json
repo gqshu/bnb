@@ -64,5 +64,32 @@
   "seed": 34925,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:43:19.994464+00:00",
+    "audio_file": "tracks/neoclassical/drone/neoclassical_drone_seed34925.wav",
+    "watermark": null,
+    "seed": 34925,
+    "qc": {
+      "attempts": 1,
+      "seed": 34925,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.4397,
+        "rms_dbfs": -21.3,
+        "silent_fraction": 0.051,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 5.75,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
 }

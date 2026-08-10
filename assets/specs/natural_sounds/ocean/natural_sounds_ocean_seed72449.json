@@ -54,5 +54,32 @@
   "seed": 72449,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:36:32.855266+00:00",
+    "audio_file": "tracks/natural_sounds/ocean/natural_sounds_ocean_seed72449.wav",
+    "watermark": null,
+    "seed": 72449,
+    "qc": {
+      "attempts": 1,
+      "seed": 72449,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.3967,
+        "rms_dbfs": -31.5,
+        "silent_fraction": 0.0,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0004,
+        "level_variation_db": 3.61,
+        "spectral_flatness": 0.032
+      }
+    }
+  }
 }

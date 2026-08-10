@@ -68,5 +68,32 @@
   "seed": 12891,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:41:58.559414+00:00",
+    "audio_file": "tracks/nature_ambient/noise_texture/nature_ambient_noise_seed12891.wav",
+    "watermark": null,
+    "seed": 12891,
+    "qc": {
+      "attempts": 1,
+      "seed": 12891,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.4382,
+        "rms_dbfs": -27.2,
+        "silent_fraction": 0.011,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 5.73,
+        "spectral_flatness": 0.001
+      }
+    }
+  }
 }

@@ -16,7 +16,8 @@ def manager(tmp_path):
 def _grid_spec(**kw):
     kw.setdefault("substrate", "drone")
     kw.setdefault("style", "buddhist_meditative")
-    return build_signature(kw["substrate"], kw["style"], 60).spec()
+    kw.setdefault("goal", "relax")
+    return build_signature(kw["substrate"], kw["style"], kw["goal"], 60).spec()
 
 
 def _keyword_spec(keyword="rain"):
@@ -130,8 +131,8 @@ def test_delete_unknown_track_returns_false(manager):
 
 
 def test_delete_cell_removes_every_track_in_it(manager):
-    a = build_signature("drone", "lofi", 60).spec()
-    other = build_signature("melodic_instrument", "lofi", 60).spec()
+    a = build_signature("drone", "lofi", "relax", 60).spec()
+    other = build_signature("melodic_instrument", "lofi", "relax", 60).spec()
     for spec in (a, other):
         manager.add_spec(spec, rebuild=False)
     manager.rebuild()
@@ -157,6 +158,22 @@ def test_search_filters_by_style_substrate_and_kind(manager):
     assert [e["track_id"] for e in manager.search(kind="special")] == [special["track_id"]]
     assert [e["track_id"] for e in manager.search(group="natural_sounds", keyword="rain")] == [special["track_id"]]
     assert manager.search(style="lofi") == []
+
+
+def test_search_filters_by_goal(manager):
+    relax = _grid_spec(substrate="drone", style="lofi", goal="relax")
+    focus = _grid_spec(substrate="drone", style="lofi", goal="focus")
+    special = _keyword_spec()
+    manager.add_spec(relax, rebuild=False)
+    manager.add_spec(focus, rebuild=False)
+    manager.add_spec(special, rebuild=False)
+    manager.rebuild()
+
+    assert [e["track_id"] for e in manager.search(goal="focus")] == [focus["track_id"]]
+    assert [e["track_id"] for e in manager.search(goal="relax")] == [relax["track_id"]]
+    # Special-group entries carry no goal, so they never match a goal filter.
+    assert special["track_id"] not in [e["track_id"] for e in manager.search(goal="relax")]
+    assert manager.pick(goal="focus")["track_id"] == focus["track_id"]
 
 
 def test_search_by_cell_covers_both_grid_and_special(manager):
@@ -185,8 +202,8 @@ def test_pick_returns_none_when_nothing_matches(manager):
 
 
 def test_pick_excludes_when_theres_an_alternative(manager):
-    a = build_signature("drone", "lofi", 60).spec()
-    b = build_signature("melodic_instrument", "lofi", 60).spec()
+    a = build_signature("drone", "lofi", "relax", 60).spec()
+    b = build_signature("melodic_instrument", "lofi", "relax", 60).spec()
     for spec in (a, b):
         manager.add_spec(spec, rebuild=False)
         manager.add_render(spec, b"\x00\x00", output_format="pcm_44100", provider="elevenlabs",

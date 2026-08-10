@@ -68,5 +68,32 @@
   "seed": 64096,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:45:22.122611+00:00",
+    "audio_file": "tracks/neoclassical/noise_texture/neoclassical_noise_seed64096.wav",
+    "watermark": null,
+    "seed": 64096,
+    "qc": {
+      "attempts": 1,
+      "seed": 64096,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.3118,
+        "rms_dbfs": -25.1,
+        "silent_fraction": 0.0,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0001,
+        "level_variation_db": 2.72,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
 }

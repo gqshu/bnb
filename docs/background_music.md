@@ -152,7 +152,63 @@ Cultural/religious styles carry appropriateness and authenticity considerations 
 
 ---
 
-## 7. Open items / decisions needed
+## 7. The goal axis: relax vs. focus (up-regulation)
+
+Everything above shipped down-regulation-only on purpose (the doc's original scope note).
+This section adds a second
+goal, **focus**, as a **third axis, orthogonal to substrate and style** — not a parallel
+taxonomy. A track is now a `(substrate, style, goal)` triple; `goal` owns every phrase in
+the base template (§4) that used to be hardcoded relax language (the opening intent, the
+motion clause, dynamics/brightness descriptors, the closing sentence, the negative prompt).
+
+### 7.1 Not every cell supports both goals
+
+Substrate and style each carry a `goals` allow-list (default: both). Two cells are
+relax-only:
+
+- **`percussive_with_tail`** (singing bowls, bells) — long resonant decays between strikes
+  are a meditative gesture, not something you want decaying across a task-focused attention
+  span.
+- **`buddhist_meditative`** — both the sound and the branding read as meditation, not
+  productivity; the same guardrail concern §6 raises about mixing traditions applies to
+  stretching this style's branding toward "focus."
+
+Every other substrate/style supports both goals; the difference is the MER coordinates
+(§7.2), not the identity of the sound.
+
+### 7.2 What actually differs for focus (corrected from the naive assumption)
+
+The intuitive guess — "focus music is higher energy, more power, more melody" — is largely
+backwards. High arousal hurts sustained attention (Yerkes-Dodson), and generic "energetic"
+music reintroduces exactly the salient, attention-grabbing events a focus bed should avoid.
+The evidence-backed shape, and what this library's `focus` goal template encodes:
+
+- **Steady, predictable pulse** instead of arrhythmic — a real tempo the listener doesn't
+  have to work to parse, not "no pulse" and not "fast."
+- **Lower melodic *complexity/surprise*, not more melody** — no hooks, no key changes, no
+  vocals; repetition, not development. The focus negative prompt explicitly bans lyrics,
+  key changes, chord progressions and dramatic climaxes that the relax negative prompt
+  never needed to mention.
+- **Moderate-low energy**, not high — enough to not be sleep-inducing, not enough to be
+  arousing.
+- **Predictability over stillness** — the relax `MOTION` clause ("never builds, resolves,
+  or arrives anywhere") becomes a focus-specific clause: "repeats in a steady, unsurprising
+  loop... but it never swells, builds, or arrives anywhere new." Focus tolerates — even
+  wants — a beat; it just can't have drama.
+
+### 7.3 The Brain.fm-competing mechanism sits outside the grid
+
+The differentiator that actually competes with Brain.fm isn't a prompt change at all: it's
+a **live amplitude-modulation (AM) pulse** applied to a `goal=focus` background track at
+serve time, using `tone.render_am_music`'s envelope math run incrementally by the stream
+engine (`stream.py`'s `am_music` beat mode). This is mechanistically closer to what Brain.fm
+actually does — rhythmic modulation of instrumental music — than binaural beats are; Brain.fm
+explicitly positions against binaural beats (see the internal research assessment). The
+pulse rate/depth are never surfaced to the user as Hz — only named presets are (`docs/
+control.md` §3.3), consistent with the existing relax UX philosophy of hiding raw parameters
+behind legible named states.
+
+## 8. Open items / decisions needed
 - Confirm loop length and whether the app crossfades or hard-loops (affects render tails, esp. for `percussive_with_tail` bowls with long decays).
 - Decide watermark stance: self-hosted Stable Audio outputs are unmarked (Lyria would force SynthID); confirm no provenance-marking requirement for the neurotech product / EU AI Act Article 50 disclosure.
 - Confirm objective-feature tolerance thresholds (how far measured MER may drift from requested before a render is rejected).

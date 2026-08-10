@@ -44,6 +44,58 @@ def test_grid_pair_still_works_alongside_a_group(run):
     assert {e["kind"] for e in manager.search()} == {"grid", "special"}
 
 
+# --- goal axis -------------------------------------------------------------------
+
+
+def test_grid_target_defaults_to_relax_goal(run):
+    manager = run("lofi:drone")
+    entry = manager.search(kind="grid")[0]
+    assert entry["goal"] == "relax"
+    assert "_relax_" in entry["track_id"]
+
+
+def test_goal_flag_plans_a_focus_grid_target(run):
+    manager = run("--goal", "focus", "lofi:drone")
+    entry = manager.search(kind="grid")[0]
+    assert entry["goal"] == "focus"
+    assert "_focus_" in entry["track_id"]
+
+
+def test_relax_only_cell_rejected_for_focus_goal(run):
+    with pytest.raises(SystemExit, match="does not support goal 'focus'"):
+        run("--goal", "focus", "buddhist_meditative:drone")
+
+
+def test_curated_sample_set_is_relax_only(run):
+    with pytest.raises(SystemExit, match="relax-only"):
+        run("--goal", "focus")
+
+
+def test_fill_respects_goal_and_excludes_relax_only_cells(run):
+    manager = run("--fill", str(len(pb.SUBSTRATES) * len(pb.STYLES)), "--goal", "focus")
+    entries = manager.search(kind="grid")
+    assert entries  # something was planned
+    assert all(e["goal"] == "focus" for e in entries)
+    assert all(e["substrate"] != "percussive_with_tail" for e in entries)
+    assert all(e["style"] != "buddhist_meditative" for e in entries)
+
+
+def test_relax_and_focus_fill_runs_dont_double_count_each_other(run):
+    run("--goal", "relax", "lofi:drone")
+    manager = run("--goal", "focus", "lofi:drone")
+    cells = {(e["substrate"], e["style"], e["goal"]) for e in manager.search(kind="grid")}
+    assert ("drone", "lofi", "relax") in cells
+    assert ("drone", "lofi", "focus") in cells
+
+
+def test_list_shows_goal_restrictions(run, capsys):
+    run("--list")
+    out = capsys.readouterr().out
+    assert "percussive_with_tail  [goals: relax]" in out
+    assert "buddhist_meditative  [goals: relax]" in out
+    assert "drone  [goals: focus, relax]" in out
+
+
 def test_unknown_bare_target_names_the_special_groups(run):
     with pytest.raises(SystemExit) as excinfo:
         run("lofi")  # a style, not a group: bare targets only name special groups

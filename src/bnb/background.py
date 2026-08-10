@@ -28,7 +28,7 @@ from __future__ import annotations
 import hashlib
 from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 # Applies to every down-regulation track (§4). Kept as prose (prompt) and as
@@ -86,6 +86,13 @@ class Substrate:
     the seven axis fields fill the continuous MER slots. ``requested`` is the
     categorical MER coordinate recorded in metadata (§3 ``requested_features``);
     styles may override its ``mode`` / ``nature_bed`` without touching the axis.
+
+    These fields are the substrate's **relax** (down-regulation) defaults — the goal this
+    library shipped with first. ``goals`` says which goals this substrate is usable for at
+    all (a physical sound can be goal-inappropriate outright, e.g. long resonant bowl decays
+    don't suit focus); ``focus_overrides`` carries the deltas the **focus** goal applies on
+    top of the relax fields (see :func:`_resolve_substrate_for_goal`), so substrates that
+    support both goals don't need two full definitions.
     """
 
     name: str
@@ -101,6 +108,8 @@ class Substrate:
     register: str
     requested: dict[str, Any]
     event_driven: bool = False  # built from separate strikes/notes rather than one wash
+    goals: frozenset[str] = field(default_factory=lambda: frozenset({"relax", "focus"}))
+    focus_overrides: dict[str, Any] = field(default_factory=dict)
 
 
 SUBSTRATES: dict[str, Substrate] = {
@@ -125,6 +134,15 @@ SUBSTRATES: dict[str, Substrate] = {
             "texture_density": "very_sparse",
             "nature_bed": "none",
         },
+        focus_overrides={
+            "tempo": "a slow, steady pulse underneath, unchanging meter",
+            "energy": "low-moderate",
+            "timbre": "warm-neutral",
+            "harmony": "static, no melodic development",
+            "texture": "sparse, with one subtle repeating rhythmic layer",
+            "register": "low-mid",
+            "requested": {"energy": "low", "spectral_centroid": "warm_neutral", "texture_density": "sparse"},
+        },
     ),
     "melodic_instrument": Substrate(
         name="melodic_instrument",
@@ -148,6 +166,14 @@ SUBSTRATES: dict[str, Substrate] = {
             "texture_density": "sparse",
             "nature_bed": "none",
         },
+        focus_overrides={
+            "tempo": "a steady 80-100 bpm feel, held constant throughout",
+            "energy": "low-moderate",
+            "timbre": "warm-neutral",
+            "harmony": "simple and repetitive, no melodic hooks, no key changes",
+            "texture": "steady, unchanging",
+            "requested": {"tempo_bpm": 90, "energy": "moderate", "spectral_centroid": "warm_neutral"},
+        },
     ),
     "field_recording": Substrate(
         name="field_recording",
@@ -169,6 +195,13 @@ SUBSTRATES: dict[str, Substrate] = {
             "register": "full",
             "texture_density": "continuous",
             "nature_bed": "present",
+        },
+        # A masking bed for focus rather than a lead sound (§4 of the product doc:
+        # broadband/nature beds help focus via masking, not by being "more energetic"),
+        # so only energy nudges up slightly; it stays arrhythmic and even.
+        focus_overrides={
+            "energy": "low",
+            "requested": {"energy": "low"},
         },
     ),
     "noise_texture": Substrate(
@@ -198,6 +231,16 @@ SUBSTRATES: dict[str, Substrate] = {
             "texture_density": "even",
             "nature_bed": "none",
         },
+        # Best-evidenced focus masking substrate (broadband noise masks distraction), but
+        # the relax framing ("deep brown noise... like distant surf") is bass-heavy on
+        # purpose to feel enveloping at bedtime; focus wants a more neutral, less
+        # sleep-coded wash, still smooth and steady, never harsh hiss.
+        focus_overrides={
+            "energy": "low-moderate",
+            "timbre": "neutral, gently filtered, no harsh hiss",
+            "register": "full-bodied, neutral",
+            "requested": {"energy": "low", "spectral_centroid": "neutral_broadband"},
+        },
     ),
     "percussive_with_tail": Substrate(
         name="percussive_with_tail",
@@ -221,6 +264,9 @@ SUBSTRATES: dict[str, Substrate] = {
             "texture_density": "very_sparse",
             "nature_bed": "none",
         },
+        # Relax-only: long resonant decays between strikes are a meditative gesture, not
+        # something you want decaying across a task-focused attention span.
+        goals=frozenset({"relax"}),
     ),
 }
 
@@ -253,6 +299,7 @@ class Style:
     overrides: dict[str, StyleSubstrate] = field(default_factory=dict)
     mode_override: str | None = None  # e.g. buddhist -> just_intonation
     nature_bed_override: str | None = None  # e.g. nature_ambient -> present
+    goals: frozenset[str] = field(default_factory=lambda: frozenset({"relax", "focus"}))
 
 
 STYLES: dict[str, Style] = {
@@ -308,6 +355,10 @@ STYLES: dict[str, Style] = {
                 instrumentation=("temple_bells", "mountain_stream", "wind_chime"),
             ),
         },
+        # Relax-only: both the sound and the branding read as meditation, not productivity
+        # (§6 of the product doc already flags mixing traditions as a guardrail concern;
+        # stretching the same style toward "focus" branding is a similar overreach).
+        goals=frozenset({"relax"}),
     ),
     "neoclassical": Style(
         name="neoclassical",
@@ -371,10 +422,11 @@ STYLES: dict[str, Style] = {
 
 @dataclass(frozen=True)
 class Signature:
-    """A fully resolved render spec for one (substrate, style, duration) cell."""
+    """A fully resolved render spec for one (substrate, style, goal, duration) cell."""
 
     substrate: Substrate
     style: Style
+    goal: "Goal"
     duration_s: int
     seed: int
     prompt: str
@@ -385,7 +437,7 @@ class Signature:
 
     @property
     def track_id(self) -> str:
-        return f"{self.style.name}_{self.substrate.short}_seed{self.seed}"
+        return f"{self.style.name}_{self.substrate.short}_{self.goal.name}_seed{self.seed}"
 
     def spec(self) -> dict[str, Any]:
         """The render-independent request record (§3), before any audio exists.
@@ -403,6 +455,7 @@ class Signature:
             "kind": "grid",
             "substrate": self.substrate.name,
             "style": self.style.name,
+            "goal": self.goal.name,
             "group": None,
             "keyword": None,
             "requested_features": self.requested_features,
@@ -464,51 +517,147 @@ MOTION = (
     "resolves, or arrives anywhere"
 )
 
+# Focus's counterpart to MOTION: predictability, not stillness, is the goal (brainstorm
+# finding — high arousal/"more energy" hurts sustained attention; a steady, unsurprising
+# loop is what the evidence and Brain.fm's own "functional music" framing both argue for).
+FOCUS_MOTION = (
+    "It repeats in a steady, unsurprising loop — the same short pattern held and returned "
+    "to, with only the faintest quiet detail appearing and receding — but it never swells, "
+    "builds, or arrives anywhere new"
+)
 
-def build_prompt(substrate: Substrate, style: Style, body: str, nature_bed: str) -> str:
+FOCUS_NEGATIVE_PROMPT = (
+    "lyrics, vocals, spoken word, key change, chord progression, melodic hook, catchy "
+    "melody, dramatic climax, sudden transitions, EDM, buildup, drop, harsh, distorted, "
+    "chaotic"
+)
+
+FOCUS_NEGATIVE_GLOBAL_STYLES: tuple[str, ...] = (
+    "vocals",
+    "lyrics",
+    "buildup",
+    "drop",
+    "chaotic",
+    "harsh",
+)
+
+
+@dataclass(frozen=True)
+class Goal:
+    """One arousal target — a third axis, orthogonal to substrate and style.
+
+    Substrate says *what* the sound physically is; style says *what tradition* it evokes;
+    goal says *how aroused* it should feel, and owns every phrase in the base template that
+    used to be hardcoded relax language (the opening intent, the motion clause, the
+    dynamics/brightness descriptors, the closing sentence, and the negative prompt).
+    """
+
+    name: str
+    intent: str  # "...soundscape for {intent}." — the template's opening
+    motion: str
+    dynamics: str  # e.g. "very soft dynamics" vs "smooth, controlled dynamics"
+    brightness: str  # e.g. "warm and dark, low spectral brightness"
+    closing: str
+    negative_prompt: str
+    negative_global_styles: tuple[str, ...]
+
+
+GOALS: dict[str, Goal] = {
+    "relax": Goal(
+        name="relax",
+        intent="deep relaxation",
+        motion=MOTION,
+        dynamics="very soft dynamics",
+        brightness="warm and dark, low spectral brightness",
+        closing="No vocals, no percussion hits, no sudden transitions. Seamless, calm, continuous.",
+        negative_prompt=NEGATIVE_PROMPT,
+        negative_global_styles=NEGATIVE_GLOBAL_STYLES,
+    ),
+    "focus": Goal(
+        name="focus",
+        intent="sustained focus",
+        motion=FOCUS_MOTION,
+        dynamics="smooth, controlled dynamics, no sudden loud or soft jumps",
+        brightness="clear and present, natural spectral brightness, never harsh",
+        closing="No vocals, no lyrics, no sudden transitions. Seamless and steady, never dramatic.",
+        negative_prompt=FOCUS_NEGATIVE_PROMPT,
+        negative_global_styles=FOCUS_NEGATIVE_GLOBAL_STYLES,
+    ),
+}
+
+
+def _resolve_substrate_for_goal(substrate: Substrate, goal_name: str) -> Substrate:
+    """The substrate's MER fields as they apply under ``goal_name``.
+
+    ``relax`` is the substrate's own definition; ``focus`` shallow-merges
+    ``substrate.focus_overrides`` on top (``requested`` merges into the existing dict rather
+    than replacing it). Identity fields (``body``, ``instrumentation``, ``short``, ...) are
+    never in ``focus_overrides`` and so never move — only arousal changes with goal.
+    """
+    if goal_name == "relax" or not substrate.focus_overrides:
+        return substrate
+    overrides = dict(substrate.focus_overrides)
+    requested_override = overrides.pop("requested", None)
+    if requested_override:
+        overrides["requested"] = {**substrate.requested, **requested_override}
+    return replace(substrate, **overrides)
+
+
+def build_prompt(substrate: Substrate, style: Style, body: str, nature_bed: str, goal: Goal) -> str:
     """Fill the §4 base template: substrate body, style descriptor and character, the
-    MER axes, and the slow-motion clause that keeps a long listen from going flat."""
+    MER axes, and the goal-conditioned motion/dynamics/brightness/closing clauses."""
     nature = "" if nature_bed == "none" else "A soft natural bed blended gently underneath. "
     character = f"{style.character}. " if style.character else ""
     return (
-        f"Instrumental {style.descriptor} soundscape for deep relaxation. "
+        f"Instrumental {style.descriptor} soundscape for {goal.intent}. "
         f"{body}. "
-        f"{MOTION}. "
+        f"{goal.motion}. "
         f"{density_clause(substrate.event_driven)}. "
         f"{character}"
-        f"Tempo {substrate.tempo}, {substrate.energy} energy, very soft dynamics. "
-        f"{substrate.timbre} timbre, warm and dark, low spectral brightness. "
+        f"Tempo {substrate.tempo}, {substrate.energy} energy, {goal.dynamics}. "
+        f"{substrate.timbre} timbre, {goal.brightness}. "
         f"{substrate.harmony} harmony, {substrate.texture} texture, {substrate.register} register. "
         f"{nature}"
-        "No vocals, no percussion hits, no sudden transitions. "
-        "Seamless, calm, continuous."
+        f"{goal.closing}"
     )
 
 
 def build_signature(
-    substrate_name: str, style_name: str, duration_s: int, variant: int = 0
+    substrate_name: str, style_name: str, goal_name: str, duration_s: int, variant: int = 0
 ) -> Signature:
-    """Resolve a (substrate, style) pair into a full render spec.
+    """Resolve a (substrate, style, goal) triple into a full render spec.
 
-    Any pair is valid (§2): where the style has a coherent realization for the
-    substrate we use it, otherwise the substrate's generic body is coloured by
-    the style's global tags. ``variant`` selects a distinct seed within the cell.
+    A substrate/style pair is valid (§2) only for the goals both support — some cells are
+    goal-restricted (e.g. ``percussive_with_tail`` and ``buddhist_meditative`` are relax-only;
+    see their definitions for why) — where the style has a coherent realization for the
+    substrate we use it, otherwise the substrate's generic body is coloured by the style's
+    global tags. ``variant`` selects a distinct seed within the cell.
     """
     if substrate_name not in SUBSTRATES:
         raise ValueError(f"unknown substrate {substrate_name!r}, expected one of {list(SUBSTRATES)}")
     if style_name not in STYLES:
         raise ValueError(f"unknown style {style_name!r}, expected one of {list(STYLES)}")
+    if goal_name not in GOALS:
+        raise ValueError(f"unknown goal {goal_name!r}, expected one of {list(GOALS)}")
 
     substrate = SUBSTRATES[substrate_name]
     style = STYLES[style_name]
+    if goal_name not in substrate.goals:
+        raise ValueError(f"substrate {substrate_name!r} does not support goal {goal_name!r}")
+    if goal_name not in style.goals:
+        raise ValueError(f"style {style_name!r} does not support goal {goal_name!r}")
+
+    goal = GOALS[goal_name]
+    substrate = _resolve_substrate_for_goal(substrate, goal_name)
     override = style.overrides.get(substrate_name)
 
     body = override.body if override else substrate.body
     instrumentation = override.instrumentation if override else substrate.instrumentation
     extra_tags = override.extra_style_tags if override else ()
 
-    # Requested MER coordinate: substrate default, with the style allowed to move
-    # only mode/nature_bed (§2: style changes instrumentation/mode, not the axis).
+    # Requested MER coordinate: substrate default (goal-resolved above), with the style
+    # allowed to move only mode/nature_bed (§2: style changes instrumentation/mode, not
+    # the axis).
     requested = dict(substrate.requested)
     if style.mode_override is not None:
         requested["mode"] = style.mode_override
@@ -521,12 +670,12 @@ def build_signature(
     # wordless render (guardrail §6.2). Local styles carry the instrumentation.
     composition_plan: dict[str, Any] = {
         "positive_global_styles": positive_global_styles,
-        "negative_global_styles": list(NEGATIVE_GLOBAL_STYLES),
+        "negative_global_styles": list(goal.negative_global_styles),
         "sections": [
             {
                 "section_name": "loop",
                 "positive_local_styles": list(instrumentation),
-                "negative_local_styles": list(NEGATIVE_GLOBAL_STYLES),
+                "negative_local_styles": list(goal.negative_global_styles),
                 "duration_ms": duration_s * 1000,
                 "lines": [],
             }
@@ -536,10 +685,11 @@ def build_signature(
     return Signature(
         substrate=substrate,
         style=style,
+        goal=goal,
         duration_s=duration_s,
-        seed=_seed((style_name, substrate_name), variant),
-        prompt=build_prompt(substrate, style, body, requested["nature_bed"]),
-        negative_prompt=NEGATIVE_PROMPT,
+        seed=_seed((f"{style_name}:{goal_name}", substrate_name), variant),
+        prompt=build_prompt(substrate, style, body, requested["nature_bed"], goal),
+        negative_prompt=goal.negative_prompt,
         instrumentation=instrumentation,
         composition_plan=composition_plan,
         requested_features=requested,
@@ -602,10 +752,17 @@ class KeywordEntry:
     chime strike) or is one continuous bed (rain, wind) — which decides the density
     limit it gets, since telling a bed to leave gaps makes it *more* eventful, not less
     (:func:`density_clause`).
+
+    ``goals`` is metadata only, unlike the grid's ``goals`` allow-lists: a field recording
+    doesn't need a different *render* per goal (the same rainfall suits both relaxing and
+    masking-for-focus), so this doesn't gate :func:`build_keyword_signature` or change
+    ``track_id`` — it just documents which goals a keyword is expected to suit, for a future
+    caller (e.g. background selection) that wants to filter by it.
     """
 
     description: str
     event_driven: bool = False
+    goals: frozenset[str] = field(default_factory=lambda: frozenset({"relax", "focus"}))
 
 
 @dataclass(frozen=True)
@@ -836,8 +993,9 @@ SAMPLE_PAIRS: tuple[tuple[str, str], ...] = (
 
 
 def sample_signatures(duration_s: int) -> list[Signature]:
-    """The default sample set, one signature per SAMPLE_PAIRS entry."""
-    return [build_signature(sub, style, duration_s) for style, sub in SAMPLE_PAIRS]
+    """The default sample set, one signature per SAMPLE_PAIRS entry (relax — the goal the
+    curated sample set was built for)."""
+    return [build_signature(sub, style, "relax", duration_s) for style, sub in SAMPLE_PAIRS]
 
 
 # --- Coverage-driven enrichment ---------------------------------------------
@@ -851,8 +1009,10 @@ Cell = tuple[str, str]  # (substrate, style)
 
 
 def _resolve_axes(
-    substrates: Sequence[str] | None, styles: Sequence[str] | None
+    substrates: Sequence[str] | None, styles: Sequence[str] | None, goal: str = "relax"
 ) -> tuple[list[str], list[str]]:
+    if goal not in GOALS:
+        raise ValueError(f"unknown goal {goal!r}, expected one of {list(GOALS)}")
     subs = list(substrates) if substrates is not None else list(SUBSTRATES)
     stys = list(styles) if styles is not None else list(STYLES)
     for name in subs:
@@ -861,6 +1021,11 @@ def _resolve_axes(
     for name in stys:
         if name not in STYLES:
             raise ValueError(f"unknown style {name!r}, expected one of {list(STYLES)}")
+    # Goal-incompatible axis members are dropped rather than rejected: an explicit
+    # --substrates/--styles restriction combined with --goal focus is meant to intersect,
+    # not error (only an unknown *name* above is a mistake worth raising on).
+    subs = [name for name in subs if goal in SUBSTRATES[name].goals]
+    stys = [name for name in stys if goal in STYLES[name].goals]
     return subs, stys
 
 
@@ -868,9 +1033,10 @@ def coverage_report(
     existing_cells: Iterable[Cell],
     substrates: Sequence[str] | None = None,
     styles: Sequence[str] | None = None,
+    goal: str = "relax",
 ) -> dict[str, Any]:
-    """Count how many tracks each cell / substrate / style currently has."""
-    subs, stys = _resolve_axes(substrates, styles)
+    """Count how many tracks each cell / substrate / style currently has, for one goal."""
+    subs, stys = _resolve_axes(substrates, styles, goal)
     grid = {(sub, sty) for sub in subs for sty in stys}
     counts = Counter(cell for cell in existing_cells if cell in grid)
     return {
@@ -922,17 +1088,20 @@ def plan_coverage(
     used_track_ids: Iterable[str] = (),
     substrates: Sequence[str] | None = None,
     styles: Sequence[str] | None = None,
+    goal: str = "relax",
 ) -> list[Signature]:
     """Pick the next ``n`` signatures that most evenly fill the substrate×style grid.
 
     Greedy: each step adds to the cell with the fewest tracks, breaking ties by
     the least-covered substrate then style, so the marginals stay balanced too.
     Seeds advance per cell (``variant``) so repeated picks are distinct renders.
-    Restrict the grid with ``substrates`` / ``styles`` for targeted coverage.
+    Restrict the grid with ``substrates`` / ``styles`` for targeted coverage. A run
+    plans one ``goal`` at a time (a substrate/style not supporting it is dropped from
+    the grid, per :func:`_resolve_axes`).
     """
     if n <= 0:
         return []
-    subs, stys = _resolve_axes(substrates, styles)
+    subs, stys = _resolve_axes(substrates, styles, goal)
     grid = [(sub, sty) for sub in subs for sty in stys]
     counts = Counter(cell for cell in existing_cells if cell in set(grid))
 
@@ -951,7 +1120,7 @@ def plan_coverage(
         grid,
         counts,
         set(used_track_ids),
-        lambda cell, variant: build_signature(cell[0], cell[1], duration_s, variant),
+        lambda cell, variant: build_signature(cell[0], cell[1], goal, duration_s, variant),
         priority,
     )
 
@@ -964,9 +1133,10 @@ def fill_to_per_cell(
     used_track_ids: Iterable[str] = (),
     substrates: Sequence[str] | None = None,
     styles: Sequence[str] | None = None,
+    goal: str = "relax",
 ) -> list[Signature]:
-    """Coverage guide: bring every selected cell up to ``target`` tracks."""
-    subs, stys = _resolve_axes(substrates, styles)
+    """Coverage guide: bring every selected cell up to ``target`` tracks, for one goal."""
+    subs, stys = _resolve_axes(substrates, styles, goal)
     grid = {(sub, sty) for sub in subs for sty in stys}
     counts = Counter(cell for cell in existing_cells if cell in grid)
     needed = sum(max(0, target - counts[cell]) for cell in grid)
@@ -977,6 +1147,7 @@ def fill_to_per_cell(
         used_track_ids=used_track_ids,
         substrates=substrates,
         styles=styles,
+        goal=goal,
     )
 
 

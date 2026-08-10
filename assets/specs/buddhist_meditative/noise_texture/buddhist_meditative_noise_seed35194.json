@@ -68,5 +68,32 @@
   "seed": 35194,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:30:26.392255+00:00",
+    "audio_file": "tracks/buddhist_meditative/noise_texture/buddhist_meditative_noise_seed35194.wav",
+    "watermark": null,
+    "seed": 35194,
+    "qc": {
+      "attempts": 1,
+      "seed": 35194,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.2389,
+        "rms_dbfs": -26.6,
+        "silent_fraction": 0.007,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 6.04,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
 }

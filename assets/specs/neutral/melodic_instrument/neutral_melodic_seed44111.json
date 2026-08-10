@@ -63,5 +63,32 @@
   "seed": 44111,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:48:25.385519+00:00",
+    "audio_file": "tracks/neutral/melodic_instrument/neutral_melodic_seed44111.wav",
+    "watermark": null,
+    "seed": 44111,
+    "qc": {
+      "attempts": 1,
+      "seed": 44111,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.2007,
+        "rms_dbfs": -30.7,
+        "silent_fraction": 0.012,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 5.74,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
 }

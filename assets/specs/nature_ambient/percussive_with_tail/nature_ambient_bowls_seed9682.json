@@ -66,5 +66,32 @@
   "seed": 9682,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:39:36.087742+00:00",
+    "audio_file": "tracks/nature_ambient/percussive_with_tail/nature_ambient_bowls_seed9682.wav",
+    "watermark": null,
+    "seed": 9682,
+    "qc": {
+      "attempts": 1,
+      "seed": 9682,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.5762,
+        "rms_dbfs": -24.2,
+        "silent_fraction": 0.052,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 10.36,
+        "spectral_flatness": 0.003
+      }
+    }
+  }
 }

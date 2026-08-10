@@ -64,5 +64,32 @@
   "seed": 76352,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:45:01.763465+00:00",
+    "audio_file": "tracks/neoclassical/melodic_instrument/neoclassical_melodic_seed76352.wav",
+    "watermark": null,
+    "seed": 76352,
+    "qc": {
+      "attempts": 1,
+      "seed": 76352,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.4409,
+        "rms_dbfs": -26.6,
+        "silent_fraction": 0.012,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 8.57,
+        "spectral_flatness": 0.002
+      }
+    }
+  }
 }

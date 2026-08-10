@@ -65,5 +65,32 @@
   "seed": 20802,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:32:28.515915+00:00",
+    "audio_file": "tracks/lofi/field_recording/lofi_field_seed20802.wav",
+    "watermark": null,
+    "seed": 20802,
+    "qc": {
+      "attempts": 1,
+      "seed": 20802,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.3372,
+        "rms_dbfs": -24.4,
+        "silent_fraction": 0.019,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0082,
+        "level_variation_db": 7.01,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
 }

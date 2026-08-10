@@ -65,5 +65,34 @@
   "seed": 84050,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:46:02.846187+00:00",
+    "audio_file": "tracks/neutral/percussive_with_tail/neutral_bowls_seed84050.wav",
+    "watermark": null,
+    "seed": 84050,
+    "qc": {
+      "attempts": 1,
+      "seed": 84050,
+      "verdict": "warn",
+      "warnings": [
+        "10% silence"
+      ],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.8647,
+        "rms_dbfs": -23.9,
+        "silent_fraction": 0.103,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0002,
+        "level_variation_db": 11.49,
+        "spectral_flatness": 0.002
+      }
+    }
+  }
 }

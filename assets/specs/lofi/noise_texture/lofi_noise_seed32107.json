@@ -68,5 +68,32 @@
   "seed": 32107,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:33:49.981062+00:00",
+    "audio_file": "tracks/lofi/noise_texture/lofi_noise_seed32107.wav",
+    "watermark": null,
+    "seed": 32107,
+    "qc": {
+      "attempts": 1,
+      "seed": 32107,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.4846,
+        "rms_dbfs": -23.4,
+        "silent_fraction": 0.023,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0001,
+        "level_variation_db": 9.88,
+        "spectral_flatness": 0.001
+      }
+    }
+  }
 }

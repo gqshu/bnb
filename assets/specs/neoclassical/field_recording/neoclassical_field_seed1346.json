@@ -65,5 +65,32 @@
   "seed": 1346,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:44:21.084058+00:00",
+    "audio_file": "tracks/neoclassical/field_recording/neoclassical_field_seed1346.wav",
+    "watermark": null,
+    "seed": 1346,
+    "qc": {
+      "attempts": 1,
+      "seed": 1346,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.4768,
+        "rms_dbfs": -20.8,
+        "silent_fraction": 0.0,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0001,
+        "level_variation_db": 2.96,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
 }

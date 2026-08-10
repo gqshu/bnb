@@ -299,6 +299,25 @@ def _fit_length(background: np.ndarray, n_frames: int) -> np.ndarray:
     return np.tile(background, (repeats, 1))[:n_frames]
 
 
+def am_unit_envelope(
+    phi: np.ndarray, modulator: str, beat_hz: float, duty: float, ramp_ms: float
+) -> np.ndarray:
+    """The AM modulation unit in ``[0, 1]`` at fractional-cycle positions ``phi``.
+
+    Shared by :func:`render_am_music` and the live stream engine (``stream.py``'s
+    ``am_music`` mode) so the sine/gate envelope math exists in one place. ``sine`` is a
+    smooth raised-cosine and ignores ``duty``/``ramp_ms``; ``gate`` reuses the isochronic
+    trapezoid (:func:`_gate_envelope`).
+    """
+    if modulator not in AM_MODULATORS:
+        raise ValueError(f"unknown modulator {modulator!r}, expected one of {AM_MODULATORS}")
+    if modulator == "sine":
+        # Starts at the trough like the gate does, so both shapes share a phase origin.
+        return 0.5 * (1 - np.cos(2 * np.pi * phi))
+    ramp_frac = min((ramp_ms / 1000.0) * beat_hz, duty / 2, (1 - duty) / 2)
+    return _gate_envelope(phi, duty, ramp_frac)
+
+
 def render_am_music(
     background: np.ndarray,
     beat_hz: float,
@@ -345,13 +364,7 @@ def render_am_music(
     bed = _fit_length(background, n_frames).astype(np.float64)
     t = np.arange(n_frames, dtype=np.float64) / sample_rate
     phi = np.mod(t * beat_hz, 1.0)
-
-    if modulator == "sine":
-        # Starts at the trough like the gate does, so both shapes share a phase origin.
-        unit = 0.5 * (1 - np.cos(2 * np.pi * phi))
-    else:
-        ramp_frac = min((ramp_ms / 1000.0) * beat_hz, duty / 2, (1 - duty) / 2)
-        unit = _gate_envelope(phi, duty, ramp_frac)
+    unit = am_unit_envelope(phi, modulator, beat_hz, duty, ramp_ms)
 
     env = (1 - depth) + depth * unit
     return (bed * env[:, None]).astype(np.float32)

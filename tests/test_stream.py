@@ -309,3 +309,258 @@ def test_isochronic_carrier_range_is_validated_over_the_api():
         "/api/stream/start", json={"beat": {"mode": "dichotic", "carrier_hz": 150}}
     ).status_code == 422
     client.post("/api/stream/stop")
+
+
+# --- am_music (focus goal: modulates the background itself, opposite constraint
+#     from isochronic — a background is required, not forbidden) ----------------
+
+
+def test_am_music_requires_background_at_start():
+    eng = StreamEngine()
+    with pytest.raises(ValueError, match="requires a background"):
+        eng.start(beat=Beat(mode="am_music", beat_hz=10.0), background_id=None, background_volume=1.0)
+
+
+def test_am_music_rejects_clearing_background_via_set_background(monkeypatch):
+    eng = StreamEngine()
+    _fake_library(monkeypatch, eng, ["a"], frames=200_000)
+    eng.start(beat=Beat(mode="am_music", beat_hz=10.0), background_id="a", background_volume=1.0)
+    with pytest.raises(ValueError, match="requires a background"):
+        eng.set_background(None)
+    eng.stop()
+
+
+def test_am_music_rejected_via_set_beat_when_no_background(monkeypatch):
+    eng = StreamEngine()
+    eng.start(beat=Beat(mode="dichotic"), background_id=None, background_volume=1.0)
+    with pytest.raises(ValueError, match="requires a background"):
+        eng.set_beat(Beat(mode="am_music", beat_hz=10.0))
+    eng.stop()
+
+
+def test_update_rejects_am_music_without_a_background():
+    eng = StreamEngine()
+    eng.start(beat=Beat(mode="dichotic"), background_id=None, background_volume=1.0)
+    with pytest.raises(ValueError, match="requires a background"):
+        eng.update(beat=Beat(mode="am_music", beat_hz=10.0))
+    eng.stop()
+
+
+def test_update_allows_switching_to_am_music_while_setting_a_background(monkeypatch):
+    eng = StreamEngine()
+    _fake_library(monkeypatch, eng, ["a"], frames=200_000)
+    eng.start(beat=Beat(mode="dichotic"), background_id=None, background_volume=1.0)
+    eng.update(beat=Beat(mode="am_music", beat_hz=10.0), background_id="a")
+    assert eng.beat.mode == "am_music"
+    assert eng.background_id == "a"
+    eng.stop()
+
+
+def test_am_music_modulates_the_background(monkeypatch):
+    eng = StreamEngine()
+    _fake_library(monkeypatch, eng, ["a"], frames=200_000)  # bigger than the read, no looping
+    eng.start(
+        beat=Beat(mode="am_music", beat_hz=10.0, depth=1.0, modulator="sine"),
+        background_id="a",
+        background_volume=1.0,
+    )
+    frames = eng.read(eng.sample_rate * 2)  # 2 s
+    assert np.array_equal(frames[:, 0], frames[:, 1])  # constant bg -> shared envelope in both ears
+
+    signal = frames[:, 0] - frames[:, 0].mean()
+    spectrum = np.abs(np.fft.rfft(signal))
+    freqs = np.fft.rfftfreq(len(signal), 1 / eng.sample_rate)
+    assert freqs[np.argmax(spectrum)] == pytest.approx(10.0, abs=0.5)
+    eng.stop()
+
+
+def test_am_music_no_beat_at_all_when_no_background_is_playing(monkeypatch):
+    # A fresh engine with am_music set but background not yet loaded (e.g. mid-switch)
+    # must render silence, never a bare unmodulated tone — there is no tone in this mode.
+    eng = StreamEngine()
+    eng.beat = Beat(mode="am_music", beat_hz=10.0)
+    frames = eng.read(100)
+    assert np.array_equal(frames, np.zeros_like(frames))
+
+
+def test_am_music_phase_is_continuous_across_chunks(monkeypatch):
+    def render_flat(chunks):
+        eng = StreamEngine()
+        _fake_library(monkeypatch, eng, ["a"], frames=200_000)
+        eng.start(beat=Beat(mode="am_music", beat_hz=10.0, depth=1.0), background_id="a", background_volume=1.0)
+        eng._fade_in = 1.0  # skip the background's own fade-in ramp so only AM phase differs
+        return np.concatenate([eng.read(n) for n in chunks])
+
+    one_chunk = render_flat([2000])
+    two_chunks = render_flat([1000, 1000])
+    assert np.allclose(one_chunk, two_chunks, atol=1e-6)
+
+
+def test_am_music_over_the_api_requires_a_background():
+    res = client.post("/api/stream/start", json={"beat": {"mode": "am_music", "beat_hz": 10}})
+    assert res.status_code == 400
+    client.post("/api/stream/stop")
+
+
+def test_am_music_beat_range_extends_to_60hz_over_the_api():
+    """am_music has no binaural-fusion ceiling, so it's allowed past tone.MAX_BEAT_HZ (40)."""
+    assert client.post(
+        "/api/stream/start", json={"beat": {"mode": "am_music", "beat_hz": 60}}
+    ).status_code == 400  # valid Hz, rejected only for lacking a background
+    assert client.post(
+        "/api/stream/start", json={"beat": {"mode": "am_music", "beat_hz": 61}}
+    ).status_code == 422  # over the am_music ceiling
+    assert client.post(
+        "/api/stream/start", json={"beat": {"mode": "dichotic", "beat_hz": 41}}
+    ).status_code == 422  # the ordinary tone-mode ceiling is unchanged
+    client.post("/api/stream/stop")
+
+
+# ── Per-session API (concurrent independent streams) ──────────────────────────
+def test_session_lifecycle_create_start_stop_delete():
+    sid = client.post("/api/session").json()["session_id"]
+    assert client.get(f"/api/session/{sid}").json()["running"] is False
+    started = client.post(f"/api/session/{sid}/start", json={"beat": {"beat_hz": 8}}).json()
+    assert started["running"] is True and started["beat"]["beat_hz"] == 8
+    assert client.post(f"/api/session/{sid}/stop").json()["running"] is False
+    assert client.delete(f"/api/session/{sid}").json()["ok"] is True
+    # gone after delete
+    assert client.get(f"/api/session/{sid}").status_code == 404
+
+
+def test_sessions_are_independent():
+    a = client.post("/api/session").json()["session_id"]
+    b = client.post("/api/session").json()["session_id"]
+    assert a != b
+    client.post(f"/api/session/{a}/start", json={"beat": {"beat_hz": 6}})
+    client.post(f"/api/session/{b}/start", json={"beat": {"beat_hz": 12}})
+    assert client.get(f"/api/session/{a}").json()["beat"]["beat_hz"] == 6
+    assert client.get(f"/api/session/{b}").json()["beat"]["beat_hz"] == 12
+    # editing one leaves the other untouched
+    client.patch(f"/api/session/{a}/spec", json={"beat": {"beat_hz": 4}})
+    assert client.get(f"/api/session/{a}").json()["beat"]["beat_hz"] == 4
+    assert client.get(f"/api/session/{b}").json()["beat"]["beat_hz"] == 12
+    client.delete(f"/api/session/{a}")
+    client.delete(f"/api/session/{b}")
+
+
+def test_unknown_session_is_404():
+    assert client.get("/api/session/nope").status_code == 404
+    assert client.post("/api/session/nope/start", json={"beat": {"beat_hz": 8}}).status_code == 404
+    assert client.patch("/api/session/nope/spec", json={"beat": {"beat_hz": 8}}).status_code == 404
+
+
+def test_session_stream_endpoint_serves_wav_header():
+    # Not started → the generator yields the WAV header then ends. Stream and read
+    # just the first raw chunk (the header); don't consume the fake Content-Length.
+    sid = client.post("/api/session").json()["session_id"]
+    with client.stream("GET", f"/stream/{sid}.wav") as r:
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "audio/wav"
+        first = next(r.iter_raw())
+        assert first[:4] == b"RIFF" and first[8:12] == b"WAVE"
+    client.delete(f"/api/session/{sid}")
+
+
+# ── MP3 stream + blank-spec default background ────────────────────────────────
+def test_empty_spec_start_picks_a_natural_sounds_background():
+    sid = client.post("/api/session").json()["session_id"]
+    snap = client.post(f"/api/session/{sid}/start", json={}).json()
+    assert snap["running"] is True
+    assert snap["beat"] is None
+    assert snap["background_id"] is not None
+    assert snap["background_id"].startswith("natural_sounds_")
+    client.post(f"/api/session/{sid}/stop")
+    client.delete(f"/api/session/{sid}")
+
+
+def test_session_mp3_endpoint_content_type():
+    # Not started → empty body; stream so headers read without waiting on the body.
+    sid = client.post("/api/session").json()["session_id"]
+    with client.stream("GET", f"/stream/{sid}.mp3") as r:
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "audio/mpeg"
+    client.delete(f"/api/session/{sid}")
+
+
+def test_stream_supports_range_requests_for_android():
+    # Android's player opens with `Range: bytes=0-` and needs a 206 + Content-Range,
+    # otherwise it errors out ("error player to stop"). Verify the handshake.
+    sid = client.post("/api/session").json()["session_id"]
+    with client.stream("GET", f"/stream/{sid}.mp3", headers={"Range": "bytes=0-"}) as r:
+        assert r.status_code == 206
+        assert r.headers["accept-ranges"] == "bytes"
+        assert "content-range" in r.headers
+    client.delete(f"/api/session/{sid}")
+
+
+def test_mp3_encoding_pipeline_produces_frames():
+    # Drive the same encode path the endpoint uses, but bounded (no open stream).
+    import lameenc
+
+    eng = StreamEngine()
+    eng.start(beat=Beat(beat_hz=10), background_id=None, background_volume=1.0)
+    enc = lameenc.Encoder()
+    enc.set_bit_rate(128)
+    enc.set_in_sample_rate(eng.sample_rate)
+    enc.set_channels(2)
+    enc.set_quality(5)
+    out = b""
+    for _ in range(5):
+        out += bytes(enc.encode(to_int16_bytes(eng.read(int(eng.sample_rate * 0.2)))))
+    out += bytes(enc.flush())
+    eng.stop()
+    assert len(out) > 0
+    assert b"\xff" in out  # MP3 frame sync high byte
+
+
+def test_random_background_returns_playable_track():
+    res = client.get("/api/backgrounds/random").json()
+    assert res["track_id"].startswith("natural_sounds_")
+    assert res["url"] == f"/background/{res['track_id']}.mp3"
+    assert res["name"]  # non-empty display name
+
+
+def test_random_special_background_excludes_goal_incompatible_keywords(monkeypatch):
+    """A keyword restricted to one goal (KeywordEntry.goals) must never be picked for
+    a session of the other goal, even though the special-group spec itself carries no
+    per-track goal (that's metadata on the taxonomy, not the render)."""
+    from dataclasses import replace
+
+    from bnb import server
+    from bnb.background import SPECIAL_GROUPS, KeywordEntry
+
+    group = SPECIAL_GROUPS["natural_sounds"]
+    patched_keywords = dict(group.keywords)
+    patched_keywords["cafe"] = KeywordEntry("Coffee shop murmur", goals=frozenset({"focus"}))
+    monkeypatch.setitem(SPECIAL_GROUPS, "natural_sounds", replace(group, keywords=patched_keywords))
+
+    fake_entries = [
+        {"track_id": "natural_sounds_rain_seedX", "keyword": "rain", "group": "natural_sounds"},
+        {"track_id": "natural_sounds_cafe_seedY", "keyword": "cafe", "group": "natural_sounds"},
+    ]
+    monkeypatch.setattr(
+        server.categories,
+        "search",
+        lambda **kw: [e for e in fake_entries if kw.get("group") in (None, e["group"])],
+    )
+
+    relax_picks = {server._random_special_background("natural_sounds", "relax") for _ in range(20)}
+    focus_picks = {server._random_special_background("natural_sounds", "focus") for _ in range(20)}
+    assert relax_picks == {"natural_sounds_rain_seedX"}
+    assert "natural_sounds_cafe_seedY" in focus_picks
+
+
+def test_random_background_endpoint_accepts_a_goal_query_param():
+    res = client.get("/api/backgrounds/random", params={"goal": "focus"})
+    assert res.status_code == 200
+    assert client.get("/api/backgrounds/random", params={"goal": "gamma"}).status_code == 422
+
+
+def test_background_mp3_serves_complete_file():
+    tid = client.get("/api/backgrounds/random").json()["track_id"]
+    r = client.get(f"/background/{tid}.mp3")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "audio/mpeg"
+    assert len(r.content) > 10000  # a real encoded file
+    assert r.content[:2] == b"\xff\xfb"  # mp3 frame sync

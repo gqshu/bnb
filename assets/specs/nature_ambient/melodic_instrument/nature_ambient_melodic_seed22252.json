@@ -64,5 +64,32 @@
   "seed": 22252,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:41:17.852927+00:00",
+    "audio_file": "tracks/nature_ambient/melodic_instrument/nature_ambient_melodic_seed22252.wav",
+    "watermark": null,
+    "seed": 22252,
+    "qc": {
+      "attempts": 1,
+      "seed": 22252,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.3596,
+        "rms_dbfs": -26.5,
+        "silent_fraction": 0.032,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 7.49,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
 }

@@ -32,7 +32,7 @@ FAKE_MLX_CLI = "/opt/stable-audio-3/optimized/mlx/sa3"
 
 @pytest.fixture
 def spec():
-    return build_signature("drone", "lofi", 60).spec()
+    return build_signature("drone", "lofi", "relax", 60).spec()
 
 
 def argv_value(cmd: list[str], flag: str) -> str:

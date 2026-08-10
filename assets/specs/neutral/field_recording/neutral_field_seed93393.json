@@ -64,5 +64,32 @@
   "seed": 93393,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:47:44.675201+00:00",
+    "audio_file": "tracks/neutral/field_recording/neutral_field_seed93393.wav",
+    "watermark": null,
+    "seed": 93393,
+    "qc": {
+      "attempts": 1,
+      "seed": 93393,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.6714,
+        "rms_dbfs": -22.1,
+        "silent_fraction": 0.004,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 7.68,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
 }

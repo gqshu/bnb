@@ -84,6 +84,12 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--duration", type=int, default=60, help="seconds per track (default: 60)")
+    parser.add_argument(
+        "--goal",
+        choices=["relax", "focus"],
+        default="relax",
+        help="arousal goal for grid targets/coverage (default: relax); a run plans one goal at a time",
+    )
 
     coverage = parser.add_argument_group(
         "coverage guides (grow the library; the substrate × style grid, or special cells with --groups)"
@@ -120,9 +126,14 @@ def unknown_value(name: str, known: Iterable[str], *, label: str, note: str = ""
     return SystemExit("\n".join(lines))
 
 
-def existing_grid_cells(manager: CategoryManager) -> list[tuple[str, str]]:
-    """The (substrate, style) of every grid spec currently in the repo."""
-    return [(e["substrate"], e["style"]) for e in manager.search(kind="grid")]
+def existing_grid_cells(manager: CategoryManager, goal: str) -> list[tuple[str, str]]:
+    """The (substrate, style) of every grid spec for ``goal`` currently in the repo.
+
+    Filtered by goal (not just ``kind="grid"``) because relax and focus renders of the
+    same (substrate, style) are different tracks — counting them together would make a
+    focus coverage run think a cell is filled by relax tracks alone.
+    """
+    return [(e["substrate"], e["style"]) for e in manager.search(kind="grid", goal=goal)]
 
 
 def existing_special_cells(manager: CategoryManager) -> list[tuple[str, str]]:
@@ -132,11 +143,11 @@ def existing_special_cells(manager: CategoryManager) -> list[tuple[str, str]]:
 
 def print_axes() -> None:
     print("Substrates (Axis A):")
-    for name in SUBSTRATES:
-        print(f"  {name}")
+    for name, sub in SUBSTRATES.items():
+        print(f"  {name}  [goals: {', '.join(sorted(sub.goals))}]")
     print("\nStyles (Axis B):")
-    for name in STYLES:
-        print(f"  {name}")
+    for name, sty in STYLES.items():
+        print(f"  {name}  [goals: {', '.join(sorted(sty.goals))}]")
     print("\nDefault sample set (style:substrate):")
     for style, substrate in SAMPLE_PAIRS:
         print(f"  {style}:{substrate}")
@@ -148,12 +159,12 @@ def print_axes() -> None:
 
 
 def print_grid_coverage(
-    manager: CategoryManager, substrates: list[str] | None, styles: list[str] | None
+    manager: CategoryManager, substrates: list[str] | None, styles: list[str] | None, goal: str
 ) -> None:
-    """Print the substrate × style count matrix with marginals."""
-    report = coverage_report(existing_grid_cells(manager), substrates, styles)
-    subs = substrates or list(SUBSTRATES)
-    stys = styles or list(STYLES)
+    """Print the substrate × style count matrix with marginals, for one goal."""
+    report = coverage_report(existing_grid_cells(manager, goal), substrates, styles, goal)
+    subs = [s for s in (substrates or SUBSTRATES) if goal in SUBSTRATES[s].goals]
+    stys = [s for s in (styles or STYLES) if goal in STYLES[s].goals]
     shorts = [SUBSTRATES[s].short for s in subs]
     col_w = max(6, *(len(s) for s in shorts)) + 1
     style_w = max(len(s) for s in stys) + 1
@@ -188,21 +199,22 @@ def print_coverage(args: argparse.Namespace, manager: CategoryManager) -> None:
     special_only = groups is not None
 
     if not special_only:
-        print_grid_coverage(manager, substrates, styles)
+        print_grid_coverage(manager, substrates, styles, args.goal)
     if not grid_only:
         if not special_only:
             print("\nSpecial groups (outside the grid):")
         print_special_coverage(manager, groups)
 
 
-def build_target(target: str, duration_s: int) -> list[AnySignature]:
+def build_target(target: str, duration_s: int, goal: str) -> list[AnySignature]:
     """One CLI target, resolved into the signatures it names.
 
     ``STYLE:SUBSTRATE`` is one grid cell and ``GROUP:KEYWORD`` one special cell (the
     left side disambiguates them). A bare ``GROUP`` is every keyword in that special
     group — the whole of natural_sounds in one go, since a group is small, fixed, and
     usually wanted entire. There is no bare-style equivalent: a style spans the grid,
-    which is what the coverage guides are for.
+    which is what the coverage guides are for. ``goal`` only applies to grid targets —
+    special cells have no goal axis (§ background.py's ``KeywordEntry.goals`` note).
     """
     if ":" not in target:
         if target in SPECIAL_GROUPS:
@@ -218,7 +230,7 @@ def build_target(target: str, duration_s: int) -> list[AnySignature]:
     if left in STYLES:
         if right not in SUBSTRATES:
             raise unknown_value(right, SUBSTRATES, label=f"substrate in {target!r}")
-        return [build_signature(right, left, duration_s)]
+        return [build_signature(right, left, goal, duration_s)]
     if left in SPECIAL_GROUPS:
         keywords = SPECIAL_GROUPS[left].keywords
         if right not in keywords:
@@ -243,18 +255,24 @@ def planned_signatures(args: argparse.Namespace, manager: CategoryManager) -> li
             return plan_special_coverage(args.fill, args.duration, **common)
 
         common = dict(
-            existing_cells=existing_grid_cells(manager),
-            used_track_ids={e["track_id"] for e in manager.search(kind="grid")},
+            existing_cells=existing_grid_cells(manager, args.goal),
+            used_track_ids={e["track_id"] for e in manager.search(kind="grid", goal=args.goal)},
             substrates=_split(args.substrates),
             styles=_split(args.styles),
+            goal=args.goal,
         )
         if args.per_cell is not None:
             return fill_to_per_cell(args.per_cell, args.duration, **common)
         return plan_coverage(args.fill, args.duration, **common)
 
     if args.targets:
-        return [sig for target in args.targets for sig in build_target(target, args.duration)]
+        return [sig for target in args.targets for sig in build_target(target, args.duration, args.goal)]
 
+    if args.goal != "relax":
+        raise SystemExit(
+            "the curated sample set (no targets given) is relax-only; pass explicit "
+            "STYLE:SUBSTRATE targets or --fill/--per-cell to plan focus specs"
+        )
     return sample_signatures(args.duration)
 
 

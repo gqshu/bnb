@@ -10,6 +10,7 @@ from bnb.tone import (
     SAMPLE_RATE,
     WAVEFORMS,
     _gate_envelope,
+    am_unit_envelope,
     load_background,
     render_am_music,
     render_binaural,
@@ -402,3 +403,26 @@ def test_load_background_resamples_when_asked(tmp_path):
 def test_load_background_rejects_an_unknown_source():
     with pytest.raises(FileNotFoundError):
         load_background("no_such_track_id")
+
+
+# --- am_unit_envelope (shared by render_am_music and stream.py's live am_music mode) ---
+
+
+def test_am_unit_envelope_sine_stays_in_unit_range():
+    phi = np.linspace(0, 1, 1000, endpoint=False)
+    unit = am_unit_envelope(phi, "sine", beat_hz=10.0, duty=0.5, ramp_ms=5.0)
+    assert unit.min() >= 0.0 and unit.max() <= 1.0
+    assert unit[0] == pytest.approx(0.0, abs=1e-6)  # starts at the trough
+
+
+def test_am_unit_envelope_gate_matches_gate_envelope():
+    phi = np.linspace(0, 1, 1000, endpoint=False)
+    beat_hz, duty, ramp_ms = 10.0, 0.5, 5.0
+    ramp_frac = min((ramp_ms / 1000.0) * beat_hz, duty / 2, (1 - duty) / 2)
+    expected = _gate_envelope(phi, duty, ramp_frac)
+    assert np.allclose(am_unit_envelope(phi, "gate", beat_hz, duty, ramp_ms), expected)
+
+
+def test_am_unit_envelope_rejects_unknown_modulator():
+    with pytest.raises(ValueError):
+        am_unit_envelope(np.array([0.0]), "square", beat_hz=10.0, duty=0.5, ramp_ms=5.0)

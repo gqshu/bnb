@@ -67,5 +67,32 @@
   "seed": 52471,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:49:06.125045+00:00",
+    "audio_file": "tracks/neutral/noise_texture/neutral_noise_seed52471.wav",
+    "watermark": null,
+    "seed": 52471,
+    "qc": {
+      "attempts": 1,
+      "seed": 52471,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.4736,
+        "rms_dbfs": -22.5,
+        "silent_fraction": 0.018,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0007,
+        "level_variation_db": 7.27,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
 }

@@ -63,7 +63,7 @@ def test_check_provider_ready_stable_audio_passes_when_cli_found(monkeypatch):
 
 
 def test_describe_grid_spec():
-    spec = build_signature("drone", "buddhist_meditative", 60).spec()
+    spec = build_signature("drone", "buddhist_meditative", "relax", 60).spec()
     assert rb.describe(spec) == "drone x buddhist_meditative"
 
 
@@ -82,7 +82,7 @@ def test_provider_kwargs_elevenlabs():
 def test_engine_routes_special_cells_to_an_sfx_checkpoint():
     from bnb.background import build_keyword_signature
 
-    grid = build_signature("drone", "lofi", 60).spec()
+    grid = build_signature("drone", "lofi", "relax", 60).spec()
     special = build_keyword_signature("natural_sounds", "rain", 60).spec()
 
     # Traded down to the small checkpoint: field recordings still need an SFX-capable
@@ -123,7 +123,7 @@ def test_record_output_format_stable_audio_is_always_wav():
 
 
 def test_render_stable_audio_uses_the_audiosparx_adapted_prompt(monkeypatch, tmp_path):
-    spec = build_signature("melodic_instrument", "neoclassical", 60).spec()  # felt_piano -> "Piano" tag
+    spec = build_signature("melodic_instrument", "neoclassical", "relax", 60).spec()  # felt_piano -> "Piano" tag
     captured = {}
 
     def fake_render(spec, out_path, **kwargs):
@@ -174,7 +174,7 @@ def _renderer(tmp_path, verdicts):
 
 
 def test_a_healthy_render_is_kept_on_the_first_attempt(tmp_path):
-    spec = build_signature("drone", "lofi", 60).spec()
+    spec = build_signature("drone", "lofi", "relax", 60).spec()
     render, calls = _renderer(tmp_path, [True])
 
     path, quality = rb.render_checked(render, spec, max_retry=3, check=True)
@@ -187,7 +187,7 @@ def test_a_healthy_render_is_kept_on_the_first_attempt(tmp_path):
 
 
 def test_a_failed_render_is_redone_with_a_fresh_seed(tmp_path):
-    spec = build_signature("drone", "lofi", 60).spec()
+    spec = build_signature("drone", "lofi", "relax", 60).spec()
     render, calls = _renderer(tmp_path, [False, False, True])
 
     path, quality = rb.render_checked(render, spec, max_retry=3, check=True)
@@ -201,7 +201,7 @@ def test_a_failed_render_is_redone_with_a_fresh_seed(tmp_path):
 
 
 def test_giving_up_after_max_retry_keeps_nothing(tmp_path):
-    spec = build_signature("drone", "lofi", 60).spec()
+    spec = build_signature("drone", "lofi", "relax", 60).spec()
     render, calls = _renderer(tmp_path, [False] * 4)
 
     path, quality = rb.render_checked(render, spec, max_retry=3, check=True)
@@ -213,7 +213,7 @@ def test_giving_up_after_max_retry_keeps_nothing(tmp_path):
 
 
 def test_max_retry_zero_renders_once(tmp_path):
-    spec = build_signature("drone", "lofi", 60).spec()
+    spec = build_signature("drone", "lofi", "relax", 60).spec()
     render, calls = _renderer(tmp_path, [False])
 
     path, _ = rb.render_checked(render, spec, max_retry=0, check=True)
@@ -222,7 +222,7 @@ def test_max_retry_zero_renders_once(tmp_path):
 
 
 def test_no_qc_keeps_whatever_came_back(tmp_path):
-    spec = build_signature("drone", "lofi", 60).spec()
+    spec = build_signature("drone", "lofi", "relax", 60).spec()
     render, calls = _renderer(tmp_path, [False])
 
     path, quality = rb.render_checked(render, spec, max_retry=3, check=False)
@@ -235,7 +235,7 @@ def test_no_qc_keeps_whatever_came_back(tmp_path):
 def test_retry_seeds_are_deterministic():
     from bnb.background import retry_seed
 
-    spec = build_signature("drone", "lofi", 60).spec()
+    spec = build_signature("drone", "lofi", "relax", 60).spec()
     assert retry_seed(spec["track_id"], 1) == retry_seed(spec["track_id"], 1)
     assert retry_seed(spec["track_id"], 1) != retry_seed(spec["track_id"], 2)
     assert retry_seed(spec["track_id"], 1) != spec["seed"]
@@ -266,7 +266,7 @@ def test_session_uses_a_worker_for_the_torch_backend(monkeypatch, tmp_path):
     monkeypatch.setattr(stable_audio, "Worker", FakeWorker)
 
     with rb.render_session(_args(provider="stable_audio"), rb.Engine("small-music", "torch")) as render:
-        out = render(build_signature("drone", "lofi", 60).spec())
+        out = render(build_signature("drone", "lofi", "relax", 60).spec())
 
     assert out.exists()
     assert started[0]["model"] == "small-music"
@@ -282,7 +282,7 @@ def test_session_falls_back_to_one_process_per_track(monkeypatch, capsys):
     monkeypatch.setattr(rb, "render_stable_audio", lambda spec, **kw: Path("/tmp/x.wav"))
 
     with rb.render_session(_args(provider="stable_audio"), rb.Engine("small-music", "torch")) as render:
-        assert render(build_signature("drone", "lofi", 60).spec()) == Path("/tmp/x.wav")
+        assert render(build_signature("drone", "lofi", "relax", 60).spec()) == Path("/tmp/x.wav")
     assert "falling back" in capsys.readouterr().out
 
 
@@ -291,7 +291,7 @@ def test_session_never_starts_a_worker_for_mlx_or_elevenlabs(monkeypatch):
     monkeypatch.setattr(rb, "render_stable_audio", lambda spec, **kw: Path("/tmp/x.wav"))
     monkeypatch.setattr(rb, "render_elevenlabs", lambda spec, **kw: Path("/tmp/y.wav"))
 
-    spec = build_signature("drone", "lofi", 60).spec()
+    spec = build_signature("drone", "lofi", "relax", 60).spec()
     with rb.render_session(_args(provider="stable_audio"), rb.Engine("medium", "mlx")) as render:
         assert render(spec) == Path("/tmp/x.wav")
     with rb.render_session(_args(provider="stable_audio", no_worker=True), rb.Engine("small-music", "torch")) as render:

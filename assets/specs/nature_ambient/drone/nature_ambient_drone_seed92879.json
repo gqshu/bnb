@@ -68,5 +68,32 @@
   "seed": 92879,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:40:16.775658+00:00",
+    "audio_file": "tracks/nature_ambient/drone/nature_ambient_drone_seed92879.wav",
+    "watermark": null,
+    "seed": 92879,
+    "qc": {
+      "attempts": 1,
+      "seed": 92879,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.4097,
+        "rms_dbfs": -24.5,
+        "silent_fraction": 0.022,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0002,
+        "level_variation_db": 6.63,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
 }

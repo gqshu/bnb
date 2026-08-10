@@ -65,5 +65,32 @@
   "seed": 22047,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:40:37.147682+00:00",
+    "audio_file": "tracks/nature_ambient/field_recording/nature_ambient_field_seed22047.wav",
+    "watermark": null,
+    "seed": 22047,
+    "qc": {
+      "attempts": 1,
+      "seed": 22047,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.3215,
+        "rms_dbfs": -25.7,
+        "silent_fraction": 0.003,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0002,
+        "level_variation_db": 1.76,
+        "spectral_flatness": 0.001
+      }
+    }
+  }
 }

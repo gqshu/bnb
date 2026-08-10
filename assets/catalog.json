@@ -25,10 +25,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/buddhist_meditative/percussive_with_tail/buddhist_meditative_bowls_seed31991.json",
-      "audio": null
+      "audio": "tracks/buddhist_meditative/percussive_with_tail/buddhist_meditative_bowls_seed31991.wav"
     },
     {
       "track_id": "buddhist_meditative_bowls_seed59164",
@@ -54,10 +54,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/buddhist_meditative/percussive_with_tail/buddhist_meditative_bowls_seed59164.json",
-      "audio": null
+      "audio": "tracks/buddhist_meditative/percussive_with_tail/buddhist_meditative_bowls_seed59164.wav"
     },
     {
       "track_id": "buddhist_meditative_drone_seed47427",
@@ -83,10 +83,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/buddhist_meditative/drone/buddhist_meditative_drone_seed47427.json",
-      "audio": null
+      "audio": "tracks/buddhist_meditative/drone/buddhist_meditative_drone_seed47427.wav"
     },
     {
       "track_id": "buddhist_meditative_drone_seed81657",
@@ -112,10 +112,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/buddhist_meditative/drone/buddhist_meditative_drone_seed81657.json",
-      "audio": null
+      "audio": "tracks/buddhist_meditative/drone/buddhist_meditative_drone_seed81657.wav"
     },
     {
       "track_id": "buddhist_meditative_field_seed47637",
@@ -142,10 +142,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/buddhist_meditative/field_recording/buddhist_meditative_field_seed47637.json",
-      "audio": null
+      "audio": "tracks/buddhist_meditative/field_recording/buddhist_meditative_field_seed47637.wav"
     },
     {
       "track_id": "buddhist_meditative_field_seed67927",
@@ -172,10 +172,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/buddhist_meditative/field_recording/buddhist_meditative_field_seed67927.json",
-      "audio": null
+      "audio": "tracks/buddhist_meditative/field_recording/buddhist_meditative_field_seed67927.wav"
     },
     {
       "track_id": "buddhist_meditative_melodic_seed57864",
@@ -201,10 +201,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/buddhist_meditative/melodic_instrument/buddhist_meditative_melodic_seed57864.json",
-      "audio": null
+      "audio": "tracks/buddhist_meditative/melodic_instrument/buddhist_meditative_melodic_seed57864.wav"
     },
     {
       "track_id": "buddhist_meditative_melodic_seed69177",
@@ -230,10 +230,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/buddhist_meditative/melodic_instrument/buddhist_meditative_melodic_seed69177.json",
-      "audio": null
+      "audio": "tracks/buddhist_meditative/melodic_instrument/buddhist_meditative_melodic_seed69177.wav"
     },
     {
       "track_id": "buddhist_meditative_noise_seed35194",
@@ -259,10 +259,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/buddhist_meditative/noise_texture/buddhist_meditative_noise_seed35194.json",
-      "audio": null
+      "audio": "tracks/buddhist_meditative/noise_texture/buddhist_meditative_noise_seed35194.wav"
     },
     {
       "track_id": "buddhist_meditative_noise_seed6956",
@@ -288,10 +288,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/buddhist_meditative/noise_texture/buddhist_meditative_noise_seed6956.json",
-      "audio": null
+      "audio": "tracks/buddhist_meditative/noise_texture/buddhist_meditative_noise_seed6956.wav"
     },
     {
       "track_id": "lofi_bowls_seed10866",
@@ -317,10 +317,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/lofi/percussive_with_tail/lofi_bowls_seed10866.json",
-      "audio": null
+      "audio": "tracks/lofi/percussive_with_tail/lofi_bowls_seed10866.wav"
     },
     {
       "track_id": "lofi_bowls_seed25658",
@@ -346,10 +346,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/lofi/percussive_with_tail/lofi_bowls_seed25658.json",
-      "audio": null
+      "audio": "tracks/lofi/percussive_with_tail/lofi_bowls_seed25658.wav"
     },
     {
       "track_id": "lofi_drone_seed25206",
@@ -375,10 +375,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/lofi/drone/lofi_drone_seed25206.json",
-      "audio": null
+      "audio": "tracks/lofi/drone/lofi_drone_seed25206.wav"
     },
     {
       "track_id": "lofi_drone_seed47621",
@@ -404,10 +404,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/lofi/drone/lofi_drone_seed47621.json",
-      "audio": null
+      "audio": "tracks/lofi/drone/lofi_drone_seed47621.wav"
     },
     {
       "track_id": "lofi_field_seed20802",
@@ -432,10 +432,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/lofi/field_recording/lofi_field_seed20802.json",
-      "audio": null
+      "audio": "tracks/lofi/field_recording/lofi_field_seed20802.wav"
     },
     {
       "track_id": "lofi_field_seed88064",
@@ -460,10 +460,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/lofi/field_recording/lofi_field_seed88064.json",
-      "audio": null
+      "audio": "tracks/lofi/field_recording/lofi_field_seed88064.wav"
     },
     {
       "track_id": "lofi_melodic_seed35662",
@@ -489,10 +489,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/lofi/melodic_instrument/lofi_melodic_seed35662.json",
-      "audio": null
+      "audio": "tracks/lofi/melodic_instrument/lofi_melodic_seed35662.wav"
     },
     {
       "track_id": "lofi_melodic_seed53413",
@@ -518,10 +518,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/lofi/melodic_instrument/lofi_melodic_seed53413.json",
-      "audio": null
+      "audio": "tracks/lofi/melodic_instrument/lofi_melodic_seed53413.wav"
     },
     {
       "track_id": "lofi_noise_seed32107",
@@ -547,10 +547,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/lofi/noise_texture/lofi_noise_seed32107.json",
-      "audio": null
+      "audio": "tracks/lofi/noise_texture/lofi_noise_seed32107.wav"
     },
     {
       "track_id": "lofi_noise_seed53531",
@@ -576,10 +576,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/lofi/noise_texture/lofi_noise_seed53531.json",
-      "audio": null
+      "audio": "tracks/lofi/noise_texture/lofi_noise_seed53531.wav"
     },
     {
       "track_id": "natural_sounds_chimes_seed21288",
@@ -596,10 +596,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/chimes/natural_sounds_chimes_seed21288.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/chimes/natural_sounds_chimes_seed21288.wav"
     },
     {
       "track_id": "natural_sounds_chimes_seed89603",
@@ -616,10 +616,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/chimes/natural_sounds_chimes_seed89603.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/chimes/natural_sounds_chimes_seed89603.wav"
     },
     {
       "track_id": "natural_sounds_forest_seed48529",
@@ -636,10 +636,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/forest/natural_sounds_forest_seed48529.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/forest/natural_sounds_forest_seed48529.wav"
     },
     {
       "track_id": "natural_sounds_forest_seed95435",
@@ -656,10 +656,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/forest/natural_sounds_forest_seed95435.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/forest/natural_sounds_forest_seed95435.wav"
     },
     {
       "track_id": "natural_sounds_night_seed51038",
@@ -676,10 +676,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/night/natural_sounds_night_seed51038.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/night/natural_sounds_night_seed51038.wav"
     },
     {
       "track_id": "natural_sounds_night_seed84194",
@@ -696,10 +696,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/night/natural_sounds_night_seed84194.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/night/natural_sounds_night_seed84194.wav"
     },
     {
       "track_id": "natural_sounds_ocean_seed72449",
@@ -716,10 +716,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/ocean/natural_sounds_ocean_seed72449.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/ocean/natural_sounds_ocean_seed72449.wav"
     },
     {
       "track_id": "natural_sounds_ocean_seed79188",
@@ -736,10 +736,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/ocean/natural_sounds_ocean_seed79188.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/ocean/natural_sounds_ocean_seed79188.wav"
     },
     {
       "track_id": "natural_sounds_rain_seed41654",
@@ -756,10 +756,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/rain/natural_sounds_rain_seed41654.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/rain/natural_sounds_rain_seed41654.wav"
     },
     {
       "track_id": "natural_sounds_rain_seed89126",
@@ -776,10 +776,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/rain/natural_sounds_rain_seed89126.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/rain/natural_sounds_rain_seed89126.wav"
     },
     {
       "track_id": "natural_sounds_stream_seed45421",
@@ -796,10 +796,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/stream/natural_sounds_stream_seed45421.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/stream/natural_sounds_stream_seed45421.wav"
     },
     {
       "track_id": "natural_sounds_stream_seed57548",
@@ -816,10 +816,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/stream/natural_sounds_stream_seed57548.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/stream/natural_sounds_stream_seed57548.wav"
     },
     {
       "track_id": "natural_sounds_wind_seed18116",
@@ -836,10 +836,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/wind/natural_sounds_wind_seed18116.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/wind/natural_sounds_wind_seed18116.wav"
     },
     {
       "track_id": "natural_sounds_wind_seed61654",
@@ -856,10 +856,10 @@
       ],
       "requested_features": null,
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/natural_sounds/wind/natural_sounds_wind_seed61654.json",
-      "audio": null
+      "audio": "tracks/natural_sounds/wind/natural_sounds_wind_seed61654.wav"
     },
     {
       "track_id": "nature_ambient_bowls_seed71728",
@@ -885,10 +885,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/nature_ambient/percussive_with_tail/nature_ambient_bowls_seed71728.json",
-      "audio": null
+      "audio": "tracks/nature_ambient/percussive_with_tail/nature_ambient_bowls_seed71728.wav"
     },
     {
       "track_id": "nature_ambient_bowls_seed9682",
@@ -914,10 +914,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/nature_ambient/percussive_with_tail/nature_ambient_bowls_seed9682.json",
-      "audio": null
+      "audio": "tracks/nature_ambient/percussive_with_tail/nature_ambient_bowls_seed9682.wav"
     },
     {
       "track_id": "nature_ambient_drone_seed69926",
@@ -944,10 +944,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/nature_ambient/drone/nature_ambient_drone_seed69926.json",
-      "audio": null
+      "audio": "tracks/nature_ambient/drone/nature_ambient_drone_seed69926.wav"
     },
     {
       "track_id": "nature_ambient_drone_seed92879",
@@ -974,10 +974,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/nature_ambient/drone/nature_ambient_drone_seed92879.json",
-      "audio": null
+      "audio": "tracks/nature_ambient/drone/nature_ambient_drone_seed92879.wav"
     },
     {
       "track_id": "nature_ambient_field_seed22047",
@@ -1003,10 +1003,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/nature_ambient/field_recording/nature_ambient_field_seed22047.json",
-      "audio": null
+      "audio": "tracks/nature_ambient/field_recording/nature_ambient_field_seed22047.wav"
     },
     {
       "track_id": "nature_ambient_field_seed97740",
@@ -1032,10 +1032,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/nature_ambient/field_recording/nature_ambient_field_seed97740.json",
-      "audio": null
+      "audio": "tracks/nature_ambient/field_recording/nature_ambient_field_seed97740.wav"
     },
     {
       "track_id": "nature_ambient_melodic_seed22252",
@@ -1060,10 +1060,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/nature_ambient/melodic_instrument/nature_ambient_melodic_seed22252.json",
-      "audio": null
+      "audio": "tracks/nature_ambient/melodic_instrument/nature_ambient_melodic_seed22252.wav"
     },
     {
       "track_id": "nature_ambient_melodic_seed65443",
@@ -1088,10 +1088,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/nature_ambient/melodic_instrument/nature_ambient_melodic_seed65443.json",
-      "audio": null
+      "audio": "tracks/nature_ambient/melodic_instrument/nature_ambient_melodic_seed65443.wav"
     },
     {
       "track_id": "nature_ambient_noise_seed12891",
@@ -1117,10 +1117,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/nature_ambient/noise_texture/nature_ambient_noise_seed12891.json",
-      "audio": null
+      "audio": "tracks/nature_ambient/noise_texture/nature_ambient_noise_seed12891.wav"
     },
     {
       "track_id": "nature_ambient_noise_seed76410",
@@ -1146,10 +1146,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/nature_ambient/noise_texture/nature_ambient_noise_seed76410.json",
-      "audio": null
+      "audio": "tracks/nature_ambient/noise_texture/nature_ambient_noise_seed76410.wav"
     },
     {
       "track_id": "neoclassical_bowls_seed49037",
@@ -1175,10 +1175,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neoclassical/percussive_with_tail/neoclassical_bowls_seed49037.json",
-      "audio": null
+      "audio": "tracks/neoclassical/percussive_with_tail/neoclassical_bowls_seed49037.wav"
     },
     {
       "track_id": "neoclassical_bowls_seed5828",
@@ -1204,10 +1204,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neoclassical/percussive_with_tail/neoclassical_bowls_seed5828.json",
-      "audio": null
+      "audio": "tracks/neoclassical/percussive_with_tail/neoclassical_bowls_seed5828.wav"
     },
     {
       "track_id": "neoclassical_drone_seed34925",
@@ -1232,10 +1232,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neoclassical/drone/neoclassical_drone_seed34925.json",
-      "audio": null
+      "audio": "tracks/neoclassical/drone/neoclassical_drone_seed34925.wav"
     },
     {
       "track_id": "neoclassical_drone_seed3964",
@@ -1260,10 +1260,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neoclassical/drone/neoclassical_drone_seed3964.json",
-      "audio": null
+      "audio": "tracks/neoclassical/drone/neoclassical_drone_seed3964.wav"
     },
     {
       "track_id": "neoclassical_field_seed11247",
@@ -1288,10 +1288,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neoclassical/field_recording/neoclassical_field_seed11247.json",
-      "audio": null
+      "audio": "tracks/neoclassical/field_recording/neoclassical_field_seed11247.wav"
     },
     {
       "track_id": "neoclassical_field_seed1346",
@@ -1316,10 +1316,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neoclassical/field_recording/neoclassical_field_seed1346.json",
-      "audio": null
+      "audio": "tracks/neoclassical/field_recording/neoclassical_field_seed1346.wav"
     },
     {
       "track_id": "neoclassical_melodic_seed62862",
@@ -1344,10 +1344,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neoclassical/melodic_instrument/neoclassical_melodic_seed62862.json",
-      "audio": null
+      "audio": "tracks/neoclassical/melodic_instrument/neoclassical_melodic_seed62862.wav"
     },
     {
       "track_id": "neoclassical_melodic_seed76352",
@@ -1372,10 +1372,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neoclassical/melodic_instrument/neoclassical_melodic_seed76352.json",
-      "audio": null
+      "audio": "tracks/neoclassical/melodic_instrument/neoclassical_melodic_seed76352.wav"
     },
     {
       "track_id": "neoclassical_noise_seed64096",
@@ -1401,10 +1401,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neoclassical/noise_texture/neoclassical_noise_seed64096.json",
-      "audio": null
+      "audio": "tracks/neoclassical/noise_texture/neoclassical_noise_seed64096.wav"
     },
     {
       "track_id": "neoclassical_noise_seed97660",
@@ -1430,10 +1430,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neoclassical/noise_texture/neoclassical_noise_seed97660.json",
-      "audio": null
+      "audio": "tracks/neoclassical/noise_texture/neoclassical_noise_seed97660.wav"
     },
     {
       "track_id": "neutral_bowls_seed84050",
@@ -1459,10 +1459,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neutral/percussive_with_tail/neutral_bowls_seed84050.json",
-      "audio": null
+      "audio": "tracks/neutral/percussive_with_tail/neutral_bowls_seed84050.wav"
     },
     {
       "track_id": "neutral_bowls_seed98314",
@@ -1488,10 +1488,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neutral/percussive_with_tail/neutral_bowls_seed98314.json",
-      "audio": null
+      "audio": "tracks/neutral/percussive_with_tail/neutral_bowls_seed98314.wav"
     },
     {
       "track_id": "neutral_drone_seed23763",
@@ -1517,10 +1517,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neutral/drone/neutral_drone_seed23763.json",
-      "audio": null
+      "audio": "tracks/neutral/drone/neutral_drone_seed23763.wav"
     },
     {
       "track_id": "neutral_drone_seed56505",
@@ -1546,10 +1546,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neutral/drone/neutral_drone_seed56505.json",
-      "audio": null
+      "audio": "tracks/neutral/drone/neutral_drone_seed56505.wav"
     },
     {
       "track_id": "neutral_field_seed17737",
@@ -1574,10 +1574,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neutral/field_recording/neutral_field_seed17737.json",
-      "audio": null
+      "audio": "tracks/neutral/field_recording/neutral_field_seed17737.wav"
     },
     {
       "track_id": "neutral_field_seed93393",
@@ -1602,10 +1602,10 @@
         "nature_bed": "present"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neutral/field_recording/neutral_field_seed93393.json",
-      "audio": null
+      "audio": "tracks/neutral/field_recording/neutral_field_seed93393.wav"
     },
     {
       "track_id": "neutral_melodic_seed34350",
@@ -1630,10 +1630,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neutral/melodic_instrument/neutral_melodic_seed34350.json",
-      "audio": null
+      "audio": "tracks/neutral/melodic_instrument/neutral_melodic_seed34350.wav"
     },
     {
       "track_id": "neutral_melodic_seed44111",
@@ -1658,10 +1658,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neutral/melodic_instrument/neutral_melodic_seed44111.json",
-      "audio": null
+      "audio": "tracks/neutral/melodic_instrument/neutral_melodic_seed44111.wav"
     },
     {
       "track_id": "neutral_noise_seed50801",
@@ -1687,10 +1687,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neutral/noise_texture/neutral_noise_seed50801.json",
-      "audio": null
+      "audio": "tracks/neutral/noise_texture/neutral_noise_seed50801.wav"
     },
     {
       "track_id": "neutral_noise_seed52471",
@@ -1716,10 +1716,10 @@
         "nature_bed": "none"
       },
       "measured_features": null,
-      "rendered": false,
-      "provider": null,
+      "rendered": true,
+      "provider": "stable_audio",
       "spec": "specs/neutral/noise_texture/neutral_noise_seed52471.json",
-      "audio": null
+      "audio": "tracks/neutral/noise_texture/neutral_noise_seed52471.wav"
     }
   ]
 }

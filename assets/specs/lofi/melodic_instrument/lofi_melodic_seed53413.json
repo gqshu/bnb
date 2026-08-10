@@ -66,5 +66,32 @@
   "seed": 53413,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:33:29.607638+00:00",
+    "audio_file": "tracks/lofi/melodic_instrument/lofi_melodic_seed53413.wav",
+    "watermark": null,
+    "seed": 53413,
+    "qc": {
+      "attempts": 1,
+      "seed": 53413,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.7285,
+        "rms_dbfs": -27.5,
+        "silent_fraction": 0.001,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 10.12,
+        "spectral_flatness": 0.003
+      }
+    }
+  }
 }

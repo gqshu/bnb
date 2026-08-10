@@ -31,7 +31,7 @@ import soundfile as sf
 
 from . import assets
 from .catalog import CategoryManager
-from .tone import CARRIER_HZ, _gate_envelope
+from .tone import CARRIER_HZ, _gate_envelope, am_unit_envelope
 
 STREAM_SAMPLE_RATE = 44_100
 TWO_PI = 2.0 * np.pi
@@ -73,8 +73,15 @@ class Beat:
       ``beat_hz`` times per second, using ``depth``/``duty``/``ramp_ms``. Mono by
       nature (identical L/R). Never mix a background under this mode (doc §5) —
       enforced by :class:`StreamEngine`, not here.
+    - ``am_music`` — the focus-goal mode: there is no synthesized tone at all. The
+      background track itself is amplitude-modulated at ``beat_hz`` (``depth``/
+      ``modulator``/``duty``/``ramp_ms``, same math as ``tone.render_am_music``, run
+      incrementally by :class:`StreamEngine`). ``carrier_hz``/``waveform``/``volume``
+      are unused for this mode; a background is *required*, the opposite constraint
+      from ``isochronic`` (enforced by :class:`StreamEngine`, not here).
 
-    ``depth``, ``duty``, and ``ramp_ms`` only apply to ``isochronic``.
+    ``depth``, ``duty``, and ``ramp_ms`` apply to ``isochronic`` and ``am_music``.
+    ``modulator`` (``"sine"``/``"gate"``) only applies to ``am_music``.
     """
 
     carrier_hz: float = CARRIER_HZ
@@ -85,6 +92,7 @@ class Beat:
     depth: float = 1.0
     duty: float = 0.5
     ramp_ms: float = 5.0
+    modulator: str = "sine"
 
 
 def _oscillator(phase_rad: np.ndarray, waveform: str) -> np.ndarray:
@@ -150,6 +158,8 @@ class StreamEngine:
         # _left_phase/_right_phase so switching modes never cross-contaminates.
         self._iso_carrier_phase = 0.0
         self._iso_gate_phase = 0.0
+        # am_music's modulation phase, kept separate for the same reason.
+        self._am_phase = 0.0
         # Background: the current track plus (during a switch) the outgoing one it
         # crossfades from. ``_fade_in`` is how faded-in the current track is (0..1);
         # ``_fade_out`` is the outgoing track's remaining gain (1..0). Separate so the
@@ -166,12 +176,13 @@ class StreamEngine:
     # --- control (called from API threads) ---------------------------------
 
     def start(self, *, beat: Beat | None, background_id: str | None, background_volume: float) -> None:
-        self._check_isochronic_background(beat, background_id)
+        self._check_mode_background_compat(beat, background_id)
         with self._lock:
             self.beat = beat
             self.background_volume = background_volume
             self._left_phase = self._right_phase = 0.0
             self._iso_carrier_phase = self._iso_gate_phase = 0.0
+            self._am_phase = 0.0
             self._amp = 0.0  # fade in over the first chunk
             # A fresh stream starts from clean background state — no crossfade
             # bleeding in from a previously-stopped one.
@@ -187,7 +198,7 @@ class StreamEngine:
 
     def set_beat(self, beat: Beat | None) -> None:
         with self._lock:
-            self._check_isochronic_background(beat, self.background_id)
+            self._check_mode_background_compat(beat, self.background_id)
             self.beat = beat
 
     def set_background(self, background_id: str | None) -> None:
@@ -214,7 +225,7 @@ class StreamEngine:
         with self._lock:
             new_beat = self.beat if beat is _UNSET else beat
             new_background_id = self.background_id if background_id is _UNSET else background_id
-            self._check_isochronic_background(new_beat, new_background_id)
+            self._check_mode_background_compat(new_beat, new_background_id)
             if beat is not _UNSET:
                 self.beat = beat
             if background_id is not _UNSET:
@@ -223,17 +234,25 @@ class StreamEngine:
                 self.background_volume = background_volume
 
     @staticmethod
-    def _check_isochronic_background(beat: Beat | None, background_id: str | None) -> None:
-        """Isochronic must never be mixed with a background (doc §5) — the pulsing
-        *is* the entrainment signal, and any background reduces its effective
-        modulation depth. Checked at the control plane (when a spec is set) so the
-        invalid combination never reaches the render loop."""
-        if beat is not None and beat.mode == "isochronic" and background_id is not None:
+    def _check_mode_background_compat(beat: Beat | None, background_id: str | None) -> None:
+        """Two modes have a background constraint, in opposite directions.
+
+        Isochronic must never be mixed with a background (doc §5) — the pulsing *is* the
+        entrainment signal, and any background reduces its effective modulation depth.
+        am_music requires one — there is no separate synthesized tone in that mode, so a
+        beat with no background would be silence, not a stimulus. Checked at the control
+        plane (when a spec is set) so an invalid combination never reaches the render loop.
+        """
+        if beat is None:
+            return
+        if beat.mode == "isochronic" and background_id is not None:
             raise ValueError("isochronic mode cannot be combined with a background track")
+        if beat.mode == "am_music" and background_id is None:
+            raise ValueError("am_music mode requires a background track")
 
     def _begin_background(self, background_id: str | None) -> None:
         """Point the background at a pinned track, silence, or ``SHUFFLE``. Holds lock."""
-        self._check_isochronic_background(self.beat, background_id)
+        self._check_mode_background_compat(self.beat, background_id)
         if background_id == SHUFFLE:
             self.shuffle = True
             self._switch_background(self._random_track())
@@ -290,14 +309,41 @@ class StreamEngine:
     # --- rendering (called from the streaming request thread) --------------
 
     def read(self, n_frames: int) -> np.ndarray:
-        """Render the next ``n_frames`` as float32 stereo in [-1, 1]."""
+        """Render the next ``n_frames`` as float32 stereo in [-1, 1].
+
+        ``am_music`` is structurally different from every other mode: there's no
+        independent tone to add to the background, because the background itself *is*
+        the stimulus once modulated. So this mode renders the background first and
+        applies the envelope to it, instead of summing a separately-rendered beat.
+        """
         with self._lock:
             out = np.zeros((n_frames, 2), dtype=np.float32)
+            has_bg = self._bg is not None or self._bg_out is not None
+            if self.beat is not None and self.beat.mode == "am_music":
+                if has_bg:
+                    bg = self._render_background(n_frames) * self.background_volume
+                    out += self._apply_am_envelope(self.beat, bg, n_frames)
+                return _soft_limit(out)
             if self.beat is not None:
                 out += self._render_beat(n_frames)
-            if self._bg is not None or self._bg_out is not None:
+            if has_bg:
                 out += self._render_background(n_frames) * self.background_volume
             return _soft_limit(out)
+
+    def _apply_am_envelope(self, beat: Beat, bg: np.ndarray, n: int) -> np.ndarray:
+        """Amplitude-modulate the mixed background at ``beat.beat_hz`` — the am_music mode.
+
+        Same envelope math as ``tone.render_am_music`` (shared via ``tone.am_unit_envelope``),
+        but run incrementally here with phase carried across chunks, the same technique
+        ``_render_isochronic`` uses for its gate phase so a live rate change doesn't click.
+        """
+        step = np.arange(1, n + 1, dtype=np.float64) / self.sample_rate
+        phase = self._am_phase + beat.beat_hz * step  # in cycles, not radians
+        self._am_phase = float(phase[-1] % 1.0)
+        phi = np.mod(phase, 1.0)
+        unit = am_unit_envelope(phi, beat.modulator, beat.beat_hz, beat.duty, beat.ramp_ms)
+        env = (1 - beat.depth) + beat.depth * unit
+        return (bg * env[:, None]).astype(np.float32)
 
     def _render_beat(self, n: int) -> np.ndarray:
         beat = self.beat

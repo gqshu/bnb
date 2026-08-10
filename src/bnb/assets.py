@@ -304,6 +304,7 @@ def _entry(
         "summary": _summary(spec),
         "substrate": spec.get("substrate"),
         "style": spec.get("style"),
+        "goal": spec.get("goal", "relax") if spec.get("kind", "grid") == "grid" else spec.get("goal"),
         "group": spec.get("group"),
         "keyword": spec.get("keyword"),
         "seed": spec.get("seed"),

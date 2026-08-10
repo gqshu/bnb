@@ -67,5 +67,34 @@
   "seed": 57864,
   "duration_s": 60,
   "loopable": true,
-  "render": null
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:torch",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-08T16:29:45.683559+00:00",
+    "audio_file": "tracks/buddhist_meditative/melodic_instrument/buddhist_meditative_melodic_seed57864.wav",
+    "watermark": null,
+    "seed": 57864,
+    "qc": {
+      "attempts": 1,
+      "seed": 57864,
+      "verdict": "warn",
+      "warnings": [
+        "24% silence"
+      ],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.6543,
+        "rms_dbfs": -23.8,
+        "silent_fraction": 0.245,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 13.09,
+        "spectral_flatness": 0.001
+      }
+    }
+  }
 }
