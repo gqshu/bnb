@@ -56,31 +56,29 @@
   "loopable": true,
   "render": {
     "provider": "stable_audio",
-    "model_version": "medium:torch",
+    "model_version": "medium:mlx",
     "output_format": "wav",
     "license": "stable-audio-3-community",
-    "generated_at": "2026-08-08T16:34:30.691660+00:00",
+    "generated_at": "2026-08-10T19:02:28.276276+00:00",
     "audio_file": "tracks/natural_sounds/chimes/natural_sounds_chimes_seed21288.wav",
     "watermark": null,
     "seed": 21288,
     "qc": {
       "attempts": 1,
       "seed": 21288,
-      "verdict": "warn",
-      "warnings": [
-        "quiet: -38.2 dBFS RMS"
-      ],
+      "verdict": "ok",
+      "warnings": [],
       "metrics": {
         "duration_s": 60.0,
         "sample_rate": 44100,
         "channels": 2,
-        "peak": 0.8428,
-        "rms_dbfs": -38.2,
-        "silent_fraction": 0.008,
+        "peak": 0.9698,
+        "rms_dbfs": -32.2,
+        "silent_fraction": 0.032,
         "clipped_fraction": 0.0,
         "dc_offset": 0.0,
-        "level_variation_db": 6.83,
-        "spectral_flatness": 0.006
+        "level_variation_db": 10.03,
+        "spectral_flatness": 0.015
       }
     }
   }

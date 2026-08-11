@@ -56,10 +56,10 @@
   "loopable": true,
   "render": {
     "provider": "stable_audio",
-    "model_version": "medium:torch",
+    "model_version": "medium:mlx",
     "output_format": "wav",
     "license": "stable-audio-3-community",
-    "generated_at": "2026-08-08T16:38:55.364897+00:00",
+    "generated_at": "2026-08-10T19:04:06.846089+00:00",
     "audio_file": "tracks/natural_sounds/wind/natural_sounds_wind_seed61654.wav",
     "watermark": null,
     "seed": 61654,
@@ -68,19 +68,19 @@
       "seed": 61654,
       "verdict": "warn",
       "warnings": [
-        "quiet: -46.8 dBFS RMS"
+        "quiet: -38.4 dBFS RMS"
       ],
       "metrics": {
         "duration_s": 60.0,
         "sample_rate": 44100,
         "channels": 2,
-        "peak": 0.1343,
-        "rms_dbfs": -46.8,
-        "silent_fraction": 0.0,
+        "peak": 0.4957,
+        "rms_dbfs": -38.4,
+        "silent_fraction": 0.012,
         "clipped_fraction": 0.0,
-        "dc_offset": 0.0001,
-        "level_variation_db": 2.38,
-        "spectral_flatness": 0.094
+        "dc_offset": 0.0,
+        "level_variation_db": 4.8,
+        "spectral_flatness": 0.053
       }
     }
   }

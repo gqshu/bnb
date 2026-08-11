@@ -3,33 +3,59 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>bnb — binaural beat stream</title>
+<title>bnb — dashboard</title>
 <style>
   :root {
     --bg: #0e1116; --panel: #171b22; --line: #262c36; --text: #e6e9ef;
     --muted: #8b93a3; --accent: #6ea8fe; --good: #4ade80; --off: #4b5563;
+    --sidebar: 14rem;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     background: var(--bg); color: var(--text);
-    display: flex; justify-content: center; padding: 2rem 1rem;
+    display: flex; min-height: 100vh;
   }
-  main { width: 100%; max-width: 640px; }
+  a { color: inherit; text-decoration: none; }
+
+  /* --- left nav ------------------------------------------------------------ */
+  .sidebar {
+    flex: 0 0 var(--sidebar); border-right: 1px solid var(--line);
+    background: #11151b; padding: 1.4rem 0; position: sticky; top: 0; height: 100vh;
+  }
+  .brand { font-weight: 700; letter-spacing: .04em; padding: 0 1.2rem 1.2rem; }
+  .brand small { display: block; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+  .nav-item {
+    display: block; padding: .6rem 1.2rem; color: var(--muted);
+    border-left: 3px solid transparent; cursor: pointer;
+  }
+  .nav-item:hover { color: var(--text); background: #151a21; }
+  .nav-item.active { color: var(--text); border-left-color: var(--accent); background: #161c26; }
+
+  /* --- page shell --------------------------------------------------------- */
+  .content { flex: 1; min-width: 0; }
+  .page { display: none; }
+  .page.active { display: block; }
+  #page-player { padding: 2rem 1rem; }
+  #page-player .inner { width: 100%; max-width: 640px; margin: 0 auto; }
   h1 { font-size: 1.3rem; margin: 0 0 .25rem; }
   .sub { color: var(--muted); margin: 0 0 1.5rem; }
+
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
   .row { display: flex; align-items: center; gap: .75rem; margin: .7rem 0; }
   .row label { flex: 0 0 8.5rem; color: var(--muted); }
   .row output { flex: 0 0 4rem; text-align: right; font-variant-numeric: tabular-nums; }
   input[type=range] { flex: 1; accent-color: var(--accent); }
-  select { flex: 1; background: #0d1017; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: .4rem; }
+  select, input[type=text] { background: #0d1017; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: .4rem; font: inherit; }
+  .row select { flex: 1; }
   .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .3rem; }
   .head h2 { font-size: .95rem; margin: 0; letter-spacing: .02em; }
   .toggle { display: flex; align-items: center; gap: .4rem; color: var(--muted); }
   button { font: inherit; border: 0; border-radius: 9px; padding: .6rem 1.15rem; cursor: pointer; color: #0b0e13; font-weight: 600; }
   .start { background: var(--good); } .stop { background: #f87171; }
   button:disabled { opacity: .45; cursor: not-allowed; }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); font-weight: 500; }
+  button.ghost:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
   .controls { display: flex; align-items: center; gap: .8rem; }
   .pill { display: inline-flex; align-items: center; gap: .45rem; color: var(--muted); font-size: .9rem; }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--off); }
@@ -39,10 +65,66 @@
   fieldset { border: 0; padding: 0; margin: 0; }
   fieldset:disabled { opacity: .4; }
   .iso-only { display: none; }
+
+  /* --- catalog page ------------------------------------------------------- */
+  /* Filters pinned on top, operation panel pinned at the bottom, the list
+     scrolling between them — so a selection stays actionable however long the
+     filtered list is. */
+  #page-catalog.active { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
+  .cat-head { border-bottom: 1px solid var(--line); padding: 1.1rem 1.4rem .9rem; }
+  .cat-title { display: flex; align-items: baseline; gap: .8rem; margin-bottom: .8rem; }
+  .cat-title h1 { margin: 0; }
+  .filters { display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: flex-end; }
+  .filter { display: flex; flex-direction: column; gap: .2rem; }
+  .filter span { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+  .filter select { min-width: 8.5rem; }
+
+  .cat-list { overflow-y: auto; padding: 0 1.4rem; }
+  /* One column template shared by the header and every row (a var rather than
+     subgrid, so the sticky header stays a plain sticky grid item). */
+  .tracks { --cols: 2rem 2.6rem minmax(16rem, 1.6fr) minmax(11rem, 1.2fr) 4.5rem minmax(7rem, .9fr); }
+  .trow {
+    display: grid; grid-template-columns: var(--cols); gap: .6rem;
+    align-items: center; padding: .55rem .3rem; border-bottom: 1px solid var(--line);
+  }
+  .thead {
+    color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+    position: sticky; top: 0; background: var(--bg); z-index: 1;
+  }
+  .trow.track { cursor: pointer; }
+  .trow.track:hover { background: #141922; }
+  .trow.selected { background: #17202e; }
+  .trow.playing .tid { color: var(--accent); }
+  .c-dur { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+  .c-tags { color: var(--muted); font-size: .85rem; }
+  .tid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .84rem; overflow-wrap: anywhere; }
+  .tsum { color: var(--muted); font-size: .84rem; }
+  .playbtn { background: #222a36; color: var(--text); border-radius: 50%; width: 1.9rem; height: 1.9rem; padding: 0; font-size: .8rem; font-weight: 400; }
+  .playbtn:hover:not(:disabled) { background: #2c3644; }
+  .badge { display: inline-block; background: #212936; color: #b9c2d0; border-radius: 5px; padding: .05rem .38rem; font-size: .72rem; margin-right: .3rem; white-space: nowrap; }
+  .badge.tag { background: #23324a; color: #a9c6f5; }
+  .empty { color: var(--muted); padding: 2rem .5rem; }
+
+  .cat-ops { border-top: 1px solid var(--line); background: #11151b; padding: .9rem 1.4rem; }
+  .ops-row { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+  .ops-row input[type=text] { flex: 1; min-width: 12rem; }
+  .selcount { color: var(--muted); font-size: .88rem; white-space: nowrap; }
+  .selcount b { color: var(--text); }
+  .ops-msg { color: var(--muted); font-size: .82rem; margin-top: .5rem; min-height: 1.2em; }
 </style>
 </head>
 <body>
-<main>
+<nav class="sidebar">
+  <div class="brand">bnb<small>dashboard</small></div>
+  <a class="nav-item active" href="#player" data-page="player">Player</a>
+  <a class="nav-item" href="#catalog" data-page="catalog">Catalog management</a>
+</nav>
+
+<div class="content">
+
+<!-- ══ PLAYER ════════════════════════════════════════════════════════════ -->
+<section class="page active" id="page-player">
+ <div class="inner">
   <h1>bnb — binaural beat stream</h1>
   <p class="sub">Demo portal for the live down-regulation stream. Headphones required —
     the beat only exists across the two ears.</p>
@@ -139,7 +221,48 @@
   </div>
 
   <audio id="player"></audio>
-</main>
+ </div>
+</section>
+
+<!-- ══ CATALOG MANAGEMENT ════════════════════════════════════════════════ -->
+<section class="page" id="page-catalog">
+  <div class="cat-head">
+    <div class="cat-title">
+      <h1>Catalog</h1>
+      <span class="selcount" id="catCount">—</span>
+    </div>
+    <div class="filters" id="filters">
+      <!-- facet selects are injected here by renderFilters() -->
+      <label class="filter"><span>rendered</span>
+        <select id="fRendered"><option value="">any</option><option value="yes">yes</option><option value="no">no</option></select></label>
+      <label class="filter"><span>tag</span>
+        <select id="fTag"><option value="">any</option></select></label>
+      <button class="ghost" id="fReset">Reset</button>
+    </div>
+  </div>
+
+  <div class="cat-list">
+    <div class="tracks" id="trackList"></div>
+    <div class="empty" id="catEmpty" style="display:none">No track matches these filters.</div>
+  </div>
+
+  <div class="cat-ops">
+    <div class="head"><h2>OPERATIONS</h2>
+      <span class="selcount"><b id="selCount">0</b> selected</span>
+    </div>
+    <div class="ops-row">
+      <input type="text" id="tagInput" placeholder="tag to apply, e.g. warm-bed" />
+      <button class="start" id="tagBtn" disabled>Tag selected</button>
+      <button class="ghost" id="selAllBtn">Select all filtered</button>
+      <button class="ghost" id="selNoneBtn">Clear selection</button>
+    </div>
+    <div class="ops-msg" id="opsMsg"></div>
+  </div>
+
+  <audio id="trackPlayer"></audio>
+</section>
+
+</div><!-- /content -->
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -200,7 +323,13 @@ async function api(method, path, body) {
     headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    const err = new Error(detail);
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
 }
 
@@ -301,10 +430,252 @@ $("bgVolume").addEventListener("input", () => { bindOut("bgVolume"); patch({ bac
 $("startBtn").addEventListener("click", start);
 $("stopBtn").addEventListener("click", stop);
 
+// ══ navigation ════════════════════════════════════════════════════════════
+// Hash routing, so a page is linkable and survives reload.
+const PAGES = ["player", "catalog"];
+function showPage(name) {
+  if (!PAGES.includes(name)) name = "player";
+  PAGES.forEach((p) => $("page-" + p).classList.toggle("active", p === name));
+  document.querySelectorAll(".nav-item").forEach((a) => a.classList.toggle("active", a.dataset.page === name));
+  // Leaving the catalog stops its preview — otherwise it keeps playing under the
+  // player page's own stream, and you'd hear both at once.
+  if (name !== "catalog") stopPreview();
+  if (name === "catalog") loadCatalog();
+}
+window.addEventListener("hashchange", () => showPage(location.hash.slice(1)));
+
+// ══ catalog management ════════════════════════════════════════════════════
+// Filterable dimensions rendered as selects, in display order. Values come from the
+// backend's facets block, so adding a style/keyword needs no change here.
+const FACETS = [
+  ["goal", "goal"], ["style", "style"], ["substrate", "substrate"],
+  ["group", "group"], ["provider", "provider"],
+];
+let tracks = [];            // every catalog entry, as returned
+let filtered = [];          // the current filter result, in display order
+const selected = new Set(); // selected track_ids (survives filter changes)
+let taggingEnabled = false; // whether this service accepts tag writes
+let catalogLoaded = false;
+
+async function loadCatalog(force = false) {
+  if (catalogLoaded && !force) return;
+  try {
+    const data = await api("GET", "/api/catalog");
+    tracks = data.tracks;
+    taggingEnabled = data.tagging_enabled;
+    catalogLoaded = true;
+    renderFilters(data.facets);
+    syncTagging();
+    applyFilters();
+  } catch (e) {
+    $("catEmpty").style.display = "";
+    $("catEmpty").textContent = "Could not load the catalog: " + e.message;
+  }
+}
+
+// The facet selects come from whatever dimensions actually have values — a facet with
+// nothing in it (e.g. no special-group tracks yet) is skipped rather than rendered as a
+// select with one "any" option. Rebuilt on every catalog load (a tag edit re-fetches),
+// so any active choice is carried across rather than silently reset to "any".
+function renderFilters(facets) {
+  const anchor = $("fRendered").closest(".filter");
+  const active = new Map([...document.querySelectorAll(".filter.facet select")]
+    .map((s) => [s.dataset.field, s.value]));
+  document.querySelectorAll(".filter.facet").forEach((el) => el.remove());
+  for (const [field, label] of FACETS) {
+    const values = facets[field] || [];
+    if (!values.length) continue;
+    const wrap = document.createElement("label");
+    wrap.className = "filter facet";
+    wrap.innerHTML = `<span>${label}</span>`;
+    const sel = document.createElement("select");
+    sel.dataset.field = field;
+    sel.innerHTML = `<option value="">any</option>` +
+      values.map((v) => `<option value="${v}">${v}</option>`).join("");
+    if (values.includes(active.get(field))) sel.value = active.get(field);
+    sel.addEventListener("change", applyFilters);
+    wrap.appendChild(sel);
+    $("filters").insertBefore(wrap, anchor);
+  }
+  refreshTagFilter(facets.tags || []);
+}
+
+// The tag filter is rebuilt after every tag edit, keeping the current choice if it
+// still exists (tagging the last "warm-bed" track away drops the option).
+function refreshTagFilter(values) {
+  const sel = $("fTag");
+  const keep = sel.value;
+  sel.innerHTML = `<option value="">any</option>` +
+    values.map((t) => `<option value="${t}">${t}</option>`).join("");
+  sel.value = values.includes(keep) ? keep : "";
+}
+
+function applyFilters() {
+  const rendered = $("fRendered").value;
+  const tag = $("fTag").value;
+  const facetValues = [...document.querySelectorAll(".filter.facet select")]
+    .map((s) => [s.dataset.field, s.value]).filter(([, v]) => v !== "");
+
+  filtered = tracks.filter((e) => {
+    if (rendered === "yes" && !e.rendered) return false;
+    if (rendered === "no" && e.rendered) return false;
+    if (tag && !(e.tags || []).includes(tag)) return false;
+    return facetValues.every(([f, v]) => String(e[f]) === v);
+  });
+  filtered.sort((a, b) => a.track_id.localeCompare(b.track_id));
+  renderTracks();
+}
+
+const HEADER = `<div class="trow thead">
+  <div class="c-sel"></div><div class="c-play"></div><div>track</div>
+  <div>dimensions</div><div class="c-dur">length</div><div class="c-tags">tags</div>
+</div>`;
+
+function badge(text) { return text ? `<span class="badge">${text}</span>` : ""; }
+
+function renderTracks() {
+  const list = $("trackList").parentElement;
+  const scroll = list.scrollTop;  // a re-render after a tag apply shouldn't jump the list
+  $("catCount").textContent = `${filtered.length} of ${tracks.length} tracks`;
+  $("catEmpty").style.display = filtered.length ? "none" : "";
+  $("catEmpty").textContent = "No track matches these filters.";
+  $("trackList").innerHTML = HEADER + filtered.map((e) => {
+    const dims = [e.kind, e.goal, e.style, e.substrate, e.group, e.keyword].filter(Boolean).map(badge).join("");
+    const tags = (e.tags || []).map((t) => `<span class="badge tag">${t}</span>`).join("") || "—";
+    const playing = e.track_id === playingId;
+    return `<div class="trow track${selected.has(e.track_id) ? " selected" : ""}${playing ? " playing" : ""}" data-id="${e.track_id}">
+      <div class="c-sel"><input type="checkbox" data-role="sel"${selected.has(e.track_id) ? " checked" : ""} /></div>
+      <div class="c-play"><button class="playbtn" data-role="play"${e.rendered ? "" : " disabled title='not rendered'"}>${playing ? "❙❙" : "▶"}</button></div>
+      <div><div class="tid">${e.track_id}</div><div class="tsum">${e.summary || ""}</div></div>
+      <div>${dims}</div>
+      <div class="c-dur">${e.duration_s != null ? e.duration_s + "s" : "—"}</div>
+      <div class="c-tags">${tags}</div>
+    </div>`;
+  }).join("");
+  list.scrollTop = scroll;
+  syncOps();
+}
+
+// One delegated listener for the whole list, so re-rendering rows costs no rebinding.
+$("trackList").addEventListener("click", (ev) => {
+  const row = ev.target.closest(".trow.track");
+  if (!row) return;
+  const id = row.dataset.id;
+  const role = ev.target.dataset.role;
+  if (role === "play") { togglePreview(id); return; }
+  if (role === "sel") { setSelected(id, ev.target.checked); return; }
+  setSelected(id, !selected.has(id));  // clicking anywhere else on the row toggles it
+});
+
+// Selection and play state touch one row each, so they patch that row in place
+// rather than re-rendering the list (which would reset the scroll position and
+// yank the row you just clicked out from under the cursor).
+function rowEl(id) {
+  return id === null ? null : $("trackList").querySelector(`.trow.track[data-id="${CSS.escape(id)}"]`);
+}
+
+function setSelected(id, on) {
+  if (on) selected.add(id); else selected.delete(id);
+  const row = rowEl(id);
+  if (row) {
+    row.classList.toggle("selected", on);
+    row.querySelector('[data-role="sel"]').checked = on;
+  }
+  syncOps();
+}
+
+function paintPlaying(id, on) {
+  const row = rowEl(id);
+  if (!row) return;
+  row.classList.toggle("playing", on);
+  row.querySelector('[data-role="play"]').textContent = on ? "❙❙" : "▶";
+}
+
+// --- preview playback ------------------------------------------------------
+// /background/<id>.mp3 serves any rendered track as a complete, seekable file, so a
+// catalog preview is a plain <audio> src — no stream session involved.
+const preview = $("trackPlayer");
+let playingId = null;
+
+function togglePreview(id) {
+  if (playingId === id) { stopPreview(); return; }
+  stopPreview();  // one preview at a time
+  playingId = id;
+  paintPlaying(id, true);
+  preview.src = `/background/${encodeURIComponent(id)}.mp3`;
+  preview.play().catch((e) => { setMsg("playback failed: " + e.message); stopPreview(); });
+}
+
+function stopPreview() {
+  if (playingId === null) return;
+  paintPlaying(playingId, false);
+  playingId = null;
+  preview.pause();
+  preview.removeAttribute("src");
+  preview.load();
+}
+
+preview.addEventListener("ended", stopPreview);
+
+// --- operations panel ------------------------------------------------------
+function syncOps() {
+  $("selCount").textContent = selected.size;
+  $("tagBtn").disabled = !taggingEnabled || selected.size === 0 || !$("tagInput").value.trim();
+}
+
+// The service decides whether tag writes are open (§ server.TAGGING_ENABLED). When
+// they aren't, the controls are dead up front rather than failing on submit.
+function syncTagging() {
+  $("tagInput").disabled = !taggingEnabled;
+  $("tagInput").placeholder = taggingEnabled
+    ? "tag to apply, e.g. warm-bed"
+    : "tagging is disabled on this service";
+  if (!taggingEnabled) setMsg("Tagging is turned off — restart the service with --tagging to enable it.");
+  syncOps();
+}
+
+function setMsg(text) { $("opsMsg").textContent = text; }
+
+// Tags are persisted on the tracks' specs, so the catalog is re-fetched afterwards
+// rather than patched locally — what the list shows is then what's on disk.
+async function applyTag() {
+  const tag = $("tagInput").value.trim();
+  const ids = [...selected];
+  if (!tag || !ids.length) return;
+  let saved;
+  try {
+    saved = await api("POST", "/api/catalog/tags", { track_ids: ids, tag });
+  } catch (e) {
+    setMsg("tagging failed: " + e.message);
+    return;
+  }
+  await loadCatalog(true);
+  $("tagInput").value = "";
+  // Report the tag as stored, not as typed — the server normalizes whitespace.
+  setMsg(`Tagged ${ids.length} track${ids.length === 1 ? "" : "s"} with “${saved.tag}”.` +
+         " Selection kept — apply another tag, or clear it.");
+  syncOps();
+}
+
+$("fRendered").addEventListener("change", applyFilters);
+$("fTag").addEventListener("change", applyFilters);
+$("fReset").addEventListener("click", () => {
+  $("fRendered").value = "";
+  $("fTag").value = "";
+  document.querySelectorAll(".filter.facet select").forEach((s) => { s.value = ""; });
+  applyFilters();
+});
+$("tagInput").addEventListener("input", syncOps);
+$("tagInput").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !$("tagBtn").disabled) applyTag(); });
+$("tagBtn").addEventListener("click", applyTag);
+$("selAllBtn").addEventListener("click", () => { filtered.forEach((e) => selected.add(e.track_id)); renderTracks(); });
+$("selNoneBtn").addEventListener("click", () => { selected.clear(); setMsg(""); renderTracks(); });
+
 // --- init ------------------------------------------------------------------
 async function init() {
   ["carrier", "beat", "volume", "bgVolume", "depth", "duty", "rampMs"].forEach(bindOut);
   syncModeUI();
+  showPage(location.hash.slice(1));
   try {
     const bgs = await api("GET", "/api/backgrounds");
     const sel = $("background");

@@ -2,6 +2,9 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
+from bnb import server
+from bnb.background import build_signature
+from bnb.catalog import CategoryManager
 from bnb.server import app, engine
 from bnb.stream import SHUFFLE, Beat, StreamEngine, to_int16_bytes
 
@@ -195,6 +198,111 @@ def test_backgrounds_lists_specs():
     rows = client.get("/api/backgrounds").json()
     assert isinstance(rows, list)
     assert all({"track_id", "summary", "rendered"} <= row.keys() for row in rows)
+
+
+def test_catalog_returns_whole_entries_and_facets():
+    """The catalog page filters on every dimension, so entries come through whole and
+    each facet lists exactly the distinct values present in them."""
+    body = client.get("/api/catalog").json()
+    assert body["count"] == len(body["tracks"])
+    assert all({"track_id", "kind", "style", "substrate", "goal", "group", "keyword",
+                "duration_s", "instrumentation", "rendered", "provider", "tags"} <= t.keys()
+               for t in body["tracks"])
+    for field, values in body["facets"].items():
+        if field == "tags":  # a list-valued field, so its facet is the union, not the values
+            assert values == sorted({tag for t in body["tracks"] for tag in t["tags"]})
+            continue
+        assert values == sorted({t[field] for t in body["tracks"] if t.get(field) is not None})
+        assert None not in values  # "any" is the UI's null option, not a facet value
+
+
+# --- tagging -----------------------------------------------------------------
+
+
+@pytest.fixture
+def tag_repo(tmp_path, monkeypatch):
+    """Point the service's catalog at a throwaway asset repo with two tracks in it, so
+    tag writes never touch the real one. Yields both track_ids."""
+    manager = CategoryManager(tmp_path)
+    specs = [
+        build_signature("drone", "lofi", "focus", 60).spec(),
+        build_signature("melodic_instrument", "lofi", "focus", 60).spec(),
+    ]
+    for spec in specs:
+        manager.add_spec(spec, rebuild=False)
+    manager.rebuild()
+    monkeypatch.setattr(server, "categories", manager)
+    monkeypatch.setattr(server, "TAGGING_ENABLED", True)
+    return [spec["track_id"] for spec in specs]
+
+
+def tags_by_id() -> dict:
+    return {t["track_id"]: t["tags"] for t in client.get("/api/catalog").json()["tracks"]}
+
+
+def test_tagging_a_batch_persists_and_shows_up_in_the_catalog(tag_repo):
+    first, second = tag_repo
+    res = client.post("/api/catalog/tags", json={"track_ids": tag_repo, "tag": "pilot"})
+    assert res.status_code == 200
+    assert res.json() == {"tag": "pilot", "tags": {first: ["pilot"], second: ["pilot"]}}
+
+    body = client.get("/api/catalog").json()
+    assert body["tagging_enabled"] is True
+    assert body["facets"]["tags"] == ["pilot"]
+    assert tags_by_id() == {first: ["pilot"], second: ["pilot"]}
+
+    # A second tag accumulates rather than replacing.
+    client.post("/api/catalog/tags", json={"track_ids": [first], "tag": "warm-bed"})
+    assert tags_by_id()[first] == ["pilot", "warm-bed"]
+
+
+def test_untagging_removes_only_that_tag(tag_repo):
+    first, second = tag_repo
+    client.post("/api/catalog/tags", json={"track_ids": tag_repo, "tag": "pilot"})
+    res = client.request("DELETE", "/api/catalog/tags", json={"track_ids": [first], "tag": "pilot"})
+    assert res.status_code == 200
+    assert tags_by_id() == {first: [], second: ["pilot"]}
+
+
+def test_tag_whitespace_is_normalized(tag_repo):
+    first, _ = tag_repo
+    client.post("/api/catalog/tags", json={"track_ids": [first], "tag": "  warm   bed "})
+    assert tags_by_id()[first] == ["warm bed"]
+
+
+@pytest.mark.parametrize("body", [
+    {"track_ids": [], "tag": "pilot"},   # nothing to tag
+    {"track_ids": ["x"], "tag": "   "},  # blank tag
+    {"track_ids": ["x"], "tag": "t" * 65},
+])
+def test_tag_request_validation(tag_repo, body):
+    assert client.post("/api/catalog/tags", json=body).status_code == 422
+
+
+def test_tagging_an_unknown_track_writes_nothing(tag_repo):
+    first, _ = tag_repo
+    res = client.post("/api/catalog/tags", json={"track_ids": [first, "nope"], "tag": "pilot"})
+    assert res.status_code == 404 and "nope" in res.json()["detail"]
+    assert tags_by_id()[first] == []  # the whole batch was refused, not half-applied
+
+
+def test_tagging_endpoints_are_closed_when_disabled(tag_repo, monkeypatch):
+    monkeypatch.setattr(server, "TAGGING_ENABLED", False)
+    body = {"track_ids": [tag_repo[0]], "tag": "pilot"}
+    assert client.post("/api/catalog/tags", json=body).status_code == 403
+    assert client.request("DELETE", "/api/catalog/tags", json=body).status_code == 403
+    # The dashboard greys its tagging controls out from this flag.
+    assert client.get("/api/catalog").json()["tagging_enabled"] is False
+    assert tags_by_id()[tag_repo[0]] == []
+
+
+def test_tagging_flag_reads_the_environment(monkeypatch):
+    monkeypatch.setenv("BNB_ENABLE_TAGGING", "0")
+    assert server._env_flag("BNB_ENABLE_TAGGING", True) is False
+    monkeypatch.setenv("BNB_ENABLE_TAGGING", "yes")
+    assert server._env_flag("BNB_ENABLE_TAGGING", False) is True
+    monkeypatch.delenv("BNB_ENABLE_TAGGING")
+    assert server._env_flag("BNB_ENABLE_TAGGING", True) is True
 
 
 # --- monaural ----------------------------------------------------------------

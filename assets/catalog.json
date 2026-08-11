@@ -1,430 +1,86 @@
 {
-  "count": 64,
+  "count": 46,
   "tracks": [
     {
-      "track_id": "buddhist_meditative_bowls_seed31991",
+      "track_id": "lofi_drone_focus_seed37945",
       "kind": "grid",
-      "summary": "buddhist_meditative \u00d7 percussive_with_tail \u2014 tibetan_singing_bowls, distant_temple_bell; very_low, low_mid, very_sparse",
-      "substrate": "percussive_with_tail",
-      "style": "buddhist_meditative",
-      "group": null,
-      "keyword": null,
-      "seed": 31991,
-      "duration_s": 60,
-      "instrumentation": [
-        "tibetan_singing_bowls",
-        "distant_temple_bell"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_metallic",
-        "mode": "just_intonation",
-        "register": "low_mid",
-        "texture_density": "very_sparse",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/buddhist_meditative/percussive_with_tail/buddhist_meditative_bowls_seed31991.json",
-      "audio": "tracks/buddhist_meditative/percussive_with_tail/buddhist_meditative_bowls_seed31991.wav"
-    },
-    {
-      "track_id": "buddhist_meditative_bowls_seed59164",
-      "kind": "grid",
-      "summary": "buddhist_meditative \u00d7 percussive_with_tail \u2014 tibetan_singing_bowls, distant_temple_bell; very_low, low_mid, very_sparse",
-      "substrate": "percussive_with_tail",
-      "style": "buddhist_meditative",
-      "group": null,
-      "keyword": null,
-      "seed": 59164,
-      "duration_s": 60,
-      "instrumentation": [
-        "tibetan_singing_bowls",
-        "distant_temple_bell"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_metallic",
-        "mode": "just_intonation",
-        "register": "low_mid",
-        "texture_density": "very_sparse",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/buddhist_meditative/percussive_with_tail/buddhist_meditative_bowls_seed59164.json",
-      "audio": "tracks/buddhist_meditative/percussive_with_tail/buddhist_meditative_bowls_seed59164.wav"
-    },
-    {
-      "track_id": "buddhist_meditative_drone_seed47427",
-      "kind": "grid",
-      "summary": "buddhist_meditative \u00d7 drone \u2014 singing_bowl_drone, wordless_vocal_hum; very_low, low, very_sparse",
+      "summary": "lofi \u00d7 drone \u2014 sustained_pad, low_drone; low, low, sparse",
       "substrate": "drone",
-      "style": "buddhist_meditative",
+      "style": "lofi",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 47427,
+      "seed": 37945,
       "duration_s": 60,
       "instrumentation": [
-        "singing_bowl_drone",
-        "wordless_vocal_hum"
+        "sustained_pad",
+        "low_drone"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_dark",
-        "mode": "just_intonation",
-        "register": "low",
-        "texture_density": "very_sparse",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/buddhist_meditative/drone/buddhist_meditative_drone_seed47427.json",
-      "audio": "tracks/buddhist_meditative/drone/buddhist_meditative_drone_seed47427.wav"
-    },
-    {
-      "track_id": "buddhist_meditative_drone_seed81657",
-      "kind": "grid",
-      "summary": "buddhist_meditative \u00d7 drone \u2014 singing_bowl_drone, wordless_vocal_hum; very_low, low, very_sparse",
-      "substrate": "drone",
-      "style": "buddhist_meditative",
-      "group": null,
-      "keyword": null,
-      "seed": 81657,
-      "duration_s": 60,
-      "instrumentation": [
-        "singing_bowl_drone",
-        "wordless_vocal_hum"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_dark",
-        "mode": "just_intonation",
-        "register": "low",
-        "texture_density": "very_sparse",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/buddhist_meditative/drone/buddhist_meditative_drone_seed81657.json",
-      "audio": "tracks/buddhist_meditative/drone/buddhist_meditative_drone_seed81657.wav"
-    },
-    {
-      "track_id": "buddhist_meditative_field_seed47637",
-      "kind": "grid",
-      "summary": "buddhist_meditative \u00d7 field_recording \u2014 temple_bells, mountain_stream, wind_chime; very_low, full, continuous",
-      "substrate": "field_recording",
-      "style": "buddhist_meditative",
-      "group": null,
-      "keyword": null,
-      "seed": 47637,
-      "duration_s": 60,
-      "instrumentation": [
-        "temple_bells",
-        "mountain_stream",
-        "wind_chime"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "soft_broadband",
-        "mode": "just_intonation",
-        "register": "full",
-        "texture_density": "continuous",
-        "nature_bed": "present"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/buddhist_meditative/field_recording/buddhist_meditative_field_seed47637.json",
-      "audio": "tracks/buddhist_meditative/field_recording/buddhist_meditative_field_seed47637.wav"
-    },
-    {
-      "track_id": "buddhist_meditative_field_seed67927",
-      "kind": "grid",
-      "summary": "buddhist_meditative \u00d7 field_recording \u2014 temple_bells, mountain_stream, wind_chime; very_low, full, continuous",
-      "substrate": "field_recording",
-      "style": "buddhist_meditative",
-      "group": null,
-      "keyword": null,
-      "seed": 67927,
-      "duration_s": 60,
-      "instrumentation": [
-        "temple_bells",
-        "mountain_stream",
-        "wind_chime"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "soft_broadband",
-        "mode": "just_intonation",
-        "register": "full",
-        "texture_density": "continuous",
-        "nature_bed": "present"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/buddhist_meditative/field_recording/buddhist_meditative_field_seed67927.json",
-      "audio": "tracks/buddhist_meditative/field_recording/buddhist_meditative_field_seed67927.wav"
-    },
-    {
-      "track_id": "buddhist_meditative_melodic_seed57864",
-      "kind": "grid",
-      "summary": "buddhist_meditative \u00d7 melodic_instrument \u2014 shakuhachi, singing_bowl_drone; low, mid, sparse",
-      "substrate": "melodic_instrument",
-      "style": "buddhist_meditative",
-      "group": null,
-      "keyword": null,
-      "seed": 57864,
-      "duration_s": 60,
-      "instrumentation": [
-        "shakuhachi",
-        "singing_bowl_drone"
-      ],
-      "requested_features": {
-        "tempo_bpm": 50,
         "energy": "low",
-        "spectral_centroid": "warm_dark",
-        "mode": "just_intonation",
-        "register": "mid",
+        "spectral_centroid": "warm_neutral",
+        "mode": "static_drone",
+        "register": "low",
         "texture_density": "sparse",
         "nature_bed": "none"
       },
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/buddhist_meditative/melodic_instrument/buddhist_meditative_melodic_seed57864.json",
-      "audio": "tracks/buddhist_meditative/melodic_instrument/buddhist_meditative_melodic_seed57864.wav"
+      "spec": "specs/lofi/drone/lofi_drone_focus_seed37945.json",
+      "audio": "tracks/lofi/drone/lofi_drone_focus_seed37945.wav"
     },
     {
-      "track_id": "buddhist_meditative_melodic_seed69177",
+      "track_id": "lofi_drone_focus_seed55805",
       "kind": "grid",
-      "summary": "buddhist_meditative \u00d7 melodic_instrument \u2014 shakuhachi, singing_bowl_drone; low, mid, sparse",
-      "substrate": "melodic_instrument",
-      "style": "buddhist_meditative",
+      "summary": "lofi \u00d7 drone \u2014 sustained_pad, low_drone; low, low, sparse",
+      "substrate": "drone",
+      "style": "lofi",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 69177,
+      "seed": 55805,
       "duration_s": 60,
       "instrumentation": [
-        "shakuhachi",
-        "singing_bowl_drone"
+        "sustained_pad",
+        "low_drone"
       ],
+      "tags": [],
       "requested_features": {
-        "tempo_bpm": 50,
+        "tempo_bpm": null,
         "energy": "low",
-        "spectral_centroid": "warm_dark",
-        "mode": "just_intonation",
-        "register": "mid",
+        "spectral_centroid": "warm_neutral",
+        "mode": "static_drone",
+        "register": "low",
         "texture_density": "sparse",
         "nature_bed": "none"
       },
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/buddhist_meditative/melodic_instrument/buddhist_meditative_melodic_seed69177.json",
-      "audio": "tracks/buddhist_meditative/melodic_instrument/buddhist_meditative_melodic_seed69177.wav"
+      "spec": "specs/lofi/drone/lofi_drone_focus_seed55805.json",
+      "audio": "tracks/lofi/drone/lofi_drone_focus_seed55805.wav"
     },
     {
-      "track_id": "buddhist_meditative_noise_seed35194",
+      "track_id": "lofi_field_focus_seed14551",
       "kind": "grid",
-      "summary": "buddhist_meditative \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
-      "substrate": "noise_texture",
-      "style": "buddhist_meditative",
-      "group": null,
-      "keyword": null,
-      "seed": 35194,
-      "duration_s": 60,
-      "instrumentation": [
-        "brown_noise",
-        "distant_surf"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "deep_warm",
-        "mode": "just_intonation",
-        "register": "low_full",
-        "texture_density": "even",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/buddhist_meditative/noise_texture/buddhist_meditative_noise_seed35194.json",
-      "audio": "tracks/buddhist_meditative/noise_texture/buddhist_meditative_noise_seed35194.wav"
-    },
-    {
-      "track_id": "buddhist_meditative_noise_seed6956",
-      "kind": "grid",
-      "summary": "buddhist_meditative \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
-      "substrate": "noise_texture",
-      "style": "buddhist_meditative",
-      "group": null,
-      "keyword": null,
-      "seed": 6956,
-      "duration_s": 60,
-      "instrumentation": [
-        "brown_noise",
-        "distant_surf"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "deep_warm",
-        "mode": "just_intonation",
-        "register": "low_full",
-        "texture_density": "even",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/buddhist_meditative/noise_texture/buddhist_meditative_noise_seed6956.json",
-      "audio": "tracks/buddhist_meditative/noise_texture/buddhist_meditative_noise_seed6956.wav"
-    },
-    {
-      "track_id": "lofi_bowls_seed10866",
-      "kind": "grid",
-      "summary": "lofi \u00d7 percussive_with_tail \u2014 singing_bowls, bells; very_low, low_mid, very_sparse",
-      "substrate": "percussive_with_tail",
-      "style": "lofi",
-      "group": null,
-      "keyword": null,
-      "seed": 10866,
-      "duration_s": 60,
-      "instrumentation": [
-        "singing_bowls",
-        "bells"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_metallic",
-        "mode": "inharmonic",
-        "register": "low_mid",
-        "texture_density": "very_sparse",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/lofi/percussive_with_tail/lofi_bowls_seed10866.json",
-      "audio": "tracks/lofi/percussive_with_tail/lofi_bowls_seed10866.wav"
-    },
-    {
-      "track_id": "lofi_bowls_seed25658",
-      "kind": "grid",
-      "summary": "lofi \u00d7 percussive_with_tail \u2014 singing_bowls, bells; very_low, low_mid, very_sparse",
-      "substrate": "percussive_with_tail",
-      "style": "lofi",
-      "group": null,
-      "keyword": null,
-      "seed": 25658,
-      "duration_s": 60,
-      "instrumentation": [
-        "singing_bowls",
-        "bells"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_metallic",
-        "mode": "inharmonic",
-        "register": "low_mid",
-        "texture_density": "very_sparse",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/lofi/percussive_with_tail/lofi_bowls_seed25658.json",
-      "audio": "tracks/lofi/percussive_with_tail/lofi_bowls_seed25658.wav"
-    },
-    {
-      "track_id": "lofi_drone_seed25206",
-      "kind": "grid",
-      "summary": "lofi \u00d7 drone \u2014 sustained_pad, low_drone; very_low, low, very_sparse",
-      "substrate": "drone",
-      "style": "lofi",
-      "group": null,
-      "keyword": null,
-      "seed": 25206,
-      "duration_s": 60,
-      "instrumentation": [
-        "sustained_pad",
-        "low_drone"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_dark",
-        "mode": "static_drone",
-        "register": "low",
-        "texture_density": "very_sparse",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/lofi/drone/lofi_drone_seed25206.json",
-      "audio": "tracks/lofi/drone/lofi_drone_seed25206.wav"
-    },
-    {
-      "track_id": "lofi_drone_seed47621",
-      "kind": "grid",
-      "summary": "lofi \u00d7 drone \u2014 sustained_pad, low_drone; very_low, low, very_sparse",
-      "substrate": "drone",
-      "style": "lofi",
-      "group": null,
-      "keyword": null,
-      "seed": 47621,
-      "duration_s": 60,
-      "instrumentation": [
-        "sustained_pad",
-        "low_drone"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_dark",
-        "mode": "static_drone",
-        "register": "low",
-        "texture_density": "very_sparse",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/lofi/drone/lofi_drone_seed47621.json",
-      "audio": "tracks/lofi/drone/lofi_drone_seed47621.wav"
-    },
-    {
-      "track_id": "lofi_field_seed20802",
-      "kind": "grid",
-      "summary": "lofi \u00d7 field_recording \u2014 field_recording; very_low, full, continuous",
+      "summary": "lofi \u00d7 field_recording \u2014 field_recording; low, full, continuous",
       "substrate": "field_recording",
       "style": "lofi",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 20802,
+      "seed": 14551,
       "duration_s": 60,
       "instrumentation": [
         "field_recording"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
+        "energy": "low",
         "spectral_centroid": "soft_broadband",
         "mode": "atonal",
         "register": "full",
@@ -434,25 +90,27 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/lofi/field_recording/lofi_field_seed20802.json",
-      "audio": "tracks/lofi/field_recording/lofi_field_seed20802.wav"
+      "spec": "specs/lofi/field_recording/lofi_field_focus_seed14551.json",
+      "audio": "tracks/lofi/field_recording/lofi_field_focus_seed14551.wav"
     },
     {
-      "track_id": "lofi_field_seed88064",
+      "track_id": "lofi_field_focus_seed35498",
       "kind": "grid",
-      "summary": "lofi \u00d7 field_recording \u2014 field_recording; very_low, full, continuous",
+      "summary": "lofi \u00d7 field_recording \u2014 field_recording; low, full, continuous",
       "substrate": "field_recording",
       "style": "lofi",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 88064,
+      "seed": 35498,
       "duration_s": 60,
       "instrumentation": [
         "field_recording"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
+        "energy": "low",
         "spectral_centroid": "soft_broadband",
         "mode": "atonal",
         "register": "full",
@@ -462,27 +120,29 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/lofi/field_recording/lofi_field_seed88064.json",
-      "audio": "tracks/lofi/field_recording/lofi_field_seed88064.wav"
+      "spec": "specs/lofi/field_recording/lofi_field_focus_seed35498.json",
+      "audio": "tracks/lofi/field_recording/lofi_field_focus_seed35498.wav"
     },
     {
-      "track_id": "lofi_melodic_seed35662",
+      "track_id": "lofi_melodic_focus_seed76912",
       "kind": "grid",
-      "summary": "lofi \u00d7 melodic_instrument \u2014 soft_keys, tape_texture; low, mid, sparse",
+      "summary": "lofi \u00d7 melodic_instrument \u2014 soft_keys, tape_texture; moderate, mid, sparse",
       "substrate": "melodic_instrument",
       "style": "lofi",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 35662,
+      "seed": 76912,
       "duration_s": 60,
       "instrumentation": [
         "soft_keys",
         "tape_texture"
       ],
+      "tags": [],
       "requested_features": {
-        "tempo_bpm": 50,
-        "energy": "low",
-        "spectral_centroid": "warm_dark",
+        "tempo_bpm": 90,
+        "energy": "moderate",
+        "spectral_centroid": "warm_neutral",
         "mode": "simple_consonant",
         "register": "mid",
         "texture_density": "sparse",
@@ -491,27 +151,29 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/lofi/melodic_instrument/lofi_melodic_seed35662.json",
-      "audio": "tracks/lofi/melodic_instrument/lofi_melodic_seed35662.wav"
+      "spec": "specs/lofi/melodic_instrument/lofi_melodic_focus_seed76912.json",
+      "audio": "tracks/lofi/melodic_instrument/lofi_melodic_focus_seed76912.wav"
     },
     {
-      "track_id": "lofi_melodic_seed53413",
+      "track_id": "lofi_melodic_focus_seed92009",
       "kind": "grid",
-      "summary": "lofi \u00d7 melodic_instrument \u2014 soft_keys, tape_texture; low, mid, sparse",
+      "summary": "lofi \u00d7 melodic_instrument \u2014 soft_keys, tape_texture; moderate, mid, sparse",
       "substrate": "melodic_instrument",
       "style": "lofi",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 53413,
+      "seed": 92009,
       "duration_s": 60,
       "instrumentation": [
         "soft_keys",
         "tape_texture"
       ],
+      "tags": [],
       "requested_features": {
-        "tempo_bpm": 50,
-        "energy": "low",
-        "spectral_centroid": "warm_dark",
+        "tempo_bpm": 90,
+        "energy": "moderate",
+        "spectral_centroid": "warm_neutral",
         "mode": "simple_consonant",
         "register": "mid",
         "texture_density": "sparse",
@@ -520,27 +182,29 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/lofi/melodic_instrument/lofi_melodic_seed53413.json",
-      "audio": "tracks/lofi/melodic_instrument/lofi_melodic_seed53413.wav"
+      "spec": "specs/lofi/melodic_instrument/lofi_melodic_focus_seed92009.json",
+      "audio": "tracks/lofi/melodic_instrument/lofi_melodic_focus_seed92009.wav"
     },
     {
-      "track_id": "lofi_noise_seed32107",
+      "track_id": "lofi_noise_focus_seed43006",
       "kind": "grid",
-      "summary": "lofi \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
+      "summary": "lofi \u00d7 noise_texture \u2014 brown_noise, distant_surf; low, low_full, even",
       "substrate": "noise_texture",
       "style": "lofi",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 32107,
+      "seed": 43006,
       "duration_s": 60,
       "instrumentation": [
         "brown_noise",
         "distant_surf"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "deep_warm",
+        "energy": "low",
+        "spectral_centroid": "neutral_broadband",
         "mode": "none",
         "register": "low_full",
         "texture_density": "even",
@@ -549,27 +213,29 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/lofi/noise_texture/lofi_noise_seed32107.json",
-      "audio": "tracks/lofi/noise_texture/lofi_noise_seed32107.wav"
+      "spec": "specs/lofi/noise_texture/lofi_noise_focus_seed43006.json",
+      "audio": "tracks/lofi/noise_texture/lofi_noise_focus_seed43006.wav"
     },
     {
-      "track_id": "lofi_noise_seed53531",
+      "track_id": "lofi_noise_focus_seed93245",
       "kind": "grid",
-      "summary": "lofi \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
+      "summary": "lofi \u00d7 noise_texture \u2014 brown_noise, distant_surf; low, low_full, even",
       "substrate": "noise_texture",
       "style": "lofi",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 53531,
+      "seed": 93245,
       "duration_s": 60,
       "instrumentation": [
         "brown_noise",
         "distant_surf"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "deep_warm",
+        "energy": "low",
+        "spectral_centroid": "neutral_broadband",
         "mode": "none",
         "register": "low_full",
         "texture_density": "even",
@@ -578,8 +244,8 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/lofi/noise_texture/lofi_noise_seed53531.json",
-      "audio": "tracks/lofi/noise_texture/lofi_noise_seed53531.wav"
+      "spec": "specs/lofi/noise_texture/lofi_noise_focus_seed93245.json",
+      "audio": "tracks/lofi/noise_texture/lofi_noise_focus_seed93245.wav"
     },
     {
       "track_id": "natural_sounds_chimes_seed21288",
@@ -587,6 +253,7 @@
       "summary": "natural_sounds \u00d7 chimes \u2014 chimes",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "chimes",
       "seed": 21288,
@@ -594,6 +261,7 @@
       "instrumentation": [
         "chimes"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -607,6 +275,7 @@
       "summary": "natural_sounds \u00d7 chimes \u2014 chimes",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "chimes",
       "seed": 89603,
@@ -614,6 +283,7 @@
       "instrumentation": [
         "chimes"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -627,6 +297,7 @@
       "summary": "natural_sounds \u00d7 forest \u2014 forest",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "forest",
       "seed": 48529,
@@ -634,6 +305,7 @@
       "instrumentation": [
         "forest"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -647,6 +319,7 @@
       "summary": "natural_sounds \u00d7 forest \u2014 forest",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "forest",
       "seed": 95435,
@@ -654,6 +327,7 @@
       "instrumentation": [
         "forest"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -667,6 +341,7 @@
       "summary": "natural_sounds \u00d7 night \u2014 night",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "night",
       "seed": 51038,
@@ -674,6 +349,7 @@
       "instrumentation": [
         "night"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -687,6 +363,7 @@
       "summary": "natural_sounds \u00d7 night \u2014 night",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "night",
       "seed": 84194,
@@ -694,6 +371,7 @@
       "instrumentation": [
         "night"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -707,6 +385,7 @@
       "summary": "natural_sounds \u00d7 ocean \u2014 ocean",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "ocean",
       "seed": 72449,
@@ -714,6 +393,7 @@
       "instrumentation": [
         "ocean"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -727,6 +407,7 @@
       "summary": "natural_sounds \u00d7 ocean \u2014 ocean",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "ocean",
       "seed": 79188,
@@ -734,6 +415,7 @@
       "instrumentation": [
         "ocean"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -747,6 +429,7 @@
       "summary": "natural_sounds \u00d7 rain \u2014 rain",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "rain",
       "seed": 41654,
@@ -754,6 +437,7 @@
       "instrumentation": [
         "rain"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -767,6 +451,7 @@
       "summary": "natural_sounds \u00d7 rain \u2014 rain",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "rain",
       "seed": 89126,
@@ -774,6 +459,7 @@
       "instrumentation": [
         "rain"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -787,6 +473,7 @@
       "summary": "natural_sounds \u00d7 stream \u2014 stream",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "stream",
       "seed": 45421,
@@ -794,6 +481,7 @@
       "instrumentation": [
         "stream"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -807,6 +495,7 @@
       "summary": "natural_sounds \u00d7 stream \u2014 stream",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "stream",
       "seed": 57548,
@@ -814,6 +503,7 @@
       "instrumentation": [
         "stream"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -827,6 +517,7 @@
       "summary": "natural_sounds \u00d7 wind \u2014 wind",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "wind",
       "seed": 18116,
@@ -834,6 +525,7 @@
       "instrumentation": [
         "wind"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -847,6 +539,7 @@
       "summary": "natural_sounds \u00d7 wind \u2014 wind",
       "substrate": null,
       "style": null,
+      "goal": null,
       "group": "natural_sounds",
       "keyword": "wind",
       "seed": 61654,
@@ -854,6 +547,7 @@
       "instrumentation": [
         "wind"
       ],
+      "tags": [],
       "requested_features": null,
       "measured_features": null,
       "rendered": true,
@@ -862,140 +556,88 @@
       "audio": "tracks/natural_sounds/wind/natural_sounds_wind_seed61654.wav"
     },
     {
-      "track_id": "nature_ambient_bowls_seed71728",
+      "track_id": "nature_ambient_drone_focus_seed80216",
       "kind": "grid",
-      "summary": "nature_ambient \u00d7 percussive_with_tail \u2014 singing_bowls, bells; very_low, low_mid, very_sparse",
-      "substrate": "percussive_with_tail",
-      "style": "nature_ambient",
-      "group": null,
-      "keyword": null,
-      "seed": 71728,
-      "duration_s": 60,
-      "instrumentation": [
-        "singing_bowls",
-        "bells"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_metallic",
-        "mode": "inharmonic",
-        "register": "low_mid",
-        "texture_density": "very_sparse",
-        "nature_bed": "present"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/nature_ambient/percussive_with_tail/nature_ambient_bowls_seed71728.json",
-      "audio": "tracks/nature_ambient/percussive_with_tail/nature_ambient_bowls_seed71728.wav"
-    },
-    {
-      "track_id": "nature_ambient_bowls_seed9682",
-      "kind": "grid",
-      "summary": "nature_ambient \u00d7 percussive_with_tail \u2014 singing_bowls, bells; very_low, low_mid, very_sparse",
-      "substrate": "percussive_with_tail",
-      "style": "nature_ambient",
-      "group": null,
-      "keyword": null,
-      "seed": 9682,
-      "duration_s": 60,
-      "instrumentation": [
-        "singing_bowls",
-        "bells"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_metallic",
-        "mode": "inharmonic",
-        "register": "low_mid",
-        "texture_density": "very_sparse",
-        "nature_bed": "present"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/nature_ambient/percussive_with_tail/nature_ambient_bowls_seed9682.json",
-      "audio": "tracks/nature_ambient/percussive_with_tail/nature_ambient_bowls_seed9682.wav"
-    },
-    {
-      "track_id": "nature_ambient_drone_seed69926",
-      "kind": "grid",
-      "summary": "nature_ambient \u00d7 drone \u2014 warm_pad, rain, distant_wind; very_low, low, very_sparse",
+      "summary": "nature_ambient \u00d7 drone \u2014 warm_pad, rain, distant_wind; low, low, sparse",
       "substrate": "drone",
       "style": "nature_ambient",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 69926,
+      "seed": 80216,
       "duration_s": 60,
       "instrumentation": [
         "warm_pad",
         "rain",
         "distant_wind"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_dark",
+        "energy": "low",
+        "spectral_centroid": "warm_neutral",
         "mode": "static_drone",
         "register": "low",
-        "texture_density": "very_sparse",
+        "texture_density": "sparse",
         "nature_bed": "present"
       },
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/nature_ambient/drone/nature_ambient_drone_seed69926.json",
-      "audio": "tracks/nature_ambient/drone/nature_ambient_drone_seed69926.wav"
+      "spec": "specs/nature_ambient/drone/nature_ambient_drone_focus_seed80216.json",
+      "audio": "tracks/nature_ambient/drone/nature_ambient_drone_focus_seed80216.wav"
     },
     {
-      "track_id": "nature_ambient_drone_seed92879",
+      "track_id": "nature_ambient_drone_focus_seed92347",
       "kind": "grid",
-      "summary": "nature_ambient \u00d7 drone \u2014 warm_pad, rain, distant_wind; very_low, low, very_sparse",
+      "summary": "nature_ambient \u00d7 drone \u2014 warm_pad, rain, distant_wind; low, low, sparse",
       "substrate": "drone",
       "style": "nature_ambient",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 92879,
+      "seed": 92347,
       "duration_s": 60,
       "instrumentation": [
         "warm_pad",
         "rain",
         "distant_wind"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_dark",
+        "energy": "low",
+        "spectral_centroid": "warm_neutral",
         "mode": "static_drone",
         "register": "low",
-        "texture_density": "very_sparse",
+        "texture_density": "sparse",
         "nature_bed": "present"
       },
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/nature_ambient/drone/nature_ambient_drone_seed92879.json",
-      "audio": "tracks/nature_ambient/drone/nature_ambient_drone_seed92879.wav"
+      "spec": "specs/nature_ambient/drone/nature_ambient_drone_focus_seed92347.json",
+      "audio": "tracks/nature_ambient/drone/nature_ambient_drone_focus_seed92347.wav"
     },
     {
-      "track_id": "nature_ambient_field_seed22047",
+      "track_id": "nature_ambient_field_focus_seed35899",
       "kind": "grid",
-      "summary": "nature_ambient \u00d7 field_recording \u2014 mountain_stream, wind; very_low, full, continuous",
+      "summary": "nature_ambient \u00d7 field_recording \u2014 mountain_stream, wind; low, full, continuous",
       "substrate": "field_recording",
       "style": "nature_ambient",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 22047,
+      "seed": 35899,
       "duration_s": 60,
       "instrumentation": [
         "mountain_stream",
         "wind"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
+        "energy": "low",
         "spectral_centroid": "soft_broadband",
         "mode": "atonal",
         "register": "full",
@@ -1005,26 +647,28 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/nature_ambient/field_recording/nature_ambient_field_seed22047.json",
-      "audio": "tracks/nature_ambient/field_recording/nature_ambient_field_seed22047.wav"
+      "spec": "specs/nature_ambient/field_recording/nature_ambient_field_focus_seed35899.json",
+      "audio": "tracks/nature_ambient/field_recording/nature_ambient_field_focus_seed35899.wav"
     },
     {
-      "track_id": "nature_ambient_field_seed97740",
+      "track_id": "nature_ambient_field_focus_seed63173",
       "kind": "grid",
-      "summary": "nature_ambient \u00d7 field_recording \u2014 mountain_stream, wind; very_low, full, continuous",
+      "summary": "nature_ambient \u00d7 field_recording \u2014 mountain_stream, wind; low, full, continuous",
       "substrate": "field_recording",
       "style": "nature_ambient",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 97740,
+      "seed": 63173,
       "duration_s": 60,
       "instrumentation": [
         "mountain_stream",
         "wind"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
+        "energy": "low",
         "spectral_centroid": "soft_broadband",
         "mode": "atonal",
         "register": "full",
@@ -1034,26 +678,28 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/nature_ambient/field_recording/nature_ambient_field_seed97740.json",
-      "audio": "tracks/nature_ambient/field_recording/nature_ambient_field_seed97740.wav"
+      "spec": "specs/nature_ambient/field_recording/nature_ambient_field_focus_seed63173.json",
+      "audio": "tracks/nature_ambient/field_recording/nature_ambient_field_focus_seed63173.wav"
     },
     {
-      "track_id": "nature_ambient_melodic_seed22252",
+      "track_id": "nature_ambient_melodic_focus_seed46996",
       "kind": "grid",
-      "summary": "nature_ambient \u00d7 melodic_instrument \u2014 solo_instrument; low, mid, sparse",
+      "summary": "nature_ambient \u00d7 melodic_instrument \u2014 solo_instrument; moderate, mid, sparse",
       "substrate": "melodic_instrument",
       "style": "nature_ambient",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 22252,
+      "seed": 46996,
       "duration_s": 60,
       "instrumentation": [
         "solo_instrument"
       ],
+      "tags": [],
       "requested_features": {
-        "tempo_bpm": 50,
-        "energy": "low",
-        "spectral_centroid": "warm_dark",
+        "tempo_bpm": 90,
+        "energy": "moderate",
+        "spectral_centroid": "warm_neutral",
         "mode": "simple_consonant",
         "register": "mid",
         "texture_density": "sparse",
@@ -1062,26 +708,28 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/nature_ambient/melodic_instrument/nature_ambient_melodic_seed22252.json",
-      "audio": "tracks/nature_ambient/melodic_instrument/nature_ambient_melodic_seed22252.wav"
+      "spec": "specs/nature_ambient/melodic_instrument/nature_ambient_melodic_focus_seed46996.json",
+      "audio": "tracks/nature_ambient/melodic_instrument/nature_ambient_melodic_focus_seed46996.wav"
     },
     {
-      "track_id": "nature_ambient_melodic_seed65443",
+      "track_id": "nature_ambient_melodic_focus_seed61488",
       "kind": "grid",
-      "summary": "nature_ambient \u00d7 melodic_instrument \u2014 solo_instrument; low, mid, sparse",
+      "summary": "nature_ambient \u00d7 melodic_instrument \u2014 solo_instrument; moderate, mid, sparse",
       "substrate": "melodic_instrument",
       "style": "nature_ambient",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 65443,
+      "seed": 61488,
       "duration_s": 60,
       "instrumentation": [
         "solo_instrument"
       ],
+      "tags": [],
       "requested_features": {
-        "tempo_bpm": 50,
-        "energy": "low",
-        "spectral_centroid": "warm_dark",
+        "tempo_bpm": 90,
+        "energy": "moderate",
+        "spectral_centroid": "warm_neutral",
         "mode": "simple_consonant",
         "register": "mid",
         "texture_density": "sparse",
@@ -1090,27 +738,29 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/nature_ambient/melodic_instrument/nature_ambient_melodic_seed65443.json",
-      "audio": "tracks/nature_ambient/melodic_instrument/nature_ambient_melodic_seed65443.wav"
+      "spec": "specs/nature_ambient/melodic_instrument/nature_ambient_melodic_focus_seed61488.json",
+      "audio": "tracks/nature_ambient/melodic_instrument/nature_ambient_melodic_focus_seed61488.wav"
     },
     {
-      "track_id": "nature_ambient_noise_seed12891",
+      "track_id": "nature_ambient_noise_focus_seed91176",
       "kind": "grid",
-      "summary": "nature_ambient \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
+      "summary": "nature_ambient \u00d7 noise_texture \u2014 brown_noise, distant_surf; low, low_full, even",
       "substrate": "noise_texture",
       "style": "nature_ambient",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 12891,
+      "seed": 91176,
       "duration_s": 60,
       "instrumentation": [
         "brown_noise",
         "distant_surf"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "deep_warm",
+        "energy": "low",
+        "spectral_centroid": "neutral_broadband",
         "mode": "none",
         "register": "low_full",
         "texture_density": "even",
@@ -1119,27 +769,29 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/nature_ambient/noise_texture/nature_ambient_noise_seed12891.json",
-      "audio": "tracks/nature_ambient/noise_texture/nature_ambient_noise_seed12891.wav"
+      "spec": "specs/nature_ambient/noise_texture/nature_ambient_noise_focus_seed91176.json",
+      "audio": "tracks/nature_ambient/noise_texture/nature_ambient_noise_focus_seed91176.wav"
     },
     {
-      "track_id": "nature_ambient_noise_seed76410",
+      "track_id": "nature_ambient_noise_focus_seed94906",
       "kind": "grid",
-      "summary": "nature_ambient \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
+      "summary": "nature_ambient \u00d7 noise_texture \u2014 brown_noise, distant_surf; low, low_full, even",
       "substrate": "noise_texture",
       "style": "nature_ambient",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 76410,
+      "seed": 94906,
       "duration_s": 60,
       "instrumentation": [
         "brown_noise",
         "distant_surf"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "deep_warm",
+        "energy": "low",
+        "spectral_centroid": "neutral_broadband",
         "mode": "none",
         "register": "low_full",
         "texture_density": "even",
@@ -1148,139 +800,87 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/nature_ambient/noise_texture/nature_ambient_noise_seed76410.json",
-      "audio": "tracks/nature_ambient/noise_texture/nature_ambient_noise_seed76410.wav"
+      "spec": "specs/nature_ambient/noise_texture/nature_ambient_noise_focus_seed94906.json",
+      "audio": "tracks/nature_ambient/noise_texture/nature_ambient_noise_focus_seed94906.wav"
     },
     {
-      "track_id": "neoclassical_bowls_seed49037",
+      "track_id": "neoclassical_drone_focus_seed2278",
       "kind": "grid",
-      "summary": "neoclassical \u00d7 percussive_with_tail \u2014 singing_bowls, bells; very_low, low_mid, very_sparse",
-      "substrate": "percussive_with_tail",
-      "style": "neoclassical",
-      "group": null,
-      "keyword": null,
-      "seed": 49037,
-      "duration_s": 60,
-      "instrumentation": [
-        "singing_bowls",
-        "bells"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_metallic",
-        "mode": "inharmonic",
-        "register": "low_mid",
-        "texture_density": "very_sparse",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/neoclassical/percussive_with_tail/neoclassical_bowls_seed49037.json",
-      "audio": "tracks/neoclassical/percussive_with_tail/neoclassical_bowls_seed49037.wav"
-    },
-    {
-      "track_id": "neoclassical_bowls_seed5828",
-      "kind": "grid",
-      "summary": "neoclassical \u00d7 percussive_with_tail \u2014 singing_bowls, bells; very_low, low_mid, very_sparse",
-      "substrate": "percussive_with_tail",
-      "style": "neoclassical",
-      "group": null,
-      "keyword": null,
-      "seed": 5828,
-      "duration_s": 60,
-      "instrumentation": [
-        "singing_bowls",
-        "bells"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_metallic",
-        "mode": "inharmonic",
-        "register": "low_mid",
-        "texture_density": "very_sparse",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/neoclassical/percussive_with_tail/neoclassical_bowls_seed5828.json",
-      "audio": "tracks/neoclassical/percussive_with_tail/neoclassical_bowls_seed5828.wav"
-    },
-    {
-      "track_id": "neoclassical_drone_seed34925",
-      "kind": "grid",
-      "summary": "neoclassical \u00d7 drone \u2014 string_pad; very_low, low, very_sparse",
+      "summary": "neoclassical \u00d7 drone \u2014 string_pad; low, low, sparse",
       "substrate": "drone",
       "style": "neoclassical",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 34925,
+      "seed": 2278,
       "duration_s": 60,
       "instrumentation": [
         "string_pad"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_dark",
+        "energy": "low",
+        "spectral_centroid": "warm_neutral",
         "mode": "static_drone",
         "register": "low",
-        "texture_density": "very_sparse",
+        "texture_density": "sparse",
         "nature_bed": "none"
       },
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neoclassical/drone/neoclassical_drone_seed34925.json",
-      "audio": "tracks/neoclassical/drone/neoclassical_drone_seed34925.wav"
+      "spec": "specs/neoclassical/drone/neoclassical_drone_focus_seed2278.json",
+      "audio": "tracks/neoclassical/drone/neoclassical_drone_focus_seed2278.wav"
     },
     {
-      "track_id": "neoclassical_drone_seed3964",
+      "track_id": "neoclassical_drone_focus_seed33733",
       "kind": "grid",
-      "summary": "neoclassical \u00d7 drone \u2014 string_pad; very_low, low, very_sparse",
+      "summary": "neoclassical \u00d7 drone \u2014 string_pad; low, low, sparse",
       "substrate": "drone",
       "style": "neoclassical",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 3964,
+      "seed": 33733,
       "duration_s": 60,
       "instrumentation": [
         "string_pad"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_dark",
+        "energy": "low",
+        "spectral_centroid": "warm_neutral",
         "mode": "static_drone",
         "register": "low",
-        "texture_density": "very_sparse",
+        "texture_density": "sparse",
         "nature_bed": "none"
       },
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neoclassical/drone/neoclassical_drone_seed3964.json",
-      "audio": "tracks/neoclassical/drone/neoclassical_drone_seed3964.wav"
+      "spec": "specs/neoclassical/drone/neoclassical_drone_focus_seed33733.json",
+      "audio": "tracks/neoclassical/drone/neoclassical_drone_focus_seed33733.wav"
     },
     {
-      "track_id": "neoclassical_field_seed11247",
+      "track_id": "neoclassical_field_focus_seed46470",
       "kind": "grid",
-      "summary": "neoclassical \u00d7 field_recording \u2014 field_recording; very_low, full, continuous",
+      "summary": "neoclassical \u00d7 field_recording \u2014 field_recording; low, full, continuous",
       "substrate": "field_recording",
       "style": "neoclassical",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 11247,
+      "seed": 46470,
       "duration_s": 60,
       "instrumentation": [
         "field_recording"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
+        "energy": "low",
         "spectral_centroid": "soft_broadband",
         "mode": "atonal",
         "register": "full",
@@ -1290,25 +890,27 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neoclassical/field_recording/neoclassical_field_seed11247.json",
-      "audio": "tracks/neoclassical/field_recording/neoclassical_field_seed11247.wav"
+      "spec": "specs/neoclassical/field_recording/neoclassical_field_focus_seed46470.json",
+      "audio": "tracks/neoclassical/field_recording/neoclassical_field_focus_seed46470.wav"
     },
     {
-      "track_id": "neoclassical_field_seed1346",
+      "track_id": "neoclassical_field_focus_seed97841",
       "kind": "grid",
-      "summary": "neoclassical \u00d7 field_recording \u2014 field_recording; very_low, full, continuous",
+      "summary": "neoclassical \u00d7 field_recording \u2014 field_recording; low, full, continuous",
       "substrate": "field_recording",
       "style": "neoclassical",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 1346,
+      "seed": 97841,
       "duration_s": 60,
       "instrumentation": [
         "field_recording"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
+        "energy": "low",
         "spectral_centroid": "soft_broadband",
         "mode": "atonal",
         "register": "full",
@@ -1318,26 +920,28 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neoclassical/field_recording/neoclassical_field_seed1346.json",
-      "audio": "tracks/neoclassical/field_recording/neoclassical_field_seed1346.wav"
+      "spec": "specs/neoclassical/field_recording/neoclassical_field_focus_seed97841.json",
+      "audio": "tracks/neoclassical/field_recording/neoclassical_field_focus_seed97841.wav"
     },
     {
-      "track_id": "neoclassical_melodic_seed62862",
+      "track_id": "neoclassical_melodic_focus_seed10607",
       "kind": "grid",
-      "summary": "neoclassical \u00d7 melodic_instrument \u2014 felt_piano; low, mid, sparse",
+      "summary": "neoclassical \u00d7 melodic_instrument \u2014 felt_piano; moderate, mid, sparse",
       "substrate": "melodic_instrument",
       "style": "neoclassical",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 62862,
+      "seed": 10607,
       "duration_s": 60,
       "instrumentation": [
         "felt_piano"
       ],
+      "tags": [],
       "requested_features": {
-        "tempo_bpm": 50,
-        "energy": "low",
-        "spectral_centroid": "warm_dark",
+        "tempo_bpm": 90,
+        "energy": "moderate",
+        "spectral_centroid": "warm_neutral",
         "mode": "simple_consonant",
         "register": "mid",
         "texture_density": "sparse",
@@ -1346,26 +950,28 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neoclassical/melodic_instrument/neoclassical_melodic_seed62862.json",
-      "audio": "tracks/neoclassical/melodic_instrument/neoclassical_melodic_seed62862.wav"
+      "spec": "specs/neoclassical/melodic_instrument/neoclassical_melodic_focus_seed10607.json",
+      "audio": "tracks/neoclassical/melodic_instrument/neoclassical_melodic_focus_seed10607.wav"
     },
     {
-      "track_id": "neoclassical_melodic_seed76352",
+      "track_id": "neoclassical_melodic_focus_seed40712",
       "kind": "grid",
-      "summary": "neoclassical \u00d7 melodic_instrument \u2014 felt_piano; low, mid, sparse",
+      "summary": "neoclassical \u00d7 melodic_instrument \u2014 felt_piano; moderate, mid, sparse",
       "substrate": "melodic_instrument",
       "style": "neoclassical",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 76352,
+      "seed": 40712,
       "duration_s": 60,
       "instrumentation": [
         "felt_piano"
       ],
+      "tags": [],
       "requested_features": {
-        "tempo_bpm": 50,
-        "energy": "low",
-        "spectral_centroid": "warm_dark",
+        "tempo_bpm": 90,
+        "energy": "moderate",
+        "spectral_centroid": "warm_neutral",
         "mode": "simple_consonant",
         "register": "mid",
         "texture_density": "sparse",
@@ -1374,27 +980,29 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neoclassical/melodic_instrument/neoclassical_melodic_seed76352.json",
-      "audio": "tracks/neoclassical/melodic_instrument/neoclassical_melodic_seed76352.wav"
+      "spec": "specs/neoclassical/melodic_instrument/neoclassical_melodic_focus_seed40712.json",
+      "audio": "tracks/neoclassical/melodic_instrument/neoclassical_melodic_focus_seed40712.wav"
     },
     {
-      "track_id": "neoclassical_noise_seed64096",
+      "track_id": "neoclassical_noise_focus_seed47937",
       "kind": "grid",
-      "summary": "neoclassical \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
+      "summary": "neoclassical \u00d7 noise_texture \u2014 brown_noise, distant_surf; low, low_full, even",
       "substrate": "noise_texture",
       "style": "neoclassical",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 64096,
+      "seed": 47937,
       "duration_s": 60,
       "instrumentation": [
         "brown_noise",
         "distant_surf"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "deep_warm",
+        "energy": "low",
+        "spectral_centroid": "neutral_broadband",
         "mode": "none",
         "register": "low_full",
         "texture_density": "even",
@@ -1403,27 +1011,29 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neoclassical/noise_texture/neoclassical_noise_seed64096.json",
-      "audio": "tracks/neoclassical/noise_texture/neoclassical_noise_seed64096.wav"
+      "spec": "specs/neoclassical/noise_texture/neoclassical_noise_focus_seed47937.json",
+      "audio": "tracks/neoclassical/noise_texture/neoclassical_noise_focus_seed47937.wav"
     },
     {
-      "track_id": "neoclassical_noise_seed97660",
+      "track_id": "neoclassical_noise_focus_seed8063",
       "kind": "grid",
-      "summary": "neoclassical \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
+      "summary": "neoclassical \u00d7 noise_texture \u2014 brown_noise, distant_surf; low, low_full, even",
       "substrate": "noise_texture",
       "style": "neoclassical",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 97660,
+      "seed": 8063,
       "duration_s": 60,
       "instrumentation": [
         "brown_noise",
         "distant_surf"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "deep_warm",
+        "energy": "low",
+        "spectral_centroid": "neutral_broadband",
         "mode": "none",
         "register": "low_full",
         "texture_density": "even",
@@ -1432,141 +1042,89 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neoclassical/noise_texture/neoclassical_noise_seed97660.json",
-      "audio": "tracks/neoclassical/noise_texture/neoclassical_noise_seed97660.wav"
+      "spec": "specs/neoclassical/noise_texture/neoclassical_noise_focus_seed8063.json",
+      "audio": "tracks/neoclassical/noise_texture/neoclassical_noise_focus_seed8063.wav"
     },
     {
-      "track_id": "neutral_bowls_seed84050",
+      "track_id": "neutral_drone_focus_seed25628",
       "kind": "grid",
-      "summary": "neutral \u00d7 percussive_with_tail \u2014 singing_bowls, bells; very_low, low_mid, very_sparse",
-      "substrate": "percussive_with_tail",
-      "style": "neutral",
-      "group": null,
-      "keyword": null,
-      "seed": 84050,
-      "duration_s": 60,
-      "instrumentation": [
-        "singing_bowls",
-        "bells"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_metallic",
-        "mode": "inharmonic",
-        "register": "low_mid",
-        "texture_density": "very_sparse",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/neutral/percussive_with_tail/neutral_bowls_seed84050.json",
-      "audio": "tracks/neutral/percussive_with_tail/neutral_bowls_seed84050.wav"
-    },
-    {
-      "track_id": "neutral_bowls_seed98314",
-      "kind": "grid",
-      "summary": "neutral \u00d7 percussive_with_tail \u2014 singing_bowls, bells; very_low, low_mid, very_sparse",
-      "substrate": "percussive_with_tail",
-      "style": "neutral",
-      "group": null,
-      "keyword": null,
-      "seed": 98314,
-      "duration_s": 60,
-      "instrumentation": [
-        "singing_bowls",
-        "bells"
-      ],
-      "requested_features": {
-        "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_metallic",
-        "mode": "inharmonic",
-        "register": "low_mid",
-        "texture_density": "very_sparse",
-        "nature_bed": "none"
-      },
-      "measured_features": null,
-      "rendered": true,
-      "provider": "stable_audio",
-      "spec": "specs/neutral/percussive_with_tail/neutral_bowls_seed98314.json",
-      "audio": "tracks/neutral/percussive_with_tail/neutral_bowls_seed98314.wav"
-    },
-    {
-      "track_id": "neutral_drone_seed23763",
-      "kind": "grid",
-      "summary": "neutral \u00d7 drone \u2014 sustained_pad, low_drone; very_low, low, very_sparse",
+      "summary": "neutral \u00d7 drone \u2014 sustained_pad, low_drone; low, low, sparse",
       "substrate": "drone",
       "style": "neutral",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 23763,
+      "seed": 25628,
       "duration_s": 60,
       "instrumentation": [
         "sustained_pad",
         "low_drone"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_dark",
+        "energy": "low",
+        "spectral_centroid": "warm_neutral",
         "mode": "static_drone",
         "register": "low",
-        "texture_density": "very_sparse",
+        "texture_density": "sparse",
         "nature_bed": "none"
       },
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neutral/drone/neutral_drone_seed23763.json",
-      "audio": "tracks/neutral/drone/neutral_drone_seed23763.wav"
+      "spec": "specs/neutral/drone/neutral_drone_focus_seed25628.json",
+      "audio": "tracks/neutral/drone/neutral_drone_focus_seed25628.wav"
     },
     {
-      "track_id": "neutral_drone_seed56505",
+      "track_id": "neutral_drone_focus_seed2668",
       "kind": "grid",
-      "summary": "neutral \u00d7 drone \u2014 sustained_pad, low_drone; very_low, low, very_sparse",
+      "summary": "neutral \u00d7 drone \u2014 sustained_pad, low_drone; low, low, sparse",
       "substrate": "drone",
       "style": "neutral",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 56505,
+      "seed": 2668,
       "duration_s": 60,
       "instrumentation": [
         "sustained_pad",
         "low_drone"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "warm_dark",
+        "energy": "low",
+        "spectral_centroid": "warm_neutral",
         "mode": "static_drone",
         "register": "low",
-        "texture_density": "very_sparse",
+        "texture_density": "sparse",
         "nature_bed": "none"
       },
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neutral/drone/neutral_drone_seed56505.json",
-      "audio": "tracks/neutral/drone/neutral_drone_seed56505.wav"
+      "spec": "specs/neutral/drone/neutral_drone_focus_seed2668.json",
+      "audio": "tracks/neutral/drone/neutral_drone_focus_seed2668.wav"
     },
     {
-      "track_id": "neutral_field_seed17737",
+      "track_id": "neutral_field_focus_seed41044",
       "kind": "grid",
-      "summary": "neutral \u00d7 field_recording \u2014 field_recording; very_low, full, continuous",
+      "summary": "neutral \u00d7 field_recording \u2014 field_recording; low, full, continuous",
       "substrate": "field_recording",
       "style": "neutral",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 17737,
+      "seed": 41044,
       "duration_s": 60,
       "instrumentation": [
         "field_recording"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
+        "energy": "low",
         "spectral_centroid": "soft_broadband",
         "mode": "atonal",
         "register": "full",
@@ -1576,25 +1134,27 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neutral/field_recording/neutral_field_seed17737.json",
-      "audio": "tracks/neutral/field_recording/neutral_field_seed17737.wav"
+      "spec": "specs/neutral/field_recording/neutral_field_focus_seed41044.json",
+      "audio": "tracks/neutral/field_recording/neutral_field_focus_seed41044.wav"
     },
     {
-      "track_id": "neutral_field_seed93393",
+      "track_id": "neutral_field_focus_seed67643",
       "kind": "grid",
-      "summary": "neutral \u00d7 field_recording \u2014 field_recording; very_low, full, continuous",
+      "summary": "neutral \u00d7 field_recording \u2014 field_recording; low, full, continuous",
       "substrate": "field_recording",
       "style": "neutral",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 93393,
+      "seed": 67643,
       "duration_s": 60,
       "instrumentation": [
         "field_recording"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
+        "energy": "low",
         "spectral_centroid": "soft_broadband",
         "mode": "atonal",
         "register": "full",
@@ -1604,26 +1164,28 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neutral/field_recording/neutral_field_seed93393.json",
-      "audio": "tracks/neutral/field_recording/neutral_field_seed93393.wav"
+      "spec": "specs/neutral/field_recording/neutral_field_focus_seed67643.json",
+      "audio": "tracks/neutral/field_recording/neutral_field_focus_seed67643.wav"
     },
     {
-      "track_id": "neutral_melodic_seed34350",
+      "track_id": "neutral_melodic_focus_seed31788",
       "kind": "grid",
-      "summary": "neutral \u00d7 melodic_instrument \u2014 solo_instrument; low, mid, sparse",
+      "summary": "neutral \u00d7 melodic_instrument \u2014 solo_instrument; moderate, mid, sparse",
       "substrate": "melodic_instrument",
       "style": "neutral",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 34350,
+      "seed": 31788,
       "duration_s": 60,
       "instrumentation": [
         "solo_instrument"
       ],
+      "tags": [],
       "requested_features": {
-        "tempo_bpm": 50,
-        "energy": "low",
-        "spectral_centroid": "warm_dark",
+        "tempo_bpm": 90,
+        "energy": "moderate",
+        "spectral_centroid": "warm_neutral",
         "mode": "simple_consonant",
         "register": "mid",
         "texture_density": "sparse",
@@ -1632,26 +1194,28 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neutral/melodic_instrument/neutral_melodic_seed34350.json",
-      "audio": "tracks/neutral/melodic_instrument/neutral_melodic_seed34350.wav"
+      "spec": "specs/neutral/melodic_instrument/neutral_melodic_focus_seed31788.json",
+      "audio": "tracks/neutral/melodic_instrument/neutral_melodic_focus_seed31788.wav"
     },
     {
-      "track_id": "neutral_melodic_seed44111",
+      "track_id": "neutral_melodic_focus_seed80867",
       "kind": "grid",
-      "summary": "neutral \u00d7 melodic_instrument \u2014 solo_instrument; low, mid, sparse",
+      "summary": "neutral \u00d7 melodic_instrument \u2014 solo_instrument; moderate, mid, sparse",
       "substrate": "melodic_instrument",
       "style": "neutral",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 44111,
+      "seed": 80867,
       "duration_s": 60,
       "instrumentation": [
         "solo_instrument"
       ],
+      "tags": [],
       "requested_features": {
-        "tempo_bpm": 50,
-        "energy": "low",
-        "spectral_centroid": "warm_dark",
+        "tempo_bpm": 90,
+        "energy": "moderate",
+        "spectral_centroid": "warm_neutral",
         "mode": "simple_consonant",
         "register": "mid",
         "texture_density": "sparse",
@@ -1660,27 +1224,29 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neutral/melodic_instrument/neutral_melodic_seed44111.json",
-      "audio": "tracks/neutral/melodic_instrument/neutral_melodic_seed44111.wav"
+      "spec": "specs/neutral/melodic_instrument/neutral_melodic_focus_seed80867.json",
+      "audio": "tracks/neutral/melodic_instrument/neutral_melodic_focus_seed80867.wav"
     },
     {
-      "track_id": "neutral_noise_seed50801",
+      "track_id": "neutral_noise_focus_seed2214",
       "kind": "grid",
-      "summary": "neutral \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
+      "summary": "neutral \u00d7 noise_texture \u2014 brown_noise, distant_surf; low, low_full, even",
       "substrate": "noise_texture",
       "style": "neutral",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 50801,
+      "seed": 2214,
       "duration_s": 60,
       "instrumentation": [
         "brown_noise",
         "distant_surf"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "deep_warm",
+        "energy": "low",
+        "spectral_centroid": "neutral_broadband",
         "mode": "none",
         "register": "low_full",
         "texture_density": "even",
@@ -1689,27 +1255,29 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neutral/noise_texture/neutral_noise_seed50801.json",
-      "audio": "tracks/neutral/noise_texture/neutral_noise_seed50801.wav"
+      "spec": "specs/neutral/noise_texture/neutral_noise_focus_seed2214.json",
+      "audio": "tracks/neutral/noise_texture/neutral_noise_focus_seed2214.wav"
     },
     {
-      "track_id": "neutral_noise_seed52471",
+      "track_id": "neutral_noise_focus_seed4851",
       "kind": "grid",
-      "summary": "neutral \u00d7 noise_texture \u2014 brown_noise, distant_surf; very_low, low_full, even",
+      "summary": "neutral \u00d7 noise_texture \u2014 brown_noise, distant_surf; low, low_full, even",
       "substrate": "noise_texture",
       "style": "neutral",
+      "goal": "focus",
       "group": null,
       "keyword": null,
-      "seed": 52471,
+      "seed": 4851,
       "duration_s": 60,
       "instrumentation": [
         "brown_noise",
         "distant_surf"
       ],
+      "tags": [],
       "requested_features": {
         "tempo_bpm": null,
-        "energy": "very_low",
-        "spectral_centroid": "deep_warm",
+        "energy": "low",
+        "spectral_centroid": "neutral_broadband",
         "mode": "none",
         "register": "low_full",
         "texture_density": "even",
@@ -1718,8 +1286,8 @@
       "measured_features": null,
       "rendered": true,
       "provider": "stable_audio",
-      "spec": "specs/neutral/noise_texture/neutral_noise_seed52471.json",
-      "audio": "tracks/neutral/noise_texture/neutral_noise_seed52471.wav"
+      "spec": "specs/neutral/noise_texture/neutral_noise_focus_seed4851.json",
+      "audio": "tracks/neutral/noise_texture/neutral_noise_focus_seed4851.wav"
     }
   ]
 }

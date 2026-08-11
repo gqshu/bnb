@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import random
 import shutil
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Literal
 
@@ -123,6 +124,42 @@ class CategoryManager:
         if rebuild:
             self.rebuild()
 
+    # --- tags -----------------------------------------------------------------
+
+    def add_tag(self, track_ids: Iterable[str], tag: str, *, rebuild: bool = True) -> dict[str, list[str]]:
+        """Add ``tag`` to each track's spec. Returns each track's resulting tag list."""
+        return self._edit_tags(track_ids, tag, add=True, rebuild=rebuild)
+
+    def remove_tag(self, track_ids: Iterable[str], tag: str, *, rebuild: bool = True) -> dict[str, list[str]]:
+        """Remove ``tag`` from each track's spec (a tag it doesn't carry is a no-op).
+        Returns each track's resulting tag list."""
+        return self._edit_tags(track_ids, tag, add=False, rebuild=rebuild)
+
+    def _edit_tags(
+        self, track_ids: Iterable[str], tag: str, *, add: bool, rebuild: bool
+    ) -> dict[str, list[str]]:
+        """Apply one tag edit across several tracks, then rebuild once.
+
+        Every id is resolved to a spec *before* anything is written, so a batch naming
+        one unknown track leaves the whole library untouched rather than half-tagged.
+        Raises ``FileNotFoundError`` (from :func:`assets.load_spec`) for an unknown id.
+        """
+        specs = [assets.load_spec(track_id, root=self.root) for track_id in track_ids]
+        out: dict[str, list[str]] = {}
+        for spec in specs:
+            tags = set(spec.get("tags") or [])
+            tags.add(tag) if add else tags.discard(tag)
+            assets.set_tags(spec, tags)
+            assets.write_spec(spec, root=self.root)
+            out[spec["track_id"]] = spec["tags"]
+        if rebuild:
+            self.rebuild()
+        return out
+
+    def tags(self) -> list[str]:
+        """Every distinct tag in use across the library, sorted."""
+        return sorted({tag for e in self.catalog()["tracks"] for tag in e.get("tags", [])})
+
     # --- delete ---------------------------------------------------------------
 
     def delete(self, track_id: str, *, rebuild: bool = True) -> bool:
@@ -193,12 +230,17 @@ class CategoryManager:
         cell: tuple[str, str] | None = None,
         rendered: bool | None = None,
         provider: str | None = None,
+        tag: str | None = None,
     ) -> list[dict[str, Any]]:
         """Filter the catalog by any combination of tags; unset filters are ignored.
 
         ``goal`` only ever matches grid entries (``relax``/``focus``) — special-group
         entries carry no goal (§ :func:`bnb.assets.catalog_entry`), so a goal filter
         naturally excludes them rather than needing a ``kind`` filter alongside it.
+
+        ``tag`` matches one hand-applied tag (§ :meth:`add_tag`); unlike the taxonomy
+        fields it's a membership test, since a track carries a list of them. It's what
+        makes a curated set selectable — ``pick(tag="warm-bed", rendered=True)``.
         """
         entries = self.catalog()["tracks"]
         if cell is not None:
@@ -219,6 +261,8 @@ class CategoryManager:
             entries = [e for e in entries if e["rendered"] == rendered]
         if provider is not None:
             entries = [e for e in entries if e["provider"] == provider]
+        if tag is not None:
+            entries = [e for e in entries if tag in e.get("tags", [])]
         return entries
 
     def pick(

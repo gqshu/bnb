@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(uv run *)",
-      "Bash(.venv/bin/python -c ' *)"
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(.venv/bin/python -m pytest tests/test_stream.py -q)",
+      "Bash(node drive2.mjs)",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s http://127.0.0.1:8321/api/catalog)",
+      "Bash(python3 -)",
+      "Bash(rm -rf fakeassets)",
+      "Bash(mkdir -p fakeassets)",
+      "Bash(cp -R /Users/george/work/bnb/assets/specs fakeassets/specs)",
+      "Bash(cp /Users/george/work/bnb/assets/catalog.json fakeassets/)"
     ]
   }
 }

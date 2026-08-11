@@ -77,9 +77,12 @@ Every render carries: requested substrate, requested style, requested MER coordi
   "instrumentation": ["tibetan_singing_bowls", "distant_temple_bell"],
   "prompt": "...", "negative_prompt": "...", "seed": 7,
   "duration_s": 150, "loopable": true, "license": "community-owned",
+  "tags": ["warm-bed"],
   "provenance": {"generated_at": "...", "model_version": "...", "watermark": null}
 }
 ```
+
+`tags` is the one **hand-applied** field — free-form curation labels (applied from the dashboard's catalog page, or `CategoryManager.add_tag`), as opposed to everything else, which records what was requested or measured. They live on the spec because `catalog.json` is derived: a tag stored only there would vanish on the next rebuild. Selectable like any other dimension — `pick(tag="warm-bed", rendered=True)`.
 
 ---
 

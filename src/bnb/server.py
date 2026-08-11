@@ -11,11 +11,15 @@ Endpoints:
     POST  /api/stream/stop      stop the stream
     PATCH /api/stream/spec      live-update beat / background / volumes
     GET   /api/backgrounds      catalog of background tracks (rendered ones are playable)
+    GET   /api/catalog          full catalog + filter facets (the catalog-management page)
+    POST  /api/catalog/tags     tag tracks           (only when tagging is enabled)
+    DELETE /api/catalog/tags    untag tracks         (only when tagging is enabled)
     GET   /stream.wav           the live audio (open-ended WAV, paced to real time)
 """
 
 from __future__ import annotations
 
+import os
 import random
 import time
 import uuid
@@ -27,7 +31,7 @@ import lameenc
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .background import SPECIAL_GROUPS
 from .catalog import CategoryManager
@@ -79,6 +83,23 @@ FOCUS_PRESETS: dict[str, dict[str, Any]] = {
 }
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
+
+FALSEY = {"0", "false", "no", "off", ""}
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    return default if raw is None else raw.strip().lower() not in FALSEY
+
+
+# Tagging is the one API that *writes* to the asset repo, so it's a switch decided at
+# service start rather than always-on: the same code can serve streams to clients with
+# catalog mutation closed off. On by default (the local dashboard is the main caller);
+# ``BNB_ENABLE_TAGGING=0`` in the environment or ``--no-tagging`` on the command line
+# turns it off, and the endpoints then 403 while ``GET /api/catalog`` reports the state
+# so the dashboard can grey its tagging controls out instead of failing on submit.
+TAGGING_ENABLED = _env_flag("BNB_ENABLE_TAGGING", True)
+MAX_TAG_LENGTH = 64
 
 app = FastAPI(title="bnb — binaural beat stream")
 engine = StreamEngine()
@@ -544,6 +565,87 @@ def backgrounds() -> list[dict]:
     ]
 
 
+# Dimensions the catalog page offers as filters. Each is a flat, low-cardinality field
+# on a catalog entry (§ ``bnb.assets._entry``), so the facet values are just the
+# distinct values present — no separate taxonomy call needed, and a new value shows up
+# in the UI as soon as one track carries it. ``tags`` is faceted separately: a track
+# carries a list of them, not one value.
+FACET_FIELDS = ("goal", "style", "substrate", "group", "provider")
+
+
+@app.get("/api/catalog")
+def catalog() -> dict:
+    """The full catalog plus the distinct value of every filterable dimension.
+
+    ``/api/backgrounds`` is the stream's track picker (id + summary only); this is the
+    catalog-management view, so entries come through whole and the ``facets`` block
+    lets the client build its filter controls without hardcoding taxonomy values.
+    ``tagging_enabled`` rides along so the client knows up front whether the tagging
+    operations are open on this service (§ :data:`TAGGING_ENABLED`).
+    """
+    tracks = categories.catalog()["tracks"]
+    facets = {
+        field: sorted({e[field] for e in tracks if e.get(field) is not None})
+        for field in FACET_FIELDS
+    }
+    facets["tags"] = sorted({tag for e in tracks for tag in e.get("tags", [])})
+    return {
+        "count": len(tracks),
+        "tracks": tracks,
+        "facets": facets,
+        "tagging_enabled": TAGGING_ENABLED,
+    }
+
+
+class TagRequest(BaseModel):
+    """One tag applied to (or removed from) a batch of tracks — the dashboard's
+    operation panel acts on a multi-track selection, so the batch is the unit."""
+
+    track_ids: list[str] = Field(min_length=1)
+    tag: str = Field(min_length=1, max_length=MAX_TAG_LENGTH)
+
+    @field_validator("tag")
+    @classmethod
+    def _normalize(cls, value: str) -> str:
+        """Collapse surrounding/internal whitespace, so " warm  bed " and "warm bed"
+        are the same tag rather than two that look identical in the UI."""
+        tag = " ".join(value.split())
+        if not tag:
+            raise ValueError("tag must not be blank")
+        return tag
+
+
+def _require_tagging() -> None:
+    if not TAGGING_ENABLED:
+        raise HTTPException(status_code=403, detail="tagging is disabled on this service")
+
+
+def _edit_tags(req: TagRequest, *, add: bool) -> dict:
+    edit = categories.add_tag if add else categories.remove_tag
+    try:
+        tags = edit(req.track_ids, req.tag)
+    except FileNotFoundError as exc:
+        # Nothing was written — the manager resolves every id before it edits any spec.
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"tag": req.tag, "tags": tags}
+
+
+@app.post("/api/catalog/tags")
+def add_tags(req: TagRequest) -> dict:
+    """Add one tag to every listed track. Idempotent — a tag a track already carries
+    changes nothing. Returns each track's resulting tag list."""
+    _require_tagging()
+    return _edit_tags(req, add=True)
+
+
+@app.delete("/api/catalog/tags")
+def remove_tags(req: TagRequest) -> dict:
+    """Remove one tag from every listed track (a tag it doesn't carry is a no-op), so a
+    mistyped tag isn't permanent. Returns each track's resulting tag list."""
+    _require_tagging()
+    return _edit_tags(req, add=False)
+
+
 @app.get("/stream.wav")
 def stream_wav(request: Request) -> StreamingResponse:
     return _wav_response(engine, request.headers.get("range"))
@@ -609,8 +711,21 @@ def session_stream_mp3(sid: str, request: Request) -> StreamingResponse:
 
 
 def main() -> None:
+    global TAGGING_ENABLED
+    import argparse
+
     import uvicorn
 
+    parser = argparse.ArgumentParser(description="bnb — binaural beat stream service")
+    parser.add_argument(
+        "--tagging",
+        action=argparse.BooleanOptionalAction,
+        default=TAGGING_ENABLED,
+        help="allow the catalog tagging endpoints to write to the asset repo "
+        f"(default: {'on' if TAGGING_ENABLED else 'off'}, from ${'BNB_ENABLE_TAGGING'})",
+    )
+    args = parser.parse_args()
+    TAGGING_ENABLED = args.tagging
     uvicorn.run(app, host="127.0.0.1", port=PORT)
 
 

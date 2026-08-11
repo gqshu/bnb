@@ -56,29 +56,31 @@
   "loopable": true,
   "render": {
     "provider": "stable_audio",
-    "model_version": "medium:torch",
+    "model_version": "medium:mlx",
     "output_format": "wav",
     "license": "stable-audio-3-community",
-    "generated_at": "2026-08-08T16:35:52.164670+00:00",
+    "generated_at": "2026-08-10T19:02:59.537243+00:00",
     "audio_file": "tracks/natural_sounds/night/natural_sounds_night_seed51038.wav",
     "watermark": null,
     "seed": 51038,
     "qc": {
       "attempts": 1,
       "seed": 51038,
-      "verdict": "ok",
-      "warnings": [],
+      "verdict": "warn",
+      "warnings": [
+        "quiet: -43.3 dBFS RMS"
+      ],
       "metrics": {
         "duration_s": 60.0,
         "sample_rate": 44100,
         "channels": 2,
-        "peak": 0.2139,
-        "rms_dbfs": -33.9,
-        "silent_fraction": 0.0,
+        "peak": 0.2633,
+        "rms_dbfs": -43.3,
+        "silent_fraction": 0.008,
         "clipped_fraction": 0.0,
-        "dc_offset": 0.0001,
-        "level_variation_db": 3.24,
-        "spectral_flatness": 0.009
+        "dc_offset": 0.0,
+        "level_variation_db": 2.43,
+        "spectral_flatness": 0.033
       }
     }
   }

@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import json
 import wave
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -277,6 +278,19 @@ def record_render(
     return spec
 
 
+def set_tags(spec: dict[str, Any], tags: Iterable[str]) -> dict[str, Any]:
+    """Replace a spec's free-form ``tags`` list, deduped and sorted.
+
+    Tags are the one *hand-authored* field on a spec — everything else describes what
+    was requested or measured. They live on the spec rather than in ``catalog.json``
+    precisely because the catalog is derived state (§ module docstring): a tag stored
+    only there would vanish on the next rebuild. Sorted so re-tagging a track produces
+    a minimal diff rather than reordering the list.
+    """
+    spec["tags"] = sorted(set(tags))
+    return spec
+
+
 def _summary(spec: dict[str, Any]) -> str:
     """A one-line human-readable descriptor for the catalog."""
     instruments = ", ".join(spec.get("instrumentation", [])) or "—"
@@ -310,6 +324,7 @@ def _entry(
         "seed": spec.get("seed"),
         "duration_s": spec.get("duration_s"),
         "instrumentation": spec.get("instrumentation", []),
+        "tags": sorted(spec.get("tags") or []),
         "requested_features": spec.get("requested_features"),
         "measured_features": spec.get("measured_features"),
         "rendered": audio is not None,

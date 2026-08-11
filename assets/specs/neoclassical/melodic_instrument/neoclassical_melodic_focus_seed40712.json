@@ -1,0 +1,92 @@
+{
+  "track_id": "neoclassical_melodic_focus_seed40712",
+  "kind": "grid",
+  "substrate": "melodic_instrument",
+  "style": "neoclassical",
+  "goal": "focus",
+  "group": null,
+  "keyword": null,
+  "requested_features": {
+    "tempo_bpm": 90,
+    "energy": "moderate",
+    "spectral_centroid": "warm_neutral",
+    "mode": "simple_consonant",
+    "register": "mid",
+    "texture_density": "sparse",
+    "nature_bed": "none"
+  },
+  "measured_features": null,
+  "instrumentation": [
+    "felt_piano"
+  ],
+  "prompt": "Instrumental neoclassical soundscape for sustained focus. Solo felt piano, soft close-mic, sparse tonal phrases with gentle sustain. It repeats in a steady, unsurprising loop \u2014 the same short pattern held and returned to, with only the faintest quiet detail appearing and receding \u2014 but it never swells, builds, or arrives anywhere new. Restrained and uncrowded: at most one or two things sounding at any moment, occasional and far apart, with long stretches of near-stillness between them. Close-mic'd in a small wooden room, felt and key mechanics faintly audible, warm tape saturation and a soft intimate sustain. Tempo a steady 80-100 bpm feel, held constant throughout, low-moderate energy, smooth, controlled dynamics, no sudden loud or soft jumps. warm-neutral timbre, clear and present, natural spectral brightness, never harsh. simple and repetitive, no melodic hooks, no key changes harmony, steady, unchanging texture, mid register. No vocals, no lyrics, no sudden transitions. Seamless and steady, never dramatic.",
+  "negative_prompt": "lyrics, vocals, spoken word, key change, chord progression, melodic hook, catchy melody, dramatic climax, sudden transitions, EDM, buildup, drop, harsh, distorted, chaotic",
+  "composition_plan": {
+    "positive_global_styles": [
+      "solo instrument",
+      "sparse melody",
+      "neoclassical",
+      "felt piano",
+      "strings",
+      "warm",
+      "intimate"
+    ],
+    "negative_global_styles": [
+      "vocals",
+      "lyrics",
+      "buildup",
+      "drop",
+      "chaotic",
+      "harsh"
+    ],
+    "sections": [
+      {
+        "section_name": "loop",
+        "positive_local_styles": [
+          "felt_piano"
+        ],
+        "negative_local_styles": [
+          "vocals",
+          "lyrics",
+          "buildup",
+          "drop",
+          "chaotic",
+          "harsh"
+        ],
+        "duration_ms": 60000,
+        "lines": []
+      }
+    ]
+  },
+  "seed": 40712,
+  "duration_s": 60,
+  "loopable": true,
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:mlx",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-10T19:05:52.921440+00:00",
+    "audio_file": "tracks/neoclassical/melodic_instrument/neoclassical_melodic_focus_seed40712.wav",
+    "watermark": null,
+    "seed": 40712,
+    "qc": {
+      "attempts": 1,
+      "seed": 40712,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.6889,
+        "rms_dbfs": -26.7,
+        "silent_fraction": 0.002,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 4.5,
+        "spectral_flatness": 0.0
+      }
+    }
+  }
+}

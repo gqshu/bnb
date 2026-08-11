@@ -144,6 +144,62 @@ def test_delete_cell_removes_every_track_in_it(manager):
     assert not (manager.root / "specs" / "lofi" / "drone").exists()
 
 
+# --- tags ---------------------------------------------------------------------
+
+
+def test_add_tag_writes_the_spec_and_shows_up_in_the_catalog(manager):
+    spec = _grid_spec()
+    manager.add_spec(spec)
+
+    assert manager.add_tag([spec["track_id"]], "warm-bed") == {spec["track_id"]: ["warm-bed"]}
+    assert manager.search()[0]["tags"] == ["warm-bed"]
+    # On the spec, not just the catalog — so it survives a rebuild from disk.
+    on_disk = json.loads(assets.find_spec(spec["track_id"], root=manager.root).read_text())
+    assert on_disk["tags"] == ["warm-bed"]
+    manager.rebuild()
+    assert manager.search()[0]["tags"] == ["warm-bed"]
+
+
+def test_add_tag_is_idempotent_and_accumulates(manager):
+    spec = _grid_spec()
+    manager.add_spec(spec)
+    manager.add_tag([spec["track_id"]], "warm-bed")
+    manager.add_tag([spec["track_id"]], "warm-bed")
+    assert manager.add_tag([spec["track_id"]], "aug-pilot") == {spec["track_id"]: ["aug-pilot", "warm-bed"]}
+
+
+def test_add_tag_spans_a_batch_and_remove_tag_undoes_it(manager):
+    a, b = _grid_spec(), _keyword_spec()
+    manager.add_spec(a, rebuild=False)
+    manager.add_spec(b)
+    ids = [a["track_id"], b["track_id"]]
+
+    manager.add_tag(ids, "pilot")
+    assert sorted(e["track_id"] for e in manager.search(tag="pilot")) == sorted(ids)
+    assert manager.tags() == ["pilot"]
+
+    manager.remove_tag([a["track_id"]], "pilot")
+    assert [e["track_id"] for e in manager.search(tag="pilot")] == [b["track_id"]]
+    # Removing a tag a track doesn't carry is a no-op, not an error.
+    manager.remove_tag([a["track_id"]], "pilot")
+    assert manager.search(tag="pilot", cell=("buddhist_meditative", "drone")) == []
+
+
+def test_add_tag_on_an_unknown_track_writes_nothing(manager):
+    spec = _grid_spec()
+    manager.add_spec(spec)
+    with pytest.raises(FileNotFoundError):
+        manager.add_tag([spec["track_id"], "nope"], "pilot")
+    # The known track in the batch must be untouched — validate-all-then-write.
+    assert manager.search()[0]["tags"] == []
+
+
+def test_untagged_tracks_carry_an_empty_tag_list(manager):
+    manager.add_spec(_grid_spec())
+    assert manager.search()[0]["tags"] == []
+    assert manager.tags() == []
+
+
 # --- search -------------------------------------------------------------------
 
 

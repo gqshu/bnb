@@ -56,10 +56,10 @@
   "loopable": true,
   "render": {
     "provider": "stable_audio",
-    "model_version": "medium:torch",
+    "model_version": "medium:mlx",
     "output_format": "wav",
     "license": "stable-audio-3-community",
-    "generated_at": "2026-08-08T16:36:53.197702+00:00",
+    "generated_at": "2026-08-10T19:03:22.453707+00:00",
     "audio_file": "tracks/natural_sounds/ocean/natural_sounds_ocean_seed79188.wav",
     "watermark": null,
     "seed": 79188,
@@ -72,13 +72,13 @@
         "duration_s": 60.0,
         "sample_rate": 44100,
         "channels": 2,
-        "peak": 0.7202,
-        "rms_dbfs": -29.8,
-        "silent_fraction": 0.0,
+        "peak": 0.6355,
+        "rms_dbfs": -29.0,
+        "silent_fraction": 0.002,
         "clipped_fraction": 0.0,
-        "dc_offset": 0.0004,
-        "level_variation_db": 5.63,
-        "spectral_flatness": 0.037
+        "dc_offset": 0.0001,
+        "level_variation_db": 4.4,
+        "spectral_flatness": 0.028
       }
     }
   }

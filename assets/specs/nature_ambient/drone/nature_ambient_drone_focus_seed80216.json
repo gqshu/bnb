@@ -1,0 +1,96 @@
+{
+  "track_id": "nature_ambient_drone_focus_seed80216",
+  "kind": "grid",
+  "substrate": "drone",
+  "style": "nature_ambient",
+  "goal": "focus",
+  "group": null,
+  "keyword": null,
+  "requested_features": {
+    "tempo_bpm": null,
+    "energy": "low",
+    "spectral_centroid": "warm_neutral",
+    "mode": "static_drone",
+    "register": "low",
+    "texture_density": "sparse",
+    "nature_bed": "present"
+  },
+  "measured_features": null,
+  "instrumentation": [
+    "warm_pad",
+    "rain",
+    "distant_wind"
+  ],
+  "prompt": "Instrumental nature-ambient soundscape for sustained focus. A soft warm pad under a bed of gentle rain and distant wind. It repeats in a steady, unsurprising loop \u2014 the same short pattern held and returned to, with only the faintest quiet detail appearing and receding \u2014 but it never swells, builds, or arrives anywhere new. Even and unbroken throughout, one continuous texture with nothing stepping forward out of it, no separate events and no layering. Wide open natural stereo, recorded outdoors at dawn with real depth and distance, the space itself audible around the sound. Tempo a slow, steady pulse underneath, unchanging meter, low-moderate energy, smooth, controlled dynamics, no sudden loud or soft jumps. warm-neutral timbre, clear and present, natural spectral brightness, never harsh. static, no melodic development harmony, sparse, with one subtle repeating rhythmic layer texture, low-mid register. A soft natural bed blended gently underneath. No vocals, no lyrics, no sudden transitions. Seamless and steady, never dramatic.",
+  "negative_prompt": "lyrics, vocals, spoken word, key change, chord progression, melodic hook, catchy melody, dramatic climax, sudden transitions, EDM, buildup, drop, harsh, distorted, chaotic",
+  "composition_plan": {
+    "positive_global_styles": [
+      "ambient drone",
+      "sustained pad",
+      "nature ambient",
+      "field recording",
+      "wide stereo",
+      "water",
+      "wind"
+    ],
+    "negative_global_styles": [
+      "vocals",
+      "lyrics",
+      "buildup",
+      "drop",
+      "chaotic",
+      "harsh"
+    ],
+    "sections": [
+      {
+        "section_name": "loop",
+        "positive_local_styles": [
+          "warm_pad",
+          "rain",
+          "distant_wind"
+        ],
+        "negative_local_styles": [
+          "vocals",
+          "lyrics",
+          "buildup",
+          "drop",
+          "chaotic",
+          "harsh"
+        ],
+        "duration_ms": 60000,
+        "lines": []
+      }
+    ]
+  },
+  "seed": 80216,
+  "duration_s": 60,
+  "loopable": true,
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:mlx",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-10T19:04:14.227694+00:00",
+    "audio_file": "tracks/nature_ambient/drone/nature_ambient_drone_focus_seed80216.wav",
+    "watermark": null,
+    "seed": 80216,
+    "qc": {
+      "attempts": 1,
+      "seed": 80216,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.3673,
+        "rms_dbfs": -24.8,
+        "silent_fraction": 0.001,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0001,
+        "level_variation_db": 4.36,
+        "spectral_flatness": 0.001
+      }
+    }
+  }
+}

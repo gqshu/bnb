@@ -56,10 +56,10 @@
   "loopable": true,
   "render": {
     "provider": "stable_audio",
-    "model_version": "medium:torch",
+    "model_version": "medium:mlx",
     "output_format": "wav",
     "license": "stable-audio-3-community",
-    "generated_at": "2026-08-08T16:37:13.582115+00:00",
+    "generated_at": "2026-08-10T19:03:29.815091+00:00",
     "audio_file": "tracks/natural_sounds/rain/natural_sounds_rain_seed41654.wav",
     "watermark": null,
     "seed": 41654,
@@ -74,12 +74,12 @@
         "duration_s": 60.0,
         "sample_rate": 44100,
         "channels": 2,
-        "peak": 0.3584,
+        "peak": 0.5413,
         "rms_dbfs": -40.1,
-        "silent_fraction": 0.0,
+        "silent_fraction": 0.006,
         "clipped_fraction": 0.0,
         "dc_offset": 0.0001,
-        "level_variation_db": 1.48,
+        "level_variation_db": 2.05,
         "spectral_flatness": 0.07
       }
     }

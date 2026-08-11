@@ -1,0 +1,96 @@
+{
+  "track_id": "nature_ambient_noise_focus_seed91176",
+  "kind": "grid",
+  "substrate": "noise_texture",
+  "style": "nature_ambient",
+  "goal": "focus",
+  "group": null,
+  "keyword": null,
+  "requested_features": {
+    "tempo_bpm": null,
+    "energy": "low",
+    "spectral_centroid": "neutral_broadband",
+    "mode": "none",
+    "register": "low_full",
+    "texture_density": "even",
+    "nature_bed": "present"
+  },
+  "measured_features": null,
+  "instrumentation": [
+    "brown_noise",
+    "distant_surf"
+  ],
+  "prompt": "Instrumental nature-ambient soundscape for sustained focus. A soft, deep brown-noise wash, warm and enveloping, like distant ocean surf or steady rainfall heard from far away, gently low-pass filtered. It repeats in a steady, unsurprising loop \u2014 the same short pattern held and returned to, with only the faintest quiet detail appearing and receding \u2014 but it never swells, builds, or arrives anywhere new. Even and unbroken throughout, one continuous texture with nothing stepping forward out of it, no separate events and no layering. Wide open natural stereo, recorded outdoors at dawn with real depth and distance, the space itself audible around the sound. Tempo arrhythmic, low-moderate energy, smooth, controlled dynamics, no sudden loud or soft jumps. neutral, gently filtered, no harsh hiss timbre, clear and present, natural spectral brightness, never harsh. no tonal center harmony, smooth and even texture, full-bodied, neutral register. A soft natural bed blended gently underneath. No vocals, no lyrics, no sudden transitions. Seamless and steady, never dramatic.",
+  "negative_prompt": "lyrics, vocals, spoken word, key change, chord progression, melodic hook, catchy melody, dramatic climax, sudden transitions, EDM, buildup, drop, harsh, distorted, chaotic",
+  "composition_plan": {
+    "positive_global_styles": [
+      "brown noise",
+      "warm wash",
+      "distant surf",
+      "soft rainfall",
+      "nature ambient",
+      "field recording",
+      "wide stereo",
+      "water",
+      "wind"
+    ],
+    "negative_global_styles": [
+      "vocals",
+      "lyrics",
+      "buildup",
+      "drop",
+      "chaotic",
+      "harsh"
+    ],
+    "sections": [
+      {
+        "section_name": "loop",
+        "positive_local_styles": [
+          "brown_noise",
+          "distant_surf"
+        ],
+        "negative_local_styles": [
+          "vocals",
+          "lyrics",
+          "buildup",
+          "drop",
+          "chaotic",
+          "harsh"
+        ],
+        "duration_ms": 60000,
+        "lines": []
+      }
+    ]
+  },
+  "seed": 91176,
+  "duration_s": 60,
+  "loopable": true,
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:mlx",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-10T19:04:58.616047+00:00",
+    "audio_file": "tracks/nature_ambient/noise_texture/nature_ambient_noise_focus_seed91176.wav",
+    "watermark": null,
+    "seed": 91176,
+    "qc": {
+      "attempts": 1,
+      "seed": 91176,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 0.4823,
+        "rms_dbfs": -27.0,
+        "silent_fraction": 0.001,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 5.33,
+        "spectral_flatness": 0.026
+      }
+    }
+  }
+}

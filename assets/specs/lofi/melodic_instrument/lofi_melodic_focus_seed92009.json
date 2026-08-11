@@ -1,0 +1,94 @@
+{
+  "track_id": "lofi_melodic_focus_seed92009",
+  "kind": "grid",
+  "substrate": "melodic_instrument",
+  "style": "lofi",
+  "goal": "focus",
+  "group": null,
+  "keyword": null,
+  "requested_features": {
+    "tempo_bpm": 90,
+    "energy": "moderate",
+    "spectral_centroid": "warm_neutral",
+    "mode": "simple_consonant",
+    "register": "mid",
+    "texture_density": "sparse",
+    "nature_bed": "none"
+  },
+  "measured_features": null,
+  "instrumentation": [
+    "soft_keys",
+    "tape_texture"
+  ],
+  "prompt": "Instrumental lo-fi soundscape for sustained focus. Soft lo-fi keys with tape hiss and filtered highs, gentle and unhurried. It repeats in a steady, unsurprising loop \u2014 the same short pattern held and returned to, with only the faintest quiet detail appearing and receding \u2014 but it never swells, builds, or arrives anywhere new. Restrained and uncrowded: at most one or two things sounding at any moment, occasional and far apart, with long stretches of near-stillness between them. Warm tape saturation with slow wow and flutter, a dusty vinyl noise floor and filtered highs, like a worn cassette played late at night. Tempo a steady 80-100 bpm feel, held constant throughout, low-moderate energy, smooth, controlled dynamics, no sudden loud or soft jumps. warm-neutral timbre, clear and present, natural spectral brightness, never harsh. simple and repetitive, no melodic hooks, no key changes harmony, steady, unchanging texture, mid register. No vocals, no lyrics, no sudden transitions. Seamless and steady, never dramatic.",
+  "negative_prompt": "lyrics, vocals, spoken word, key change, chord progression, melodic hook, catchy melody, dramatic climax, sudden transitions, EDM, buildup, drop, harsh, distorted, chaotic",
+  "composition_plan": {
+    "positive_global_styles": [
+      "solo instrument",
+      "sparse melody",
+      "lofi",
+      "tape texture",
+      "soft keys",
+      "warm",
+      "filtered highs"
+    ],
+    "negative_global_styles": [
+      "vocals",
+      "lyrics",
+      "buildup",
+      "drop",
+      "chaotic",
+      "harsh"
+    ],
+    "sections": [
+      {
+        "section_name": "loop",
+        "positive_local_styles": [
+          "soft_keys",
+          "tape_texture"
+        ],
+        "negative_local_styles": [
+          "vocals",
+          "lyrics",
+          "buildup",
+          "drop",
+          "chaotic",
+          "harsh"
+        ],
+        "duration_ms": 60000,
+        "lines": []
+      }
+    ]
+  },
+  "seed": 92009,
+  "duration_s": 60,
+  "loopable": true,
+  "render": {
+    "provider": "stable_audio",
+    "model_version": "medium:mlx",
+    "output_format": "wav",
+    "license": "stable-audio-3-community",
+    "generated_at": "2026-08-10T19:02:05.157745+00:00",
+    "audio_file": "tracks/lofi/melodic_instrument/lofi_melodic_focus_seed92009.wav",
+    "watermark": null,
+    "seed": 92009,
+    "qc": {
+      "attempts": 1,
+      "seed": 92009,
+      "verdict": "ok",
+      "warnings": [],
+      "metrics": {
+        "duration_s": 60.0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "peak": 1.0,
+        "rms_dbfs": -27.9,
+        "silent_fraction": 0.001,
+        "clipped_fraction": 0.0,
+        "dc_offset": 0.0,
+        "level_variation_db": 2.54,
+        "spectral_flatness": 0.003
+      }
+    }
+  }
+}
