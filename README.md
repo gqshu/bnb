@@ -97,10 +97,15 @@ can be browsed, bulk-deleted, or `ls`'d as a unit:
 assets/
   specs/<style>/<substrate>/<track_id>.json     grid spec (§3); the source of truth
   specs/<group>/<keyword>/<track_id>.json       special-cell spec, same shape
-  tracks/<style>/<substrate>/<track_id>.wav     rendered audio (git-ignored: large, costs credits/compute)
+  tracks/<style>/<substrate>/<track_id>.wav     rendered audio (large, costs credits/compute)
   tracks/<group>/<keyword>/<track_id>.wav
   catalog.json                                  generated index of compact descriptors
 ```
+
+The whole directory is git-ignored: it's a local working artifact, not source. A fresh
+checkout has no `assets/` at all — the service comes up with an empty catalog (no
+playable backgrounds) until you plan and render some. Anything worth keeping across
+machines has to be copied or re-rendered deliberately, seeds being deterministic.
 
 `track_id` (e.g. `buddhist_meditative_drone_seed81657`) stays the one flat,
 globally-unique identifier everywhere outside `assets.py` — the stream engine, the
@@ -416,5 +421,5 @@ helpers read the current beat, change one field, and send it back.
 - `scripts/` — dev utilities, not shipped
 - `tests/` — test suite
 - `docs/` — product and feasibility docs
-- `assets/` — background-media asset repo, one subdirectory per category cell (specs + catalog tracked, audio ignored)
+- `assets/` — background-media asset repo, one subdirectory per category cell (git-ignored in full: local working artifact, replanned/re-rendered from seeds)
 - `run/` — binaural ear-check renders, git-ignored
