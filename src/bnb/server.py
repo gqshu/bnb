@@ -33,7 +33,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from .background import SPECIAL_GROUPS
+from .background import SPECIAL_GROUPS, STYLES
 from .catalog import CategoryManager
 from .stream import Beat, StreamEngine, to_int16_bytes, wav_stream_header
 from .tone import (
@@ -380,14 +380,70 @@ def _compatible_keywords(group: str, goal: str) -> set[str] | None:
     return {kw for kw, entry in spec_group.keywords.items() if goal in entry.goals}
 
 
-def _random_special_background(group: str = NATURAL_SOUNDS_GROUP, goal: str = "relax") -> str | None:
-    """A random rendered background from a special group, compatible with ``goal``
-    (§ :func:`_compatible_keywords`), or None if nothing rendered matches."""
+def _special_pool(group: str, goal: str) -> list[dict]:
+    """Rendered tracks in a special group compatible with ``goal``.
+
+    Special-group specs carry no per-track goal, so compatibility comes from the
+    keyword's :class:`~bnb.background.KeywordEntry` goal allow-list, cross-referenced
+    here (§ :func:`_compatible_keywords`)."""
     candidates = categories.search(group=group, rendered=True)
     allowed = _compatible_keywords(group, goal)
     if allowed is not None:
         candidates = [e for e in candidates if e["keyword"] in allowed]
-    return random.choice(candidates)["track_id"] if candidates else None
+    return candidates
+
+
+def _random_special_entry(group: str, goal: str) -> dict | None:
+    """A random rendered entry from a special group compatible with ``goal``, or None."""
+    pool = _special_pool(group, goal)
+    return random.choice(pool) if pool else None
+
+
+def _random_special_background(group: str = NATURAL_SOUNDS_GROUP, goal: str = "relax") -> str | None:
+    """The :func:`_random_special_entry` track_id, or None."""
+    entry = _random_special_entry(group, goal)
+    return entry["track_id"] if entry else None
+
+
+def _typed_pool(category: str, goal: str) -> list[dict]:
+    """Rendered backgrounds of one ``type`` compatible with ``goal``.
+
+    ``category`` names either a grid **style** (matched on its per-track ``goal`` field)
+    or a special **group** (matched on the keyword goal allow-list, § :func:`_special_pool`).
+    Raises 400 for a type in neither."""
+    if category in STYLES:
+        return categories.search(style=category, goal=goal, rendered=True)
+    if category in SPECIAL_GROUPS:
+        return _special_pool(category, goal)
+    raise HTTPException(
+        status_code=400,
+        detail=f"unknown background type {category!r}, expected one of {sorted([*STYLES, *SPECIAL_GROUPS])}",
+    )
+
+
+def _goal_compatible_pool(goal: str) -> list[dict]:
+    """Every rendered background compatible with ``goal``, across all types.
+
+    The union of the grid tracks whose per-track ``goal`` field matches and every special
+    group's goal-compatible tracks. ``search(goal=…)`` naturally excludes the special
+    tracks (their goal field is None), so the two pools don't overlap."""
+    pool = categories.search(goal=goal, rendered=True)
+    for group in SPECIAL_GROUPS:
+        pool.extend(_special_pool(group, goal))
+    return pool
+
+
+def _random_background_entry(goal: str, category: str | None = None, exclude: str | None = None) -> dict | None:
+    """A random rendered background compatible with ``goal``, or None if nothing matches.
+
+    ``category`` is the optional ``type`` filter: given, the pool is that one type
+    (§ :func:`_typed_pool`); omitted, it's every compatible type (§ :func:`_goal_compatible_pool`).
+    ``exclude`` drops one track_id (the one already playing) so the switch button lands on
+    a different bed, falling back to the full pool if that's the only compatible track."""
+    pool = _goal_compatible_pool(goal) if category is None else _typed_pool(category, goal)
+    if exclude is not None:
+        pool = [e for e in pool if e["track_id"] != exclude] or pool
+    return random.choice(pool) if pool else None
 
 
 def _random_natural_background(goal: str = "relax") -> str | None:
@@ -498,12 +554,27 @@ _BG_NAMES = {
     "night": "夜",
     "chimes": "风铃",
 }
+_STYLE_NAMES = {
+    "buddhist_meditative": "梵音冥想",
+    "lofi": "Lo-Fi",
+    "neoclassical": "新古典",
+    "nature_ambient": "自然氛围",
+    "neutral": "中性背景",
+}
 
 
-def _bg_display_name(track_id: str) -> str:
-    parts = track_id.split("_")  # natural_sounds_<keyword>_seed...
-    kw = parts[2] if len(parts) >= 3 else ""
-    return _BG_NAMES.get(kw, "自然音")
+def _bg_display_name(entry: dict) -> str:
+    """A client-facing label for a background, from its structured catalog fields.
+
+    Grid tracks read off ``style``, special tracks off ``keyword`` — parsing the
+    track_id string would be fragile (styles like ``nature_ambient`` themselves
+    contain underscores). Falls back to the raw taxonomy value for a type with no
+    curated name yet."""
+    if entry.get("kind") == "special":
+        kw = entry.get("keyword") or ""
+        return _BG_NAMES.get(kw, "自然音")
+    style = entry.get("style") or ""
+    return _STYLE_NAMES.get(style, style or "背景音乐")
 
 
 def _background_mp3_path(track_id: str) -> str:
@@ -539,14 +610,26 @@ def _background_mp3_path(track_id: str) -> str:
 
 
 @app.get("/api/backgrounds/random")
-def random_background(group: str = NATURAL_SOUNDS_GROUP, goal: Literal["relax", "focus"] = "relax") -> dict:
+def random_background(
+    goal: Literal["relax", "focus"] = "relax",
+    type: str | None = None,
+    exclude: str | None = None,
+) -> dict:
     """Pick a random rendered background compatible with ``goal``; returns its id, display
-    name, and file URL. ``goal`` only restricts groups with keyword-goal metadata (today,
-    ``natural_sounds`` — see ``KeywordEntry.goals``); a group with none is unfiltered."""
-    tid = _random_special_background(group, goal)
-    if tid is None:
-        raise HTTPException(status_code=404, detail="no rendered background track")
-    return {"track_id": tid, "name": _bg_display_name(tid), "url": f"/background/{tid}.mp3"}
+    name, and file URL.
+
+    ``type`` is an optional filter — a grid **style** (``buddhist_meditative``, ``lofi``,
+    ``neoclassical``, ``nature_ambient``, ``neutral``) or the special **group**
+    (``natural_sounds``). Omit it (today's frontend) and the pick spans every type
+    compatible with the goal; pass it to pin one type. Unknown types 400. ``exclude`` is
+    the track_id already playing, so the switch button lands on a different bed. 404 if
+    nothing rendered matches."""
+    entry = _random_background_entry(goal, category=type, exclude=exclude)
+    if entry is None:
+        detail = f"no rendered background for goal={goal!r}" + (f", type={type!r}" if type else "")
+        raise HTTPException(status_code=404, detail=detail)
+    tid = entry["track_id"]
+    return {"track_id": tid, "name": _bg_display_name(entry), "url": f"/background/{tid}.mp3"}
 
 
 @app.get("/background/{track_id}.mp3")
