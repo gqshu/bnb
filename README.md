@@ -100,12 +100,64 @@ assets/
   tracks/<style>/<substrate>/<track_id>.wav     rendered audio (large, costs credits/compute)
   tracks/<group>/<keyword>/<track_id>.wav
   catalog.json                                  generated index of compact descriptors
+  profiles.json                                 authored mode-profile catalog (VERSIONED)
+  profiles/<id>.jpg                             card background images        (VERSIONED)
+  profiles/PROMPT.md                            text-to-image template for those images
 ```
 
-The whole directory is git-ignored: it's a local working artifact, not source. A fresh
-checkout has no `assets/` at all — the service comes up with an empty catalog (no
-playable backgrounds) until you plan and render some. Anything worth keeping across
-machines has to be copied or re-rendered deliberately, seeds being deterministic.
+Most of the directory is git-ignored: it's a local working artifact, not source. A fresh
+checkout has no `specs/`, `tracks/`, or `catalog.json` — the service comes up with an
+empty catalog (no playable backgrounds) until you plan and render some. Anything worth
+keeping across machines has to be copied or re-rendered deliberately, seeds being
+deterministic. **The exception is the profile content** (`profiles.json` and
+`profiles/`): it's hand-authored product config, not derived, so `.gitignore` keeps it
+versioned (`/assets/*` with `!/assets/profiles.json` + `!/assets/profiles/`).
+
+### Mode profiles: the app's selection grid
+
+`assets/profiles.json` is the authored catalog of **mode profiles** the app shows as
+cards in its music panel — served verbatim by `GET /api/profiles`, loaded and validated
+by `src/bnb/profiles.py`. It's plain, hand-editable JSON, re-read on every request (edit
+it and refresh — no server restart), and cross-checked against the taxonomy on read so a
+typo'd `goal` or `type` 500s loudly instead of shipping a card that picks nothing.
+
+```
+assets/
+  profiles.json                 { "profiles": [ Profile, … ] }  (order = grid order)
+  profiles/
+    PROMPT.md                   text-to-image prompt template for card art
+    <id>.jpg                    one card background per profile, named by its id
+```
+
+Each `Profile` is presentation plus the spec it expands to on tap:
+
+```jsonc
+{
+  "id": "quick_focus",              // unique; also the image filename (profiles/quick_focus.jpg)
+  "title": "快速聚焦",              // card title (required)
+  "subtitle": "提神 · 短时任务",     // optional second line
+  "image": "/profile/quick_focus.jpg", // optional; card art via GET /profile/<file>. Wins over gradient
+  "gradient": "linear-gradient(135deg, #5b6bff, #3a2f7a)", // fallback background when no image
+  "badges": [                       // optional, max 3; kind drives colour: free|eeg|new
+    { "text": "限时免费", "kind": "free" },
+    { "text": "热门", "kind": "new" }
+  ],
+  "spec": {                         // omitted only for the special "manual" card
+    "goal": "focus",                // relax | focus — required; picks the goal-compatible pool
+    "type": "drone",                // optional background filter: a substrate or a group
+    "mode": "isochronic",           // client-side beat synth: binaural | monaural | isochronic
+    "beat_hz": 14, "carrier": 300, "beat_volume": 0.4, // beat params (client synthesises)
+    "eeg_driven": false             // when true, omit beat_hz — the beat tracks live EEG (future)
+  }
+}
+```
+
+The special `"manual": true` card carries no `spec` — it opens the manual control panel.
+Card art is optional: drop a `profiles/<id>.jpg` and set `"image"`, or leave it and the
+client renders the `gradient`. `spec.type` is a **background substrate** (`drone`,
+`noise_texture`, `percussive_with_tail`, `field_recording`, `melodic_instrument`) or a
+**special group** (`natural_sounds`) — the same values `GET /api/backgrounds/random`
+accepts, so a profile's filter and the switch button agree.
 
 `track_id` (e.g. `buddhist_meditative_drone_seed81657`) stays the one flat,
 globally-unique identifier everywhere outside `assets.py` — the stream engine, the

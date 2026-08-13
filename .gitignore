@@ -7,6 +7,10 @@ run/
 
 # Asset repository: local, not versioned. The audio masters are large and cost
 # credits; the specs and catalog.json are regenerable (deterministic seeds, and the
-# catalog is a pure function of the spec tree), so the whole repository is treated as
-# a working artifact rather than source.
-/assets/
+# catalog is a pure function of the spec tree), so the repository is treated as a
+# working artifact rather than source.
+/assets/*
+# ...except the authored profile catalog + card images, which are hand-edited source
+# (product config, not derived) and belong in version control.
+!/assets/profiles.json
+!/assets/profiles/

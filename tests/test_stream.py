@@ -671,13 +671,14 @@ def test_random_background_unknown_type_is_400():
 
 
 def _install_fake_catalog(monkeypatch):
-    """A small fixed catalog: two lofi grid tracks (one per goal) and one natural_sounds
-    special track, wired through ``categories.search`` so the selection helpers run for
-    real against known data instead of the live (rebuilding) asset repo."""
+    """A small fixed catalog: grid tracks keyed by ``substrate`` × ``goal`` plus one
+    natural_sounds special track, wired through ``categories.search`` so the selection
+    helpers run for real against known data instead of the live (rebuilding) asset repo."""
     fake = [
-        {"track_id": "lofi_drone_focus_seed1", "kind": "grid", "style": "lofi", "goal": "focus", "rendered": True},
-        {"track_id": "lofi_drone_relax_seed2", "kind": "grid", "style": "lofi", "goal": "relax", "rendered": True},
-        {"track_id": "natural_sounds_rain_seed3", "kind": "special", "group": "natural_sounds", "keyword": "rain", "rendered": True},
+        {"track_id": "drone_focus", "kind": "grid", "substrate": "drone", "goal": "focus", "rendered": True},
+        {"track_id": "drone_relax", "kind": "grid", "substrate": "drone", "goal": "relax", "rendered": True},
+        {"track_id": "noise_relax", "kind": "grid", "substrate": "noise_texture", "goal": "relax", "rendered": True},
+        {"track_id": "rain", "kind": "special", "group": "natural_sounds", "keyword": "rain", "rendered": True},
     ]
 
     def fake_search(**kw):
@@ -685,7 +686,7 @@ def _install_fake_catalog(monkeypatch):
         for k, v in kw.items():
             if k == "rendered":
                 out = [e for e in out if e.get("rendered") == v]
-            elif k in ("style", "goal", "group", "keyword", "kind"):
+            elif k in ("substrate", "style", "goal", "group", "keyword", "kind"):
                 out = [e for e in out if e.get(k) == v]
         return out
 
@@ -696,34 +697,46 @@ def _install_fake_catalog(monkeypatch):
 def test_random_background_without_type_spans_all_compatible_types(monkeypatch):
     """No ``type`` -> the pool is every goal-compatible track, grid and special alike."""
     _install_fake_catalog(monkeypatch)
-    relax_ids = {server._random_background_entry("relax")["track_id"] for _ in range(40)}
-    # both the relax grid track and the (goal-agnostic) natural_sounds track can come up
-    assert relax_ids == {"lofi_drone_relax_seed2", "natural_sounds_rain_seed3"}
+    relax_ids = {server._random_background_entry("relax")["track_id"] for _ in range(60)}
+    # every relax grid substrate plus the (goal-agnostic) natural_sounds track can come up
+    assert relax_ids == {"drone_relax", "noise_relax", "rain"}
     # the focus-only grid track never leaks into a relax pool
-    assert "lofi_drone_focus_seed1" not in relax_ids
+    assert "drone_focus" not in relax_ids
 
 
 def test_random_background_type_filter_pins_one_type(monkeypatch):
-    """A grid style routes through the per-track ``goal`` field; a special group routes
-    through the keyword-goal allow-list."""
+    """A grid **substrate** routes through the per-track ``goal`` field; a special group
+    routes through the keyword-goal allow-list."""
     _install_fake_catalog(monkeypatch)
-    # a grid style picks only the entry whose own goal field matches
-    assert server._random_background_entry("focus", category="lofi")["track_id"] == "lofi_drone_focus_seed1"
-    assert server._random_background_entry("relax", category="lofi")["track_id"] == "lofi_drone_relax_seed2"
-    # a grid style with nothing rendered for that goal returns None (endpoint -> 404)
-    assert server._random_background_entry("focus", category="neutral") is None
+    # a substrate picks only its own tracks, and only the entry whose goal field matches
+    assert server._random_background_entry("focus", category="drone")["track_id"] == "drone_focus"
+    assert server._random_background_entry("relax", category="drone")["track_id"] == "drone_relax"
+    # a substrate with nothing rendered for that goal returns None (endpoint -> 404)
+    assert server._random_background_entry("focus", category="noise_texture") is None
     # a special group routes through the keyword path, not the grid goal field
     assert server._random_background_entry("relax", category="natural_sounds")["kind"] == "special"
+
+
+def test_random_background_switch_respects_goal_and_type(monkeypatch):
+    """The switch button's ``exclude`` stays inside the current goal + type pool: with two
+    relax drone beds it never returns the excluded one and never escapes to another type."""
+    fake = _install_fake_catalog(monkeypatch)
+    fake.append({"track_id": "drone_relax2", "kind": "grid", "substrate": "drone", "goal": "relax", "rendered": True})
+    picks = {
+        server._random_background_entry("relax", category="drone", exclude="drone_relax")["track_id"]
+        for _ in range(60)
+    }
+    assert picks == {"drone_relax2"}  # excluded one gone; noise/rain/focus never leak in
 
 
 def test_random_background_exclude_avoids_repeats(monkeypatch):
     """``exclude`` never returns the given track_id while another compatible one exists."""
     _install_fake_catalog(monkeypatch)
     picks = {
-        server._random_background_entry("relax", exclude="lofi_drone_relax_seed2")["track_id"]
-        for _ in range(40)
+        server._random_background_entry("relax", exclude="drone_relax")["track_id"]
+        for _ in range(60)
     }
-    assert picks == {"natural_sounds_rain_seed3"}
+    assert picks == {"noise_relax", "rain"}
 
 
 def test_background_mp3_serves_complete_file():

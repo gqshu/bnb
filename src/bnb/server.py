@@ -11,6 +11,7 @@ Endpoints:
     POST  /api/stream/stop      stop the stream
     PATCH /api/stream/spec      live-update beat / background / volumes
     GET   /api/backgrounds      catalog of background tracks (rendered ones are playable)
+    GET   /api/profiles         mode-profile catalog for the app's selection grid
     GET   /api/catalog          full catalog + filter facets (the catalog-management page)
     POST  /api/catalog/tags     tag tracks           (only when tagging is enabled)
     DELETE /api/catalog/tags    untag tracks         (only when tagging is enabled)
@@ -33,8 +34,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from .background import SPECIAL_GROUPS, STYLES
+from .background import SPECIAL_GROUPS, SUBSTRATES
 from .catalog import CategoryManager
+from .profiles import list_profiles, profiles_image_dir
 from .stream import Beat, StreamEngine, to_int16_bytes, wav_stream_header
 from .tone import (
     CARRIER_HZ,
@@ -408,16 +410,18 @@ def _random_special_background(group: str = NATURAL_SOUNDS_GROUP, goal: str = "r
 def _typed_pool(category: str, goal: str) -> list[dict]:
     """Rendered backgrounds of one ``type`` compatible with ``goal``.
 
-    ``category`` names either a grid **style** (matched on its per-track ``goal`` field)
-    or a special **group** (matched on the keyword goal allow-list, § :func:`_special_pool`).
-    Raises 400 for a type in neither."""
-    if category in STYLES:
-        return categories.search(style=category, goal=goal, rendered=True)
+    ``category`` names either a grid **substrate** — the physical kind of bed (``drone``,
+    ``noise_texture``, ``percussive_with_tail``…), matched on the track's per-track ``goal``
+    field — or a special **group** (``natural_sounds``), matched on the keyword goal
+    allow-list (§ :func:`_special_pool`). Substrate rather than cultural style is the axis
+    a listener actually picks a background by. Raises 400 for a type in neither."""
+    if category in SUBSTRATES:
+        return categories.search(substrate=category, goal=goal, rendered=True)
     if category in SPECIAL_GROUPS:
         return _special_pool(category, goal)
     raise HTTPException(
         status_code=400,
-        detail=f"unknown background type {category!r}, expected one of {sorted([*STYLES, *SPECIAL_GROUPS])}",
+        detail=f"unknown background type {category!r}, expected one of {sorted([*SUBSTRATES, *SPECIAL_GROUPS])}",
     )
 
 
@@ -618,12 +622,12 @@ def random_background(
     """Pick a random rendered background compatible with ``goal``; returns its id, display
     name, and file URL.
 
-    ``type`` is an optional filter — a grid **style** (``buddhist_meditative``, ``lofi``,
-    ``neoclassical``, ``nature_ambient``, ``neutral``) or the special **group**
-    (``natural_sounds``). Omit it (today's frontend) and the pick spans every type
+    ``type`` is an optional filter — a background **substrate** (``drone``,
+    ``noise_texture``, ``percussive_with_tail``, ``field_recording``, ``melodic_instrument``)
+    or the special **group** (``natural_sounds``). Omit it and the pick spans every type
     compatible with the goal; pass it to pin one type. Unknown types 400. ``exclude`` is
-    the track_id already playing, so the switch button lands on a different bed. 404 if
-    nothing rendered matches."""
+    the track_id already playing, so the switch button lands on a different bed while still
+    respecting ``goal`` + ``type``. 404 if nothing rendered matches."""
     entry = _random_background_entry(goal, category=type, exclude=exclude)
     if entry is None:
         detail = f"no rendered background for goal={goal!r}" + (f", type={type!r}" if type else "")
@@ -646,6 +650,36 @@ def backgrounds() -> list[dict]:
         {"track_id": e["track_id"], "summary": e["summary"], "rendered": e["rendered"]}
         for e in categories.search()
     ]
+
+
+@app.get("/api/profiles")
+def profiles() -> dict:
+    """The mode-profile catalog for the app's selection grid (§ :mod:`bnb.profiles`).
+
+    Authored presets read from ``assets/profiles.json`` on each request, each a card the
+    client renders and, on tap, expands into a play spec (``goal`` + client-side beat
+    params). ``{"profiles": [...]}`` mirrors the other list endpoints' envelope. A broken
+    or missing config file 500s with the reason (rather than serving an empty grid), so a
+    bad hand-edit is obvious."""
+    try:
+        return {"profiles": list_profiles()}
+    except (OSError, ValueError) as exc:  # ValueError covers json.JSONDecodeError + validation
+        raise HTTPException(status_code=500, detail=f"profiles config error: {exc}")
+
+
+@app.get("/profile/{filename}")
+def profile_image(filename: str):
+    """A profile card's background image from ``assets/profiles/``. Filenames only — no
+    path segments or ``..`` — so a request can't escape the image directory; 404 if
+    absent."""
+    from fastapi.responses import FileResponse
+
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=404, detail="no such profile image")
+    path = profiles_image_dir() / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="no such profile image")
+    return FileResponse(str(path))
 
 
 # Dimensions the catalog page offers as filters. Each is a flat, low-cardinality field

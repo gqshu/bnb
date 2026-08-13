@@ -1,0 +1,85 @@
+{
+  "profiles": [
+    {
+      "id": "manual",
+      "title": "手动配置",
+      "subtitle": "自由调节节拍与背景",
+      "manual": true,
+      "gradient": "linear-gradient(135deg, #2a2f45, #14161d)"
+    },
+    {
+      "id": "quick_focus",
+      "title": "快速聚焦",
+      "subtitle": "提神 · 短时任务",
+      "badges": [
+        { "text": "限时免费", "kind": "free" },
+        { "text": "热门", "kind": "new" }
+      ],
+      "spec": { "goal": "focus", "mode": "isochronic", "beat_hz": 14, "carrier": 300, "beat_volume": 0.4 },
+      "gradient": "linear-gradient(135deg, #5b6bff, #3a2f7a)"
+    },
+    {
+      "id": "eeg_flow",
+      "title": "脑波律动",
+      "subtitle": "随专注度自适应",
+      "badges": [
+        { "text": "脑波驱动", "kind": "eeg" },
+        { "text": "限时免费", "kind": "free" },
+        { "text": "新", "kind": "new" }
+      ],
+      "spec": { "goal": "focus", "mode": "binaural", "eeg_driven": true },
+      "gradient": "linear-gradient(135deg, #7d4fe3, #3a2f7a)"
+    },
+    {
+      "id": "deep_relax",
+      "title": "深度放松",
+      "subtitle": "舒缓 · 减压",
+      "spec": { "goal": "relax", "mode": "binaural", "beat_hz": 8, "carrier": 300, "beat_volume": 0.3 },
+      "gradient": "linear-gradient(135deg, #1f6f6a, #143a4a)"
+    },
+    {
+      "id": "nature_relax",
+      "title": "聆听自然",
+      "subtitle": "自然音 · 白噪",
+      "badges": [{ "text": "脑波驱动", "kind": "eeg" }],
+      "spec": { "goal": "relax", "type": "natural_sounds", "mode": "binaural", "beat_hz": 6, "carrier": 280, "beat_volume": 0.2 },
+      "gradient": "linear-gradient(135deg, #2e7d4f, #16402e)"
+    },
+    {
+      "id": "sleep",
+      "title": "安然入睡",
+      "subtitle": "助眠 · 长时",
+      "spec": { "goal": "relax", "mode": "monaural", "beat_hz": 4, "carrier": 260, "beat_volume": 0.25 },
+      "gradient": "linear-gradient(135deg, #2b3a7a, #0f1430)"
+    },
+    {
+      "id": "meditation",
+      "title": "冥想入定",
+      "subtitle": "正念 · 呼吸",
+      "spec": { "goal": "relax", "mode": "binaural", "beat_hz": 7, "carrier": 300, "beat_volume": 0.3 },
+      "gradient": "linear-gradient(135deg, #3a5a8a, #16233f)"
+    },
+    {
+      "id": "afternoon_nap",
+      "title": "午后小憩",
+      "subtitle": "20 分钟 · 回血",
+      "badges": [{ "text": "热门", "kind": "new" }],
+      "spec": { "goal": "relax", "mode": "monaural", "beat_hz": 5, "carrier": 270, "beat_volume": 0.22 },
+      "gradient": "linear-gradient(135deg, #8a5a3a, #3f2716)"
+    },
+    {
+      "id": "flow_work",
+      "title": "心流工作",
+      "subtitle": "长时 · 沉浸",
+      "spec": { "goal": "focus", "mode": "isochronic", "beat_hz": 16, "carrier": 320, "beat_volume": 0.45 },
+      "gradient": "linear-gradient(135deg, #5b6bff, #2a2f6a)"
+    },
+    {
+      "id": "caffeine_free",
+      "title": "咖啡因替代",
+      "subtitle": "清醒 · 不焦虑",
+      "spec": { "goal": "focus", "mode": "binaural", "beat_hz": 12, "carrier": 300, "beat_volume": 0.38 },
+      "gradient": "linear-gradient(135deg, #2e7d6a, #16402e)"
+    }
+  ]
+}
