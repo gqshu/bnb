@@ -159,6 +159,44 @@ client renders the `gradient`. `spec.type` is a **background substrate** (`drone
 **special group** (`natural_sounds`) — the same values `GET /api/backgrounds/random`
 accepts, so a profile's filter and the switch button agree.
 
+**Specifying AM mode in a profile: `"mode": "isochronic"`.** This is the one genuinely
+confusing corner of the format, because `spec.mode` is *client* vocabulary and does not
+mean what the identically-spelled stream-API `mode` means. A profile spec is synthesised
+on the device by the app's WebAudio engine, which knows three modes — and its
+`isochronic` is the **AM mode**: it generates no tone at all and instead amplitude-
+modulates the downloaded background bed at `beat_hz`, exactly the modality the stream API
+calls `am_music`. The server's own `isochronic` (a bare gated carrier that forbids a
+background) has no profile equivalent, and could not have one — a profile always plays
+over a background.
+
+| want | write in `spec.mode` | what the device does |
+|---|---|---|
+| binaural beat | `"binaural"` | carrier L, carrier + Δ R, mixed over the bed |
+| monaural beat | `"monaural"` | both tones summed to both ears, over the bed |
+| **AM music** | `"isochronic"` | **no tone; the bed itself is modulated at `beat_hz`** |
+
+Two spec fields change meaning under AM, which is what usually trips up an edit:
+
+- `beat_volume` is **modulation depth**, not the level of a mixed-in tone. The client
+  applies `d = 0.5 × beat_volume` and the bed's envelope becomes `(1 − d) + d·sin(2π·f·t)`,
+  i.e. it swings over `[1 − 2d, 1]`. So `1.0` is full 0→1 gating and `0.4` is a gentle
+  0.6→1.0 ripple. Depth is audible far lower here than a tone's volume would be.
+- `carrier` is **ignored entirely** — there is no carrier oscillator in this mode. Leave
+  it out rather than authoring a number that does nothing.
+
+**`eeg_driven` gates the card on a connected headband.** A profile with
+`"eeg_driven": true` has no beat frequency of its own — it tracks live EEG — so the app
+renders the card greyed out and un-enterable whenever the MindWave device isn't
+connected, with a "需连接设备" marker and a prompt offering to start a scan. Author these
+cards knowing they are invisible-in-practice to a user with no hardware; don't make one
+the only way to reach a goal or background type.
+
+`validate_profiles` does *not* check `mode`, `beat_hz`, `carrier`, or `beat_volume` —
+only `id`/`title`/`badges` and the `goal`/`type` it can cross-check against the real
+taxonomy. Everything else is client-side, so a typo'd mode string won't 500 on read; it
+falls through the client's mode switch and lands on AM, since that's the `else` branch.
+Spell it exactly.
+
 `track_id` (e.g. `buddhist_meditative_drone_seed81657`) stays the one flat,
 globally-unique identifier everywhere outside `assets.py` — the stream engine, the
 API, the CLIs — only its on-disk location is nested by cell.
@@ -428,10 +466,43 @@ binaural tone at all; the sham exists only as a live stream state. Passing
   not with a per-sample check in the render loop. Binaural and monaural have no such
   restriction — the beat survives a background layered on top either way.
 
+- `am_music` — the product-audio AM mode, and the only one with **no synthesized tone at
+  all**: the background track itself *is* the carrier, amplitude-modulated at `beat_hz`.
+  Gating broadband content stamps the beat onto every component at once, so
+  `carrier_hz`, `waveform`, and `volume` are all unused here. It shares
+  `depth`/`duty`/`ramp_ms` with `isochronic` and adds one parameter of its own:
+  - `modulator` (`sine` | `gate`, default `sine`) — the envelope shape. `sine` is a
+    smooth raised-cosine and ignores `duty`/`ramp_ms`; `gate` reuses the isochronic
+    trapezoid, ramps and all.
+
+  Two bounds differ from every other mode. `beat_hz` may run up to **60 Hz**
+  (`tone.MAX_AM_BEAT_HZ`) rather than 40 — there is no binaural-fusion ceiling to respect
+  when nothing is being fused. And a background is **required**, the exact opposite of
+  `isochronic`'s constraint: AM with no bed to modulate is a contradiction, so the engine
+  400s on it. The envelope spans `[1 - depth, 1]`, so the output never exceeds the bed's
+  own peak — no clipping, but mean level drops by roughly `depth / 2`, so level-match
+  before A/B-ing against unmodulated music. Because the drive rides on the music's own
+  irregular envelope it is muddier than an isochronic tone's clean carrier-plus-sidebands:
+  this is **product audio only, never a measurement probe** (doc §6 — that is what
+  `isochronic` is for).
+
+**Named focus presets.** `am_music`'s Hz/depth are never exposed to the app. `POST
+/api/stream/start` and `PATCH /api/stream/spec` take a `preset` field instead —
+`deep_work` (14 Hz, depth 0.35) or `quick_focus` (18 Hz, depth 0.5) — which expands
+server-side into the full `am_music` beat plus an auto-picked `goal=focus` background
+(`server.FOCUS_PRESETS`). An explicit `background_id` in the same request wins over the
+auto-pick. This is `docs/control.md`'s "named target states, not raw parameters" rule:
+the client sends a name, the server owns the numbers. The values are starting guesses to
+tune on real sessions, not derived constants.
+
 The offline renderer (`bnb.tone`) has one function per stimulus —
-`render_binaural`/`render_monaural`/`render_isochronic` — each returning float32
-stereo. `render_isochronic` deliberately has no background parameter at all: it's the
-no-background "measurement probe" path from the doc, not a live-mixed product track.
+`render_binaural`/`render_monaural`/`render_isochronic`/`render_am_music` — each
+returning float32 stereo. `render_isochronic` deliberately has no background parameter at
+all: it's the no-background "measurement probe" path from the doc, not a live-mixed
+product track. `render_am_music` is its mirror image — the background is a *required*
+positional argument, because the bed is the carrier. Both share their envelope maths with
+the live engine (`tone.am_unit_envelope`, `tone._gate_envelope`), so an offline render and
+a stream at the same settings are the same signal.
 
 ### Control client
 
