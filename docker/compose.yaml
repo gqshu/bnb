@@ -1,0 +1,70 @@
+# bnb backend, for the Ubuntu 24 host.
+#
+#   docker compose -f docker/compose.yaml up -d --build
+#   docker compose -f docker/compose.yaml logs -f
+#   docker compose -f docker/compose.yaml down
+#
+# Published on 8100 because 8000 is already taken on that host. Nothing inside the
+# container moves: bnb.server.PORT stays 8000 and every URL the service emits is
+# relative, so the change lives entirely in the port mapping below. The one place that
+# has to agree is the mini program's BASE constant
+# (neusic/miniprogram/services/bnb.ts) — point it at http://<host-lan-ip>:8100.
+
+name: bnb
+
+services:
+  bnb:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        # Should match whoever owns the assets directory on the host (`id -u`, `id -g`).
+        # Only strictly matters once the mount below is read-write.
+        UID: "${BNB_UID:-1000}"
+        GID: "${BNB_GID:-1000}"
+    image: bnb:latest
+    container_name: bnb
+    restart: unless-stopped
+
+    ports:
+      # host:container — published on all interfaces so the phone running the mini
+      # program can reach it over the LAN, not just the host itself.
+      - "8100:8000"
+
+    volumes:
+      # The asset repository — specs, rendered tracks, catalog.json, and the authored
+      # profiles.json + card images. Relative paths resolve against this file's
+      # directory, so the default is the repo's own assets/; set BNB_ASSETS_DIR to an
+      # absolute path on the real host.
+      #
+      # Read-only, which is the right default for a serving container but has two
+      # consequences worth knowing before you hit them:
+      #   - catalog.json must already exist. CategoryManager.catalog() rebuilds it when
+      #     it's missing, and that rebuild is a write. Run the catalog rebuild on the
+      #     host once and it's a non-issue.
+      #   - the tagging endpoints stay off (BNB_ENABLE_TAGGING=0 below). To use the
+      #     catalog dashboard's tagging controls against this container, change :ro to
+      #     :rw *and* flip that variable to 1 — either alone just fails differently.
+      - "${BNB_ASSETS_DIR:-../assets}:/app/assets:ro"
+
+    environment:
+      # See the volume note above — these two travel together.
+      BNB_ENABLE_TAGGING: "0"
+
+    # The stream generators run until their engine stops, so a SIGTERM has nothing to
+    # wait for. uvicorn is told to give up after 5s (see the Dockerfile CMD); this
+    # leaves Docker a little room beyond that before it reaches for SIGKILL.
+    stop_grace_period: 15s
+
+    healthcheck:
+      # Defined in the image; repeated here only to give it a start period generous
+      # enough for a cold container on a loaded host.
+      start_period: 20s
+
+    logging:
+      # An always-on service on a host with other tenants: cap the logs so a long
+      # uptime can't quietly eat the disk.
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

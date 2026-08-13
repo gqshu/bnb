@@ -1,0 +1,24 @@
+# The build context is the repo root (docker/compose.yaml sets `context: ..`), so
+# without this file the whole asset repository — gigabytes of rendered audio — would be
+# shipped to the daemon on every build, only to be shadowed at runtime by the mount.
+#
+# The image needs exactly four things: pyproject.toml, uv.lock, README.md (pyproject's
+# `readme` points at it, so the build fails without it) and src/. Everything else is
+# development-side.
+
+assets/
+run/
+.venv/
+.git/
+.gitignore
+.claude/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.wav
+.DS_Store
+
+docs/
+tests/
+scripts/
+docker/
