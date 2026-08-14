@@ -219,6 +219,91 @@ poking `assets` functions directly:
 `CategoryManager(root=...)` points a whole session at a different asset repository
 (e.g. a `tmp_path` in tests) instead of the real `assets/`.
 
+### Serving the app from WeChat cloud storage
+
+**This is the app's default content source**, not a fallback: a normal session reads
+everything from the bucket and never contacts this service. The backend is for authoring
+the library and for local development (`CONTENT_SOURCE = 'server'` in the app's
+`services/config.ts` switches back to it). `scripts/prepare_cloud_assets.py` builds the
+upload:
+
+```bash
+uv run scripts/prepare_cloud_assets.py                 # everything
+uv run scripts/prepare_cloud_assets.py --limit 5       # a trial batch first
+uv run scripts/prepare_cloud_assets.py --catalog-only  # re-emit the catalogues, skip audio
+```
+
+It transcodes every rendered master to MP3 (96 kbps stereo by default — a 60 s track goes
+from a 10.6 MB WAV to about 700 KB) and writes both catalogues the app reads:
+
+```
+run/cloud_assets/
+  bg/
+    manifest.json          the background catalogue
+    profiles.json          the mode-profile catalogue
+    <track_id>.mp3         one file per rendered track
+    profile/<id>.jpg       one card background per profile that has art
+```
+
+Upload `bg/` to the **root** of the bucket (云开发控制台 → 存储), then set `CLOUD_ENV` and
+`CLOUD_FILE_PREFIX` in `services/config.ts` to the environment id and the bucket root's
+`cloud://` prefix. The output directory is a literal mirror of the bucket, so there's one
+thing to drag and nothing to rearrange. Re-encoding is skipped for tracks already present
+in the output directory, so an interrupted run resumes rather than starting the whole
+library over; `--force` overrides that.
+
+Every path written *into* the catalogues stays relative to the bucket root — `bg/<id>.mp3`
+for audio, `bg/profile/<id>.jpg` for card art — so the client resolves any fileID by plain
+concatenation with `CLOUD_FILE_PREFIX`, one rule for all three kinds of file.
+
+**The manifest matters more than the transcoding.** Serving from a bucket means the
+bucket can't *choose* a track, so selection moves to the client — and selection needs the
+taxonomy, which has a shape that only makes sense in here. A grid track carries a
+per-track `goal`; a special-group track carries none, because the same rainfall is
+rendered once and suits both goals, so its compatibility lives on the keyword definition
+(`background.KeywordEntry.goals`) instead. That split is why the server needs both
+`_goal_compatible_pool` and `_special_pool` to answer a single question. Rather than
+reproduce it in TypeScript, the script resolves it: every track leaves with a flat `goals`
+list and a flat `type`, and the client's filter collapses to one predicate.
+
+```jsonc
+{
+  "id": "natural_sounds_rain_seed21288",
+  "file": "bg/natural_sounds_rain_seed21288.mp3",
+  "name": "雨声",              // via server._bg_display_name — same label the API returns
+  "goals": ["focus", "relax"], // grid: its own goal. special: the keyword's goals
+  "type": "natural_sounds"     // substrate (grid) or group (special) — what `?type=` takes
+}
+```
+
+`type` is deliberately the same axis `GET /api/backgrounds/random?type=` accepts and the
+same one a profile's `spec.type` names, so a profile authored against the service keeps
+working unchanged when the client is reading from the bucket. The taxonomy stays owned by
+Python; only its resolved output crosses the wire. Nothing but presentation and selection
+keys ships — prompts, seeds, requested/measured features and provider stay here rather
+than becoming a second catalog to keep in sync.
+
+A track the catalog marks rendered but whose audio is missing from disk is reported at the
+end of the run and left out of the manifest, so the client never picks an id the bucket
+can't serve.
+
+**Profiles ship the same way.** `profiles.json` goes out in the exact envelope
+`GET /api/profiles` serves, read through `bnb.profiles.list_profiles` so the validation
+guarding the endpoint also guards the upload — a duplicate id, too many badges, or a
+`spec.goal`/`spec.type` the taxonomy doesn't know aborts the run rather than shipping to a
+bucket where nothing checks it again. The one field that changes is `image`, which is a
+backend route (`/profile/<file>`) in the served form and a bucket-relative path
+(`bg/profile/<file>`) in the cloud form, with the art copied into `bg/profile/`. A profile
+naming art that isn't on disk has its `image` dropped and is reported at the end, so the
+card falls back to its `gradient` instead of rendering broken.
+
+Card art needs one extra hop on the client that the audio doesn't. The cards are drawn
+with CSS `background-image`, and a `cloud://` fileID doesn't resolve in CSS — so the app
+exchanges the paths for https URLs via `wx.cloud.getTempFileURL` when it loads the
+profile list, and re-exchanges them on each load because those URLs expire (~2 h). An
+image whose exchange fails is simply dropped, again falling back to the gradient rather
+than failing the whole grid.
+
 ### Planning and rendering are two separate scripts
 
 Spec management is offline and free (no API, no key), so you preview the catalog
@@ -541,6 +626,8 @@ helpers read the current beat, change one field, and send it back.
 - `scripts/try_stable_audio.py` — spec-free Stable Audio 3 smoke test
 - `scripts/serve.py` — run the stream service
 - `scripts/control.py` — command-line control client
+- `scripts/prepare_cloud_assets.py` — transcode the library + emit the client catalogues for
+  WeChat cloud storage
 - `scripts/` — dev utilities, not shipped
 - `tests/` — test suite
 - `docs/` — product and feasibility docs

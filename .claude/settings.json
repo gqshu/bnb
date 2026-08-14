@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(docker compose *)",
-      "Bash(uv lock *)"
+      "Bash(uv lock *)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
