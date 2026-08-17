@@ -64,7 +64,8 @@
   pre { background: #0d1017; border: 1px solid var(--line); border-radius: 8px; padding: .8rem; overflow-x: auto; color: var(--muted); font-size: .82rem; }
   fieldset { border: 0; padding: 0; margin: 0; }
   fieldset:disabled { opacity: .4; }
-  .iso-only { display: none; }
+  /* Rows list the modes they apply to; syncModeUI() reveals the current mode's set. */
+  [data-modes] { display: none; }
 
   /* --- catalog page ------------------------------------------------------- */
   /* Filters pinned on top, operation panel pinned at the bottom, the list
@@ -150,9 +151,10 @@
           <option value="dichotic" selected>Binaural</option>
           <option value="monaural">Monaural</option>
           <option value="isochronic">Isochronic</option>
+          <option value="am_music">AM music</option>
         </select>
       </div>
-      <div class="row">
+      <div class="row" data-modes="dichotic monaural isochronic">
         <label>Carrier</label>
         <input type="range" id="carrier" min="200" max="900" step="1" value="432" />
         <output id="carrierOut">432 Hz</output>
@@ -162,28 +164,35 @@
         <input type="range" id="beat" min="0" max="40" step="0.1" value="10" />
         <output id="beatOut">10.0 Hz</output>
       </div>
-      <div class="row">
+      <div class="row" data-modes="dichotic monaural isochronic">
         <label>Volume</label>
         <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5" />
         <output id="volumeOut">0.50</output>
       </div>
-      <div class="row">
+      <div class="row" data-modes="dichotic monaural isochronic">
         <label>Waveform</label>
         <select id="waveform">
           <option>sine</option><option>triangle</option><option>square</option><option>sawtooth</option>
         </select>
       </div>
-      <div class="row iso-only">
-        <label>Depth</label>
+      <div class="row" data-modes="isochronic am_music">
+        <label id="depthLabel">Depth</label>
         <input type="range" id="depth" min="0" max="1" step="0.01" value="1" />
         <output id="depthOut">1.00</output>
       </div>
-      <div class="row iso-only">
+      <div class="row" data-modes="am_music">
+        <label>Modulator</label>
+        <select id="modulator">
+          <option value="sine">sine — smooth, least damage to the music</option>
+          <option value="gate">gate — trapezoid, drives harder / more audible</option>
+        </select>
+      </div>
+      <div class="row" data-modes="isochronic am_music">
         <label>Duty</label>
         <input type="range" id="duty" min="0.1" max="0.9" step="0.01" value="0.5" />
         <output id="dutyOut">0.50</output>
       </div>
-      <div class="row iso-only">
+      <div class="row" data-modes="isochronic am_music">
         <label>Ramp</label>
         <input type="range" id="rampMs" min="2" max="10" step="0.1" value="5" />
         <output id="rampMsOut">5.0 ms</output>
@@ -276,9 +285,23 @@ const CARRIER_RANGE = {
   dichotic: { min: 200, max: 900, value: 432 },
   monaural: { min: 200, max: 900, value: 432 },
   isochronic: { min: 100, max: 500, value: 250 },
+  // am_music has no carrier of its own (the music *is* the carrier), so the row is
+  // hidden — but the field still ships, so keep it inside the backend's general range.
+  am_music: { min: 200, max: 900, value: 432 },
 };
+// AM has no binaural-fusion ceiling (the envelope is physically in the signal), so it
+// reaches tone.MAX_AM_BEAT_HZ; every other mode stops at tone.MAX_BEAT_HZ.
+const BEAT_MAX = { am_music: 60 };
+const DEFAULT_BEAT_MAX = 40;
+// Depth means different things per mode: isochronic gates the carrier fully off (1.0),
+// while AM music ships shallow (tone.AM_DEPTH) so the bed stays musical over 30 minutes.
+const MODE_DEPTH = { isochronic: 1, am_music: 0.5 };
+const BEAT_LABEL = { isochronic: "Rate", am_music: "AM rate" };
 function isIsochronic() {
   return $("mode").value === "isochronic";
+}
+function isAmMusic() {
+  return $("mode").value === "am_music";
 }
 function beatBody() {
   if (!$("beatOn").checked) return null;
@@ -289,24 +312,28 @@ function beatBody() {
     waveform: $("waveform").value,
     mode: $("mode").value,
   };
-  if (isIsochronic()) {
+  if (isIsochronic() || isAmMusic()) {
     body.depth = +$("depth").value;
     body.duty = +$("duty").value;
     body.ramp_ms = +$("rampMs").value;
   }
+  if (isAmMusic()) body.modulator = $("modulator").value;
   return body;
 }
 // Background mode -> the backend's background_id. "shuffle" is the sentinel for
 // random-forever; a pinned track_id loops itself (that *is* repeat); null = silence.
 // Isochronic never gets a background (the pulsing is the entrainment signal, and any
 // background reduces its modulation depth) — the backend enforces this with a 400,
-// so the UI disables the background panel instead of ever sending one.
+// so the UI disables the background panel instead of ever sending one. am_music is the
+// mirror constraint: the bed *is* the stimulus once modulated, so a null background
+// would be silence — syncBgMode() keeps it off "(none)", and "repeat" with no track
+// picked falls back to shuffle rather than sending the null the backend would reject.
 function backgroundId() {
   if (isIsochronic()) return null;
   const mode = $("bgMode").value;
   if (mode === "shuffle") return "shuffle";
-  if (mode === "repeat") return $("background").value || null;
-  return null;
+  if (mode === "repeat") return $("background").value || (isAmMusic() ? "shuffle" : null);
+  return isAmMusic() ? "shuffle" : null;
 }
 function startBody() {
   return {
@@ -378,25 +405,59 @@ const fmt = { carrier: (v) => v + " Hz", beat: (v) => (+v).toFixed(1) + " Hz",
               rampMs: (v) => (+v).toFixed(1) + " ms" };
 function bindOut(id) { const o = $(id + "Out"); if (o) o.textContent = fmt[id]($(id).value); }
 
-// The track picker only applies to repeat; shuffle picks its own. Isochronic disables
-// the whole panel regardless — see backgroundId() for why.
+// The track picker only applies to repeat; shuffle picks its own. The two
+// background-constrained modes move bgMode themselves so the panel can never sit in a
+// state the backend would 400 on — see backgroundId() for why.
 function syncBgMode() {
-  $("background").disabled = $("bgMode").value !== "repeat";
+  const bgMode = $("bgMode");
+  bgMode.querySelector('option[value="off"]').disabled = isAmMusic();
+  if (isAmMusic() && bgMode.value === "off") bgMode.value = "shuffle";
+  if (isIsochronic() && bgMode.value !== "off") bgMode.value = "off";
+  $("background").disabled = bgMode.value !== "repeat";
   $("bgControls").disabled = isIsochronic();
   $("bgHint").textContent = isIsochronic()
     ? "Isochronic mode: background is disabled — a soundscape would mask the pulsing that does the entrainment work."
+    : isAmMusic()
+    ? "AM music modulates this track — the music is the carrier, so a background is required."
     : "Only rendered tracks can play; others are greyed out.";
 }
 
+// The mode a row-visibility pass last ran for, so an actual mode *change* can reset
+// mode-scoped defaults without stomping the slider on every unrelated re-sync.
+let lastMode = null;
+
 function syncModeUI() {
-  const range = CARRIER_RANGE[$("mode").value];
+  const mode = $("mode").value;
+  const range = CARRIER_RANGE[mode];
   const carrier = $("carrier");
   carrier.min = range.min;
   carrier.max = range.max;
   if (+carrier.value < range.min || +carrier.value > range.max) carrier.value = range.value;
   bindOut("carrier");
-  $("beatLabel").textContent = isIsochronic() ? "Rate" : "Beat Δ";
-  document.querySelectorAll(".iso-only").forEach((el) => { el.style.display = isIsochronic() ? "flex" : "none"; });
+
+  const beatMax = BEAT_MAX[mode] || DEFAULT_BEAT_MAX;
+  const beat = $("beat");
+  beat.max = beatMax;
+  if (+beat.value > beatMax) beat.value = beatMax;  // leaving AM drops out of the gamma range
+  bindOut("beat");
+
+  $("beatLabel").textContent = BEAT_LABEL[mode] || "Beat Δ";
+  // Isochronic's depth gates a carrier; AM's sets how far the music ducks each cycle.
+  $("depthLabel").textContent = isAmMusic() ? "AM depth" : "Depth";
+  if (mode !== lastMode && mode in MODE_DEPTH) {
+    $("depth").value = MODE_DEPTH[mode];
+    bindOut("depth");
+  }
+  lastMode = mode;
+
+  // duty/ramp shape the trapezoid gate; under AM they only exist for the gate modulator
+  // (a sine modulator is a plain raised cosine and ignores both).
+  const gated = !isAmMusic() || $("modulator").value === "gate";
+  document.querySelectorAll("[data-modes]").forEach((el) => {
+    let on = el.dataset.modes.split(" ").includes(mode);
+    if (on && (el.contains($("duty")) || el.contains($("rampMs")))) on = gated;
+    el.style.display = on ? "flex" : "none";
+  });
   syncBgMode();
 }
 
@@ -404,20 +465,22 @@ function syncModeUI() {
   $(id).addEventListener("input", () => { bindOut(id); patch({ beat: beatBody() }); });
 });
 $("waveform").addEventListener("change", () => patch({ beat: beatBody() }, true));
+$("modulator").addEventListener("change", () => {
+  syncModeUI();  // gate exposes duty/ramp; sine hides them
+  patch({ beat: beatBody() }, true);
+});
 $("beatOn").addEventListener("change", () => {
   $("beatControls").disabled = !$("beatOn").checked;
   patch({ beat: beatBody() }, true);
 });
 $("mode").addEventListener("change", () => {
-  const wasBackgroundActive = $("bgMode").value !== "off";
-  syncModeUI();
+  const bgBefore = $("bgMode").value;
+  syncModeUI();  // syncBgMode() may move bgMode: off for isochronic, shuffle for am_music
   const partial = { beat: beatBody() };
-  // Switching into isochronic while a background is live would hit the backend's
-  // 400 on the next unrelated edit; clear it proactively instead.
-  if (isIsochronic() && wasBackgroundActive) {
-    $("bgMode").value = "off";
-    partial.background_id = null;
-  }
+  // Both moves must land in the *same* PATCH as the new beat: sent separately, the
+  // backend would validate the new mode against the stale background and 400. (The
+  // engine's update() validates the resulting pair, so one request is always safe.)
+  if ($("bgMode").value !== bgBefore) partial.background_id = backgroundId();
   patch(partial, true);
 });
 $("bgMode").addEventListener("change", () => {
