@@ -746,3 +746,62 @@ def test_background_mp3_serves_complete_file():
     assert r.headers["content-type"] == "audio/mpeg"
     assert len(r.content) > 10000  # a real encoded file
     assert r.content[:2] == b"\xff\xfb"  # mp3 frame sync
+
+
+# --- energizer pack in the serving path ---------------------------------------
+
+
+def test_special_background_display_name_is_per_group():
+    # The bug: a single fallback of "自然音" labelled every energizer bed "natural sounds"
+    # — wrong group, in the one field the user actually reads.
+    from bnb.server import _bg_display_name
+
+    assert _bg_display_name({"kind": "special", "group": "energizer", "keyword": "chillhop"}) == "慢拍"
+    assert _bg_display_name({"kind": "special", "group": "natural_sounds", "keyword": "universe"}) == "宇宙"
+    # An un-named keyword falls back to its own group, never another group's label.
+    assert _bg_display_name({"kind": "special", "group": "energizer", "keyword": "brandnew"}) == "活力"
+    assert _bg_display_name({"kind": "special", "group": "natural_sounds", "keyword": "brandnew"}) == "自然音"
+
+
+def test_every_special_keyword_has_a_display_name():
+    # A keyword added to the taxonomy without a name here shows the group fallback for
+    # every one of its tracks, which reads as a bug rather than as a default.
+    from bnb.background import SPECIAL_GROUPS
+    from bnb.server import _BG_NAMES, _GROUP_NAMES
+
+    for group_name, group in SPECIAL_GROUPS.items():
+        assert group_name in _GROUP_NAMES, f"group {group_name} has no fallback name"
+        for keyword in group.keywords:
+            assert keyword in _BG_NAMES, f"keyword {keyword} has no display name"
+
+
+def test_focus_preset_prefers_the_energizer_pack(monkeypatch):
+    # docs/BGMUSIC_TAXONOMY_CHANGES.md Change 4: the AM carrier rides on the curated pack,
+    # whose beds are authored continuous — a gap in the bed is a gap in the stimulus.
+    import bnb.server as srv
+
+    monkeypatch.setattr(srv, "_random_special_background", lambda group, goal: f"{group}_pick")
+    assert srv._random_focus_background() == "energizer_pick"
+
+
+def test_focus_preset_falls_back_to_the_grid_when_the_pack_is_empty(monkeypatch):
+    # A library rendered before the pack existed must still start a focus session rather
+    # than 404 on an empty pool.
+    import bnb.server as srv
+
+    monkeypatch.setattr(srv, "_random_special_background", lambda group, goal: None)
+    monkeypatch.setattr(srv.categories, "pick", lambda **kw: {"track_id": "grid_focus_bed"})
+    assert srv._random_focus_background() == "grid_focus_bed"
+
+
+def test_backgrounds_endpoint_carries_the_fields_a_client_groups_by():
+    # A flat list of ~70 track_ids can't be grouped by the caller; the dashboard and the
+    # cloud manifest both select on group/substrate.
+    entries = client.get("/api/backgrounds").json()
+    assert entries, "no specs in the library"
+    for e in entries:
+        assert {"track_id", "name", "kind", "group", "keyword", "substrate", "rendered"} <= set(e)
+        if e["kind"] == "special":
+            assert e["group"] and e["keyword"]
+        else:
+            assert e["substrate"] and e["style"]

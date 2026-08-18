@@ -742,13 +742,29 @@ async function init() {
   try {
     const bgs = await api("GET", "/api/backgrounds");
     const sel = $("background");
-    for (const b of bgs) {
-      const opt = document.createElement("option");
-      opt.value = b.track_id;
-      opt.textContent = b.track_id + (b.rendered ? "" : "  (not rendered)");
-      opt.disabled = !b.rendered;
-      opt.title = b.summary;
-      sel.appendChild(opt);
+    // Grouped rather than one flat list: the library is ~70 beds across several special
+    // groups and grid substrates, and a bare list of track_ids says nothing about which
+    // pack a bed belongs to — which is the thing you pick by.
+    const bucket = (b) => (b.kind === "special" ? b.group : b.substrate || "grid");
+    const order = [...new Set(bgs.map(bucket))].sort();
+    for (const name of order) {
+      const inBucket = bgs.filter((b) => bucket(b) === name);
+      const og = document.createElement("optgroup");
+      const ready = inBucket.filter((b) => b.rendered).length;
+      og.label = `${name} (${ready}/${inBucket.length} rendered)`;
+      for (const b of inBucket) {
+        const opt = document.createElement("option");
+        opt.value = b.track_id;
+        // The display name the app shows, then the discriminator (keyword/style) and the
+        // seed, so two beds from one cell are still tellable apart.
+        const detail = b.keyword || b.style || "";
+        opt.textContent = `${b.name}${detail ? " · " + detail : ""} — ${b.track_id}` +
+          (b.rendered ? "" : "  (not rendered)");
+        opt.disabled = !b.rendered;
+        opt.title = b.summary;
+        og.appendChild(opt);
+      }
+      sel.appendChild(og);
     }
     if (!bgs.some((b) => b.rendered)) $("bgHint").textContent =
       "No rendered background tracks yet — run scripts/render_background.py to add some.";

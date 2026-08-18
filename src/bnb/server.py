@@ -82,6 +82,11 @@ FAKE_STREAM_BYTES = 2 * 1024 * 1024 * 1024  # 2 GiB
 MP3_BITRATE_KBPS = 128  # stereo; ample for a soundscape + sine beat
 MP3_QUALITY = 5  # lameenc: 0=best/slowest … 9=fastest; 5 keeps per-stream CPU low
 NATURAL_SOUNDS_GROUP = "natural_sounds"
+ENERGIZER_GROUP = "energizer"
+"""The curated up-regulation pack a focus preset's AM carrier rides on
+(docs/BGMUSIC_TAXONOMY_CHANGES.md Change 4). Preferred over the goal=focus grid because
+its beds are authored to be continuous — an AM carrier multiplies the bed, so a gap in
+the bed is a gap in the stimulus."""
 FOCUS_GOAL = "focus"
 
 # Named focus presets (control.md's "named target states, not raw parameters" — the same
@@ -422,8 +427,8 @@ def _typed_pool(category: str, goal: str) -> list[dict]:
 
     ``category`` names either a grid **substrate** — the physical kind of bed (``drone``,
     ``noise_texture``, ``percussive_with_tail``…), matched on the track's per-track ``goal``
-    field — or a special **group** (``natural_sounds``), matched on the keyword goal
-    allow-list (§ :func:`_special_pool`). Substrate rather than cultural style is the axis
+    field — or a special **group** (``natural_sounds``, ``energizer``), matched on the
+    keyword goal allow-list (§ :func:`_special_pool`). Substrate rather than cultural style is the axis
     a listener actually picks a background by. Raises 400 for a type in neither."""
     if category in SUBSTRATES:
         return categories.search(substrate=category, goal=goal, rendered=True)
@@ -467,8 +472,17 @@ def _random_natural_background(goal: str = "relax") -> str | None:
 
 
 def _random_focus_background() -> str | None:
-    """A random rendered ``goal=focus`` grid track_id, or None if none are rendered yet —
-    the bed a focus preset's am_music beat modulates."""
+    """The bed a focus preset's ``am_music`` beat modulates: a rendered ``energizer``
+    track if the pack has any, else a ``goal=focus`` grid track, else None.
+
+    The pack comes first because its beds are the ones authored for this job — continuous
+    by construction, since an AM carrier *multiplies* the bed and a gap in the bed is a gap
+    in the stimulus (§ ``ENERGIZER_GROUP``). The grid stays as a fallback rather than being
+    replaced, so a library rendered before the pack existed still starts a focus session
+    instead of 404-ing on an empty pool."""
+    track_id = _random_special_background(ENERGIZER_GROUP, FOCUS_GOAL)
+    if track_id is not None:
+        return track_id
     entry = categories.pick(goal=FOCUS_GOAL, rendered=True)
     return entry["track_id"] if entry else None
 
@@ -559,7 +573,10 @@ def debug_sample_mp3():
 
 
 _bg_mp3_cache: dict[str, str] = {}
+# Keyed by keyword across *every* special group; keywords are unique library-wide, and a
+# flat map is what keeps a new group from silently inheriting another group's fallback.
 _BG_NAMES = {
+    # natural_sounds
     "rain": "雨声",
     "ocean": "海浪",
     "wind": "风声",
@@ -567,6 +584,22 @@ _BG_NAMES = {
     "forest": "森林",
     "night": "夜",
     "chimes": "风铃",
+    "universe": "宇宙",
+    "fireplace": "壁炉",
+    # energizer
+    "uplift": "轻扬",
+    "chillhop": "慢拍",
+    "daydream": "遐想",
+    "momentum": "律动",
+    "warmth": "暖意",
+}
+
+# Per-group fallback for a keyword with no curated name yet. The old single fallback was
+# "自然音", which labelled every energizer bed "natural sounds" — wrong group, and wrong
+# in the one place the user actually reads.
+_GROUP_NAMES = {
+    "natural_sounds": "自然音",
+    "energizer": "活力",
 }
 _STYLE_NAMES = {
     "buddhist_meditative": "梵音冥想",
@@ -586,7 +619,8 @@ def _bg_display_name(entry: dict) -> str:
     curated name yet."""
     if entry.get("kind") == "special":
         kw = entry.get("keyword") or ""
-        return _BG_NAMES.get(kw, "自然音")
+        fallback = _GROUP_NAMES.get(entry.get("group") or "", "背景音乐")
+        return _BG_NAMES.get(kw, fallback)
     style = entry.get("style") or ""
     return _STYLE_NAMES.get(style, style or "背景音乐")
 
@@ -634,7 +668,7 @@ def random_background(
 
     ``type`` is an optional filter — a background **substrate** (``drone``,
     ``noise_texture``, ``percussive_with_tail``, ``field_recording``, ``melodic_instrument``)
-    or the special **group** (``natural_sounds``). Omit it and the pick spans every type
+    or a special **group** (``natural_sounds``, ``energizer``). Omit it and the pick spans every type
     compatible with the goal; pass it to pin one type. Unknown types 400. ``exclude`` is
     the track_id already playing, so the switch button lands on a different bed while still
     respecting ``goal`` + ``type``. 404 if nothing rendered matches."""
@@ -656,8 +690,25 @@ def background_mp3(track_id: str):
 
 @app.get("/api/backgrounds")
 def backgrounds() -> list[dict]:
+    """Every background spec in the library, rendered or not.
+
+    Carries the taxonomy fields a client needs to *group* the list rather than render 70
+    raw ids in one flat select: ``kind`` plus ``group``/``keyword`` for special cells and
+    ``substrate``/``style``/``goal`` for grid cells, and the same ``name`` the random-pick
+    endpoint returns, so a bed is labelled identically wherever it appears."""
     return [
-        {"track_id": e["track_id"], "summary": e["summary"], "rendered": e["rendered"]}
+        {
+            "track_id": e["track_id"],
+            "summary": e["summary"],
+            "rendered": e["rendered"],
+            "name": _bg_display_name(e),
+            "kind": e.get("kind", "grid"),
+            "group": e.get("group"),
+            "keyword": e.get("keyword"),
+            "substrate": e.get("substrate"),
+            "style": e.get("style"),
+            "goal": e.get("goal"),
+        }
         for e in categories.search()
     ]
 
