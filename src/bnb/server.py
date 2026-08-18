@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 import random
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -56,6 +57,15 @@ from .tone import (
 )
 
 PORT = 8000
+HOST = os.environ.get("BNB_HOST", "127.0.0.1")
+"""Interface :func:`main` binds, overridable with ``--host``.
+
+Loopback by default: the service has no authentication and (with tagging on) writes
+to the asset repo, so it should not land on a shared network unless someone asks for
+it. ``0.0.0.0`` binds every address — what the mini program needs to reach the host
+over the LAN, and what a container needs, where loopback means "unreachable from
+anywhere" (docker/Dockerfile passes it to uvicorn directly for that reason).
+"""
 CHUNK_SECONDS = 0.2  # render granularity; also the live-edit latency floor
 # Burst the first few seconds as fast as the socket accepts them, then pace to real
 # time. Without this, an open-ended stream delivered at exactly 1× realtime never lets
@@ -841,9 +851,23 @@ def main() -> None:
         help="allow the catalog tagging endpoints to write to the asset repo "
         f"(default: {'on' if TAGGING_ENABLED else 'off'}, from ${'BNB_ENABLE_TAGGING'})",
     )
+    parser.add_argument(
+        "--host",
+        default=HOST,
+        help="interface to bind; 0.0.0.0 serves on every address, so a phone on the "
+        f"same LAN can reach it (default: {HOST}, from $BNB_HOST)",
+    )
     args = parser.parse_args()
     TAGGING_ENABLED = args.tagging
-    uvicorn.run(app, host="127.0.0.1", port=PORT)
+    # Binding beyond loopback exposes an unauthenticated service; say so once rather
+    # than letting an open port be a surprise.
+    if args.host not in ("127.0.0.1", "localhost", "::1"):
+        print(
+            f"bnb: binding {args.host}:{PORT} — this service has no authentication and "
+            f"tagging writes are {'ON' if TAGGING_ENABLED else 'off'}. Trusted networks only.",
+            file=sys.stderr,
+        )
+    uvicorn.run(app, host=args.host, port=PORT)
 
 
 if __name__ == "__main__":

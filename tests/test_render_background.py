@@ -41,10 +41,162 @@ def test_check_provider_ready_elevenlabs_requires_the_api_key(monkeypatch):
         rb.check_provider_ready(_args(provider="elevenlabs"))
 
 
-def test_check_provider_ready_elevenlabs_passes_when_key_set(monkeypatch):
-    monkeypatch.setenv("ELEVENLABS_API_KEY", "sk-fake")
+# --- elevenlabs credential preflight ------------------------------------------
+#
+# check_elevenlabs_credential imports the SDK inside the function, so these stub the
+# `elevenlabs` module's ElevenLabs class. None of them touch the network.
+
+FAKE_KEY = "sk-fakefakefake9xyz"
+
+
+class _FakeSubscription:
+    tier = "creator"
+    character_count = 12_345
+    character_limit = 100_000
+
+
+def _stub_sdk(monkeypatch, result):
+    """Point `elevenlabs.ElevenLabs(...).user.subscription.get()` at ``result`` — an
+    exception instance is raised, anything else is returned."""
+    import elevenlabs
+
+    class _Sub:
+        def get(self):
+            if isinstance(result, BaseException):
+                raise result
+            return result
+
+    class _User:
+        subscription = _Sub()
+
+    class _Client:
+        def __init__(self, api_key=None):
+            self.user = _User()
+
+    monkeypatch.setattr(elevenlabs, "ElevenLabs", _Client)
+
+
+def test_elevenlabs_preflight_verifies_the_key_and_reports_the_account(monkeypatch):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", FAKE_KEY)
+    _stub_sdk(monkeypatch, _FakeSubscription())
     readiness = rb.check_provider_ready(_args(provider="elevenlabs", model_id="music_v2"))
     assert "elevenlabs" in readiness and "music_v2" in readiness
+    assert "verified" in readiness
+    assert "creator" in readiness and "12,345" in readiness
+
+
+def test_elevenlabs_preflight_never_echoes_the_whole_key(monkeypatch):
+    # The readiness line is printed and often pasted into issues/logs.
+    monkeypatch.setenv("ELEVENLABS_API_KEY", FAKE_KEY)
+    _stub_sdk(monkeypatch, _FakeSubscription())
+    readiness = rb.check_provider_ready(_args(provider="elevenlabs"))
+    assert FAKE_KEY not in readiness
+    assert readiness.count(FAKE_KEY[-4:]) == 1  # enough to identify which key, no more
+
+
+def test_elevenlabs_preflight_rejects_a_set_but_invalid_key(monkeypatch):
+    # The gap this closes: a present-but-wrong key used to pass and die on the first
+    # *paid* call, partway into a batch.
+    from elevenlabs.core.api_error import ApiError
+
+    monkeypatch.setenv("ELEVENLABS_API_KEY", FAKE_KEY)
+    _stub_sdk(monkeypatch, ApiError(status_code=401, body={"detail": "invalid api key"}))
+    with pytest.raises(SystemExit, match="rejected by the API"):
+        rb.check_provider_ready(_args(provider="elevenlabs"))
+
+
+def test_elevenlabs_preflight_accepts_a_restricted_key(monkeypatch):
+    # The false alarm this fixes: ElevenLabs keys can be restricted to chosen scopes, and
+    # the account read (user_read) is not one rendering needs. The API can only name the
+    # missing scope after recognising the key, so this response *proves* authentication —
+    # reporting it as a bad key rejected a perfectly good music-generation key.
+    from elevenlabs.core.api_error import ApiError
+
+    monkeypatch.setenv("ELEVENLABS_API_KEY", FAKE_KEY)
+    _stub_sdk(
+        monkeypatch,
+        ApiError(
+            status_code=401,
+            body={"detail": {"status": "missing_permissions", "message": "missing permission user_read"}},
+        ),
+    )
+    readiness = rb.check_provider_ready(_args(provider="elevenlabs", model_id="music_v2"))
+    assert "accepted" in readiness and "music_v2" in readiness
+    assert "quota is unknown" in readiness
+    assert "missing permission user_read" in readiness
+
+
+def test_elevenlabs_preflight_surfaces_the_apis_own_reason(monkeypatch):
+    # The 401 branch used to discard the body and assert its own guess at the cause, which
+    # is what made a restricted key look identical to a revoked one.
+    from elevenlabs.core.api_error import ApiError
+
+    monkeypatch.setenv("ELEVENLABS_API_KEY", FAKE_KEY)
+    _stub_sdk(
+        monkeypatch,
+        ApiError(status_code=401, body={"detail": {"status": "invalid_api_key", "message": "Invalid API key"}}),
+    )
+    with pytest.raises(SystemExit, match="invalid_api_key") as excinfo:
+        rb.check_provider_ready(_args(provider="elevenlabs"))
+    assert "Invalid API key" in str(excinfo.value)
+
+
+def test_elevenlabs_preflight_trims_a_trailing_newline_from_the_key(monkeypatch):
+    # `export ELEVENLABS_API_KEY=$(cat key.txt)` is the common way to get one, and the
+    # newline it leaves makes a good key fail as "invalid" with no hint why.
+    seen = {}
+
+    import elevenlabs
+
+    class _Client:
+        def __init__(self, api_key=None):
+            seen["api_key"] = api_key
+            self.user = type("U", (), {"subscription": type("S", (), {"get": lambda s: _FakeSubscription()})()})()
+
+    monkeypatch.setattr(elevenlabs, "ElevenLabs", _Client)
+    monkeypatch.setenv("ELEVENLABS_API_KEY", f"  {FAKE_KEY}\n")
+    readiness = rb.check_provider_ready(_args(provider="elevenlabs"))
+    assert seen["api_key"] == FAKE_KEY  # sent clean
+    assert "whitespace was trimmed" in readiness  # ...and said so
+
+
+def test_elevenlabs_preflight_distinguishes_other_api_errors(monkeypatch):
+    from elevenlabs.core.api_error import ApiError
+
+    monkeypatch.setenv("ELEVENLABS_API_KEY", FAKE_KEY)
+    _stub_sdk(monkeypatch, ApiError(status_code=500, body="upstream boom"))
+    with pytest.raises(SystemExit, match="returned 500"):
+        rb.check_provider_ready(_args(provider="elevenlabs"))
+
+
+def test_elevenlabs_preflight_reports_an_unreachable_api(monkeypatch):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", FAKE_KEY)
+    _stub_sdk(monkeypatch, ConnectionError("dns go boom"))
+    with pytest.raises(SystemExit, match="could not reach"):
+        rb.check_provider_ready(_args(provider="elevenlabs"))
+
+
+def test_elevenlabs_preflight_runs_on_a_dry_run(monkeypatch):
+    # The point of the whole check: --dry-run is when you want a bad key to surface,
+    # before any credits are committed. A dry run must not be a way to skip it.
+    from elevenlabs.core.api_error import ApiError
+
+    monkeypatch.setenv("ELEVENLABS_API_KEY", FAKE_KEY)
+    _stub_sdk(monkeypatch, ApiError(status_code=401, body={"detail": "nope"}))
+    with pytest.raises(SystemExit, match="rejected by the API"):
+        rb.check_provider_ready(_args(provider="elevenlabs", dry_run=True))
+
+
+def test_stable_audio_preflight_never_touches_the_elevenlabs_api(monkeypatch):
+    # An offline SA3 run must not acquire a network dependency from this change.
+    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+    monkeypatch.setattr(rb, "check_elevenlabs_credential", _boom)
+    monkeypatch.setattr(stable_audio, "require_cli", lambda backend: Path("/fake/stable-audio"))
+    assert "stable_audio" in rb.check_provider_ready(_args(provider="stable_audio"))
+
+
+def _boom(*_a, **_k):
+    raise AssertionError("elevenlabs credential check must not run for stable_audio")
 
 
 def test_check_provider_ready_stable_audio_requires_the_cli(monkeypatch):

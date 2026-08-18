@@ -13,9 +13,11 @@
 #      interpreter's lib directory and the service would find no tracks at all. So this
 #      keeps a source layout at /app with an editable install pointing into it.
 #
-#   2. `bnb.server.main()` — what `scripts/serve.py` runs — binds 127.0.0.1, which inside
-#      a container means "unreachable from anywhere". The CMD therefore drives uvicorn
-#      directly with --host 0.0.0.0 rather than going through that entrypoint.
+#   2. The CMD drives uvicorn directly rather than going through `bnb.server.main()` (what
+#      `scripts/serve.py` runs), because it needs --timeout-graceful-shutdown, which that
+#      entrypoint does not expose. Binding is no longer a reason: main() takes --host
+#      (or $BNB_HOST) since it defaults to 127.0.0.1, which inside a container means
+#      "unreachable from anywhere".
 
 ARG PYTHON_VERSION=3.12
 

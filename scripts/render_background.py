@@ -17,12 +17,15 @@ paid / heavyweight half, kept separate so specs can be previewed for free first.
     uv run scripts/render_background.py --no-worker      # one process per track
 
     export ELEVENLABS_API_KEY=...
+    uv run scripts/render_background.py --provider elevenlabs --dry-run   # verify the key, render nothing
     uv run scripts/render_background.py --provider elevenlabs
     uv run scripts/render_background.py --provider elevenlabs --output-format mp3_44100_192 --model-id music_v1
 
 Every run — including --dry-run — starts with a preflight check that the selected
-provider is actually usable (SA3 CLI discoverable / API key set) and fails fast with
-setup instructions if not, before touching any spec.
+provider is actually usable (SA3 CLI discoverable / API key accepted by the API) and
+fails fast with setup instructions if not, before touching any spec. For elevenlabs the
+key is *verified*, not just read: --dry-run is exactly when you want a bad credential to
+surface, before any credits are committed.
 
 Default is credit-safe and idempotent: specs that already have audio are skipped
 unless you pass --force. Each render lands in its spec's category cell directory
@@ -333,6 +336,101 @@ def describe(spec: dict[str, Any]) -> str:
     return f"{spec['substrate']} x {spec['style']}"
 
 
+def _redact(api_key: str) -> str:
+    """Enough of a key to tell *which* one is loaded, never enough to use."""
+    return f"...{api_key[-4:]}" if len(api_key) >= 8 else "(too short to be a key)"
+
+
+def _api_error_detail(body: Any) -> tuple[str | None, str | None]:
+    """``(status, message)`` out of an ElevenLabs error body, which nests both under
+    ``detail`` — e.g. ``{"detail": {"status": "invalid_api_key", "message": "..."}}``.
+
+    Worth parsing rather than printing raw, because ``status`` is what separates a key
+    the API *rejected* from a key it *recognised and then refused for this endpoint*.
+    """
+    detail = body.get("detail") if isinstance(body, dict) else None
+    if isinstance(detail, dict):
+        return detail.get("status"), detail.get("message")
+    if isinstance(detail, str):
+        return None, detail
+    return None, None
+
+
+def check_elevenlabs_credential(model_id: str) -> str:
+    """Verify ``ELEVENLABS_API_KEY`` actually authenticates — not merely that it is set.
+
+    Checking only that the variable is non-empty passes a typo'd, rotated or revoked key,
+    and the run then dies on the first *paid* call, partway into a batch, with a raw 401
+    from inside the SDK. This spends one cheap GET (the account's subscription record) to
+    settle it up front, which is the whole point of a preflight and the reason it runs on
+    ``--dry-run`` too: a dry run is exactly when you want to learn the credential is wrong,
+    before committing credits.
+
+    The quota counters come back from the same call, so they're worth printing — but they
+    are the account-wide character counters, which is not a music-render cost estimate;
+    they say the account is live and roughly how much room is on it, nothing finer.
+
+    A *restricted* key that cannot read the account is explicitly not a failure here — see
+    the ``missing_permissions`` branch. The probe is the cheapest authenticated GET
+    available, not a permission the render itself needs.
+    """
+    raw_key = os.environ.get("ELEVENLABS_API_KEY") or ""
+    # `export ELEVENLABS_API_KEY=$(cat key.txt)` leaves a trailing newline, which the API
+    # rejects as an invalid key — indistinguishable, from the error, from a wrong one.
+    api_key = raw_key.strip()
+    if not api_key:
+        raise SystemExit("ELEVENLABS_API_KEY is not set; export it, or use --provider stable_audio")
+    whitespace_note = " [note: surrounding whitespace was trimmed]" if api_key != raw_key else ""
+
+    try:
+        from elevenlabs import ElevenLabs
+        from elevenlabs.core.api_error import ApiError
+    except ImportError as exc:  # the SDK is an optional extra (pyproject [media])
+        raise SystemExit(
+            f"--provider elevenlabs needs the elevenlabs SDK, which is not installed ({exc}). "
+            "Install it with `uv sync --extra media`, or use --provider stable_audio."
+        ) from exc
+
+    try:
+        subscription = ElevenLabs(api_key=api_key).user.subscription.get()
+    except ApiError as exc:
+        status, message = _api_error_detail(exc.body)
+        if status == "missing_permissions":
+            # Not a bad key. ElevenLabs keys can be *restricted* to chosen scopes, and the
+            # API can only name the scope it wants after recognising the key — so this
+            # proves authentication succeeded. Only the account read was refused, and
+            # nothing about rendering needs it. Failing here would reject a perfectly good
+            # music-generation key, which is precisely the wrong answer for a preflight.
+            return (
+                f"elevenlabs, model {model_id} (key {_redact(api_key)} accepted; account not "
+                f"readable, so quota is unknown — {message or 'the key lacks user_read'})"
+                f"{whitespace_note}"
+            )
+        if exc.status_code in (401, 403):
+            raise SystemExit(
+                f"ELEVENLABS_API_KEY was rejected by the API ({exc.status_code}"
+                f"{f', {status}' if status else ''}): {message or exc.body}\n"
+                f"The variable is set (ending {_redact(api_key)}), so this is a wrong, rotated "
+                f"or revoked key rather than a missing one — check the key in the ElevenLabs "
+                f"dashboard.{whitespace_note}"
+            ) from exc
+        raise SystemExit(
+            f"could not verify ELEVENLABS_API_KEY: the API returned {exc.status_code}: "
+            f"{message or exc.body}"
+        ) from exc
+    except Exception as exc:  # network/DNS/TLS — a render would fail the same way
+        raise SystemExit(
+            f"could not reach the ElevenLabs API to verify ELEVENLABS_API_KEY: {exc!r}"
+        ) from exc
+
+    used, limit = subscription.character_count, subscription.character_limit
+    quota = f"{used:,}/{limit:,} characters used" if limit else f"{used:,} characters used"
+    return (
+        f"elevenlabs, model {model_id} (key {_redact(api_key)} verified; "
+        f"tier {subscription.tier}, {quota}){whitespace_note}"
+    )
+
+
 def check_provider_ready(args: argparse.Namespace, engines: Iterable[Engine] = ()) -> str:
     """Verify every engine the run needs is actually usable, and return a short
     readiness description to print. Raises ``SystemExit`` with setup instructions if
@@ -341,9 +439,7 @@ def check_provider_ready(args: argparse.Namespace, engines: Iterable[Engine] = (
     every track is already rendered would otherwise never call the provider at all).
     """
     if args.provider == "elevenlabs":
-        if not os.environ.get("ELEVENLABS_API_KEY"):
-            raise SystemExit("ELEVENLABS_API_KEY is not set; export it, or use --provider stable_audio")
-        return f"elevenlabs, model {args.model_id}"
+        return check_elevenlabs_credential(args.model_id)
 
     engines = list(engines) or [Engine(args.sa3_model, args.sa3_backend)]
     described = []
@@ -394,6 +490,11 @@ def target_ids(args: argparse.Namespace, manager: CategoryManager) -> list[str]:
 def main() -> None:
     args = parse_args()
     license = LICENSES[args.provider]
+    # The credential check needs nothing from the catalog, so it runs before the scan: a
+    # bad key then fails in about a second, instead of underneath a screenful of skip
+    # lines. SA3's engine preflight genuinely does depend on what is in the batch (special
+    # cells route to a different checkpoint), so that half stays below, after grouping.
+    readiness = check_elevenlabs_credential(args.model_id) if args.provider == "elevenlabs" else None
     manager = CategoryManager()
 
     rendered_ids = {e["track_id"] for e in manager.search(rendered=True)}
@@ -410,7 +511,9 @@ def main() -> None:
     # is in it, since special cells route to a different checkpoint than the grid.
     groups = group_by_engine(todo, args, manager)
     check_engines_can_render(args, groups, manager)
-    print(f"provider       {check_provider_ready(args, groups)}")
+    if readiness is None:
+        readiness = check_provider_ready(args, groups)
+    print(f"provider       {readiness}")
     print(f"quality gate   {'off' if args.no_qc else f'bnb.qc, up to {args.max_retry} re-render(s)'}\n")
 
     if args.dry_run:

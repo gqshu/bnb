@@ -69,9 +69,67 @@ STEADINESS = (
     "out of it, no separate events and no layering"
 )
 
+# The two clauses above are the *stillness* bound, and they are why a melodic request came
+# back as a wash: "long stretches of near-stillness between them" and "nothing stepping
+# forward out of it, no separate events and no layering" forbid a phrase from continuing,
+# whatever `development` asks for. So a melodic development gets its own bound — still
+# countable (that is what stops the engine's dawn-chorus overshoot, which was always the
+# point), but bounding *clutter* rather than bounding motion, and with the near-stillness
+# and no-layering language dropped rather than merely softened.
+# ...and it is a *per-goal* bound, because this clause and the development fragment are
+# the two most musically salient sentences in the prompt — while both goals shared them
+# verbatim, relax and focus renders came back near-indistinguishable however much the
+# tempo/timbre adjectives differed around them.
+RELAX_FLOWING = (
+    "Full but unhurried: three or four gentle layers sounding together, chords and notes "
+    "overlapping and sustaining into one another with no gaps or empty stretches, always "
+    "consonant and easy to listen to"
+)
 
-def density_clause(event_driven: bool) -> str:
-    """The density limit that suits how this sound is produced."""
+# Focus is denser *and* gap-free, and the gap-free half is a hard technical requirement,
+# not a taste: focus ships as `am_music`, where the bed itself is the carrier the
+# entrainment envelope multiplies (tone.render_am_music). Silence in the bed is silence in
+# the stimulus — the modulation has nothing to ride on, so the drive drops out for as long
+# as the gap lasts and `am_depth_by_band` measures an intermittent, weaker signal. A
+# down-regulation bed can breathe; an AM carrier may not.
+FOCUS_FLOWING = (
+    "Full and continuous: four or five layers always sounding at once — a clear lead line "
+    "on top, warm chords beneath it, a soft steady pulse and a sustained bass note holding "
+    "underneath — so sound is present at every single moment from beginning to end. It "
+    "never thins out, never drops to silence, never leaves a gap or a rest between phrases"
+)
+
+# The MER texture words were authored for a library that never moved, so "very sparse
+# texture" ends up in the same sentence as FLOWING's "three or four gentle layers" —
+# exactly the kind of self-contradiction that made the lo-fi cells unlistenable. Under a
+# melodic development the *prose* word relaxes one step. `requested_features
+# ["texture_density"]` is deliberately untouched: that is the MER coordinate the bandit
+# consumes and the taxonomy's own address for the cell, and this is a prompt fix, not a
+# re-coordinate.
+TEXTURE_WHEN_MELODIC: dict[str, str] = {
+    "very sparse": "uncluttered but full",
+    "sparse": "uncluttered but full",
+    "steady, unchanging": "steady and full",
+}
+
+MELODIC_DEVELOPMENT = frozenset({"slow_swell", "motif_evolving"})
+"""The ``development`` values that carry a tune, and so need :data:`FLOWING` room to play
+it in. ``static`` keeps the original stillness bound; so do the keyword nature beds
+(:func:`build_keyword_signature`), which have no ``development`` axis at all — a rain bed
+must never be told to grow layers."""
+
+
+def density_clause(
+    event_driven: bool, development: str | None = None, flowing: str | None = None
+) -> str:
+    """The density limit that suits how this sound is produced, and how much it develops.
+
+    ``development``/``flowing`` omitted (the special/keyword path, which has no goal and no
+    development axis) keeps the original stillness bound — a rain bed must never be told to
+    grow layers.
+    """
+    if development in MELODIC_DEVELOPMENT and flowing is not None:
+        return flowing
     return RESTRAINT if event_driven else STEADINESS
 
 
@@ -122,7 +180,9 @@ SUBSTRATES: dict[str, Substrate] = {
         tempo="arrhythmic, no pulse",
         energy="very low",
         timbre="warm-dark",
-        harmony="static, minimal movement",
+        # Stillness is `development="static"`'s job to ask for now; hardcoding it here
+        # contradicted every other value of the axis (same bug as Change 1's melody bans).
+        harmony="warm and consonant",
         texture="very sparse",
         register="low",
         requested={
@@ -169,7 +229,7 @@ SUBSTRATES: dict[str, Substrate] = {
             "tempo": "a steady 80-100 bpm feel, held constant throughout",
             "energy": "low-moderate",
             "timbre": "warm-neutral",
-            "harmony": "simple and repetitive, no key changes",
+            "harmony": "simple, consonant and warm",
             "texture": "steady, unchanging",
             "requested": {"tempo_bpm": 90, "energy": "moderate", "spectral_centroid": "warm_neutral"},
         },
@@ -378,18 +438,38 @@ STYLES: dict[str, Style] = {
             ),
         },
     ),
+    # This style read as unpleasant noise for a reason worth writing down: its defining
+    # character *was* the noise ("a dusty vinyl noise floor", "tape hiss"), while the density
+    # and harmony clauses removed the music that floor is supposed to sit under — leaving
+    # filtered hiss and nothing else. Worse, it asked for hiss while NEGATIVE_PROMPT bans
+    # "hiss, static, white noise", so the style fought its own negative prompt. The medium
+    # (tape warmth, wow and flutter) is what makes lo-fi pleasant; the noise floor is not,
+    # and generative models render "noise floor" literally rather than as a subtle artefact.
+    # So: keep the tape, drop the hiss, and give every substrate real chords to play.
     "lofi": Style(
         name="lofi",
         descriptor="lo-fi",
-        global_styles=("lofi", "tape texture", "soft keys", "warm", "filtered highs"),
+        global_styles=("lofi", "tape texture", "soft keys", "warm", "mellow"),
         character=(
-            "Warm tape saturation with slow wow and flutter, a dusty vinyl noise floor "
-            "and filtered highs, like a worn cassette played late at night"
+            "Warm analogue tape saturation with gentle wow and flutter, soft rounded highs "
+            "and a mellow full low end, like a well-loved record played late at night"
         ),
         overrides={
             "melodic_instrument": StyleSubstrate(
-                body="Soft lo-fi keys with tape hiss and filtered highs, gentle and unhurried",
+                body=(
+                    "Soft electric piano playing warm mellow chords, rounded and unhurried, "
+                    "with a little tape wobble"
+                ),
                 instrumentation=("soft_keys", "tape_texture"),
+            ),
+            # Without this, lofi x drone fell back to the generic body and the style
+            # contributed nothing but grain — a pad made of noise.
+            "drone": StyleSubstrate(
+                body=(
+                    "Sustained tape-saturated chords on soft electric piano and warm pad, "
+                    "blurred at the edges, no rhythm"
+                ),
+                instrumentation=("soft_keys", "sustained_pad", "tape_texture"),
             ),
         },
     ),
@@ -518,17 +598,36 @@ def _dedupe(tags: tuple[str, ...]) -> list[str]:
 # somewhere") gated per goal below via `Goal.allowed_development` — sleep-onset wants
 # familiarity/low prediction-error, so the strictest cases stay `static`, while relax and
 # focus both default to `slow_swell`.
+# These were amplitude instructions ("swelling and receding") and nothing else, which is
+# why un-banning melody in Change 1 produced no melody: nothing in the prompt ever *asked*
+# for notes. Un-banning is not requesting. They now name the harmonic content explicitly —
+# chords, resolution, a phrase — because that is the thing the listener notices as
+# "progression", and they say "pleasant"/"consonant" out loud, since a model given only
+# "gentle harmonic movement" is as likely to drift somewhere sour as somewhere warm.
 DEVELOPMENT_FRAGMENT: dict[str, str] = {
-    "static": "unchanging and consistent, no development",
-    "slow_swell": "very slowly swelling and receding over minutes, gradual",
+    "static": "It holds to one harmony throughout, unchanging, with no melodic movement",
+    "slow_swell": (
+        "It moves through a slow, pleasant chord progression: four or five different warm "
+        "consonant chords, each held about fifteen seconds and then changing clearly and "
+        "audibly to the next, so you can always hear the harmony going somewhere. The bass "
+        "note moves with it. The whole texture swells and recedes over minutes"
+    ),
     "motif_evolving": (
-        "a simple motif that slowly develops and returns, gentle harmonic movement over time"
+        "A clear, pleasant melody plays over a slow chord progression underneath: a short "
+        "singable phrase of a few notes, played, then answered, then varied and returned "
+        "to, with the chords beneath it changing audibly every few bars and the bass note "
+        "moving with them, always resolving warmly. The tune is the point — it should be "
+        "easy to follow and easy to hum, never a single held note or a static wash"
     ),
 }
 
+# Change 1 removed "melodic hook, catchy melody" here but left "key change, chord
+# progression" — which bans, in as many words, the slow tone progression `development` is
+# for. Dropping both: what actually hurts sustained attention is *drama* (climax, buildup,
+# drop, sudden transitions), all of which stay banned. A warm chord progression is not drama.
 FOCUS_NEGATIVE_PROMPT = (
-    "lyrics, vocals, spoken word, key change, chord progression, dramatic climax, sudden "
-    "transitions, EDM, buildup, drop, harsh, distorted, chaotic"
+    "lyrics, vocals, spoken word, dramatic climax, sudden transitions, EDM, buildup, drop, "
+    "harsh, distorted, chaotic"
 )
 
 FOCUS_NEGATIVE_GLOBAL_STYLES: tuple[str, ...] = (
@@ -557,6 +656,7 @@ class Goal:
     dynamics: str  # e.g. "very soft dynamics" vs "smooth, controlled dynamics"
     brightness: str  # e.g. "warm and dark, low spectral brightness"
     closing: str
+    flowing: str  # the density bound once `development` is melodic (§ :func:`density_clause`)
     negative_prompt: str
     negative_global_styles: tuple[str, ...]
     allowed_development: frozenset[str]
@@ -567,9 +667,14 @@ GOALS: dict[str, Goal] = {
     "relax": Goal(
         name="relax",
         intent="deep relaxation",
-        dynamics="very soft dynamics",
-        brightness="warm and dark, low spectral brightness",
+        # Both of these used to sit at the far end of their axis ("very soft", "warm and
+        # dark, low spectral brightness"), which stacks with very-low energy and a sparse
+        # texture into something muffled rather than restful. Still unambiguously
+        # down-regulating, just no longer authored at the extreme.
+        dynamics="soft, even dynamics",
+        brightness="warm, with soft natural clarity in the upper mids, never bright or harsh",
         closing="No vocals, no percussion hits, no sudden transitions. Seamless, calm, continuous.",
+        flowing=RELAX_FLOWING,
         negative_prompt=NEGATIVE_PROMPT,
         negative_global_styles=NEGATIVE_GLOBAL_STYLES,
         # static is the strictest, sleep-safe end; motif_evolving is excluded here — real
@@ -584,12 +689,16 @@ GOALS: dict[str, Goal] = {
         dynamics="smooth, controlled dynamics, no sudden loud or soft jumps",
         brightness="clear and present, natural spectral brightness, never harsh",
         closing="No vocals, no lyrics, no sudden transitions. Seamless and steady, never dramatic.",
+        flowing=FOCUS_FLOWING,
         negative_prompt=FOCUS_NEGATIVE_PROMPT,
         negative_global_styles=FOCUS_NEGATIVE_GLOBAL_STYLES,
         # static is excluded: predictability, not stillness, is the goal — focus tolerates,
         # even wants, a beat, it just can't have drama (docs/background_music.md §7.2).
+        # The default is the *melodic* end, where relax's is slow_swell: sharing a default
+        # made the two goals' most salient sentence identical, and up-regulation is the
+        # side that should carry an actual tune.
         allowed_development=frozenset({"slow_swell", "motif_evolving"}),
-        default_development="slow_swell",
+        default_development="motif_evolving",
     ),
 }
 
@@ -637,18 +746,26 @@ def build_prompt(
 ) -> str:
     """Fill the §4 base template: substrate body, style descriptor and character, the
     MER axes, the `development`-selected motion clause, and the goal-conditioned
-    dynamics/brightness/closing clauses."""
+    dynamics/brightness/closing clauses.
+
+    A melodic ``development`` also relaxes the density bound (:func:`density_clause`) and
+    the prose texture word (:data:`TEXTURE_WHEN_MELODIC`), so the prompt doesn't ask for a
+    tune and forbid the room to play it in the same breath.
+    """
     nature = "" if nature_bed == "none" else "A soft natural bed blended gently underneath. "
     character = f"{style.character}. " if style.character else ""
+    texture = substrate.texture
+    if development in MELODIC_DEVELOPMENT:
+        texture = TEXTURE_WHEN_MELODIC.get(texture, texture)
     return (
         f"Instrumental {style.descriptor} soundscape for {goal.intent}. "
         f"{body}. "
         f"{DEVELOPMENT_FRAGMENT[development]}. "
-        f"{density_clause(substrate.event_driven)}. "
+        f"{density_clause(substrate.event_driven, development, goal.flowing)}. "
         f"{character}"
         f"Tempo {substrate.tempo}, {substrate.energy} energy, {goal.dynamics}. "
         f"{substrate.timbre} timbre, {goal.brightness}. "
-        f"{substrate.harmony} harmony, {substrate.texture} texture, {substrate.register} register. "
+        f"{substrate.harmony} harmony, {texture} texture, {substrate.register} register. "
         f"{nature}"
         f"{goal.closing}"
     )

@@ -258,17 +258,18 @@ def test_special_prompts_lead_with_the_subject():
 def test_every_prompt_bounds_how_busy_it_can_get():
     # The failure this guards: "forest" arriving as a full dawn chorus. Density is
     # capped in the positive prompt because the negative one only reaches the model
-    # under guidance, which the distilled checkpoints don't use.
-    # Event-driven sounds are told to space events out...
+    # under guidance, which the distilled checkpoints don't use. Every prompt keeps a
+    # *countable* cap; which cap depends on how the sound is made and how much it develops.
+    # Event-driven sounds with no melody to play are told to space events out...
     for prompt in (
-        build_signature("percussive_with_tail", "buddhist_meditative", "relax", 60).prompt,
+        build_signature("percussive_with_tail", "buddhist_meditative", "relax", 60, development="static").prompt,
         build_keyword_signature("natural_sounds", "forest", 60).prompt,
     ):
         assert "at most one or two things sounding" in prompt
     # ...while a continuous bed is told to stay even, because asking a cricket wash for
     # "long stretches of near-stillness" breaks it into discrete chirps instead.
     for prompt in (
-        build_signature("noise_texture", "neutral", "relax", 60).prompt,
+        build_signature("noise_texture", "neutral", "relax", 60, development="static").prompt,
         build_keyword_signature("natural_sounds", "rain", 60).prompt,
         build_keyword_signature("natural_sounds", "night", 60).prompt,
     ):
@@ -277,10 +278,83 @@ def test_every_prompt_bounds_how_busy_it_can_get():
     assert "no dawn chorus" in build_keyword_signature("natural_sounds", "forest", 60).prompt
 
 
+def test_melodic_development_swaps_the_stillness_bound_for_a_flowing_one():
+    # A tune needs room to be played: the stillness clauses ("long stretches of
+    # near-stillness", "nothing stepping forward out of it, no separate events and no
+    # layering") forbid a phrase from continuing, whatever `development` asks for — which
+    # is why the un-banning in Change 1 produced no audible melody on its own.
+    for substrate in ("melodic_instrument", "drone"):  # event-driven and not
+        prompt = build_signature(substrate, "lofi", "relax", 60).prompt  # default slow_swell
+        assert "Full but unhurried" in prompt
+        assert "near-stillness" not in prompt
+        assert "no separate events and no layering" not in prompt
+        assert "three or four gentle layers" in prompt  # the cap survives, just looser
+
+
+def test_melodic_development_relaxes_the_prose_texture_word_only():
+    # "very sparse texture" in the same prompt as "three or four gentle layers" is the
+    # same self-contradiction that made lofi unlistenable — but the MER coordinate the
+    # bandit consumes must not move, because that is the cell's address in the taxonomy.
+    sig = build_signature("drone", "lofi", "relax", 60)  # default slow_swell
+    assert "uncluttered but full texture" in sig.prompt
+    assert "very sparse texture" not in sig.prompt
+    assert sig.requested_features["texture_density"] == "very_sparse"
+    # static keeps the original word, and the coordinate is identical either way.
+    still = build_signature("drone", "lofi", "relax", 60, development="static")
+    assert "very sparse texture" in still.prompt
+    assert still.requested_features["texture_density"] == sig.requested_features["texture_density"]
+
+
+def test_the_two_goals_differ_in_the_sentences_that_actually_carry_the_music():
+    # The regression this guards: relax and focus renders coming back indistinguishable.
+    # Tempo/timbre adjectives were the only fork, while the development fragment and the
+    # density clause — the two most musically salient sentences — were byte-identical.
+    relax = build_signature("melodic_instrument", "lofi", "relax", 60)
+    focus = build_signature("melodic_instrument", "lofi", "focus", 60)
+    assert DEVELOPMENT_FRAGMENT[relax.development] not in focus.prompt
+    assert DEVELOPMENT_FRAGMENT[focus.development] not in relax.prompt
+    assert GOALS["relax"].flowing not in focus.prompt
+    assert GOALS["focus"].flowing not in relax.prompt
+    # Focus is the fuller of the two, and carries an actual tune.
+    assert "four or five layers" in focus.prompt and "three or four gentle layers" in relax.prompt
+    assert "melody" in focus.prompt
+
+
+def test_focus_beds_are_gap_free_because_they_carry_an_am_carrier():
+    # Not a taste call: focus ships as am_music, where the bed *is* the carrier the
+    # entrainment envelope multiplies. A gap in the bed is a gap in the stimulus.
+    for substrate in SUBSTRATES:
+        if "focus" not in SUBSTRATES[substrate].goals:
+            continue
+        prompt = build_signature(substrate, "neutral", "focus", 60).prompt
+        assert "never drops to silence" in prompt
+        assert "present at every single moment" in prompt
+        for phrase in ("near-stillness", "no separate events and no layering"):
+            assert phrase not in prompt, f"focus/{substrate}: {phrase!r}"
+
+
+def test_relax_is_no_longer_authored_at_the_extreme_of_every_axis():
+    # "very soft" + "warm and dark, low spectral brightness" + very-low energy + sparse
+    # stacks into muffled rather than restful.
+    relax = GOALS["relax"]
+    assert "very soft" not in relax.dynamics
+    assert "low spectral brightness" not in relax.brightness
+    assert "clarity" in relax.brightness
+    # ...but it is still unambiguously the down-regulating side of the pair.
+    assert "never bright or harsh" in relax.brightness
+    assert "warm" in relax.brightness
+
+
+def test_keyword_nature_beds_never_get_the_flowing_bound():
+    # They have no development axis at all; a rain bed must never grow layers.
+    for keyword in ("rain", "forest", "night"):
+        assert "Full but unhurried" not in build_keyword_signature("natural_sounds", keyword, 60).prompt
+
+
 def test_grid_prompts_carry_motion_and_recording_character():
     # What keeps a 60-minute listen from going flat — and the axes stay untouched.
     prompt = build_signature("drone", "lofi", "relax", 60).prompt
-    assert "swelling and receding" in prompt  # default development=slow_swell
+    assert "swells and recedes" in prompt  # relax default development=slow_swell
     assert "tape saturation" in prompt  # the lofi style's character clause
     assert "very low energy" in prompt  # the MER axes still there
     assert "No vocals, no percussion hits" in prompt
@@ -321,11 +395,7 @@ def test_relax_and_focus_signatures_of_the_same_cell_get_distinct_seeds():
 def test_focus_prompt_differs_from_relax_in_dynamics_and_negative_prompt():
     relax = build_signature("melodic_instrument", "lofi", "relax", 60)
     focus = build_signature("melodic_instrument", "lofi", "focus", 60)
-    # Both goals default to development=slow_swell (see test_development_defaults_per_goal),
-    # so the motion clause is now identical by default; dynamics/brightness/negative_prompt
-    # are what still forks by goal.
-    assert relax.development == focus.development == "slow_swell"
-    assert "very soft dynamics" in relax.prompt
+    assert "soft, even dynamics" in relax.prompt
     assert "smooth, controlled dynamics" in focus.prompt
     assert relax.negative_prompt == GOALS["relax"].negative_prompt
     assert focus.negative_prompt == GOALS["focus"].negative_prompt
@@ -395,8 +465,11 @@ def test_development_defaults_per_goal():
     relax = build_signature("drone", "lofi", "relax", 60)
     focus = build_signature("drone", "lofi", "focus", 60)
     assert relax.development == GOALS["relax"].default_development == "slow_swell"
-    assert focus.development == GOALS["focus"].default_development == "slow_swell"
+    # Up-regulation defaults to the melodic end — sharing relax's default was what made the
+    # two goals near-indistinguishable, since this drives the prompt's most salient sentence.
+    assert focus.development == GOALS["focus"].default_development == "motif_evolving"
     assert relax.spec()["requested_features"]["development"] == "slow_swell"
+    assert focus.spec()["requested_features"]["development"] == "motif_evolving"
 
 
 def test_development_gated_by_goal():
@@ -479,5 +552,50 @@ def test_no_substrate_hardcodes_a_melody_ban_that_fights_the_development_axis():
 
 def test_focus_drone_allows_motif_evolving_without_self_contradiction():
     sig = build_signature("drone", "lofi", "focus", 60, development="motif_evolving")
-    assert "a simple motif that slowly develops and returns" in sig.prompt
+    assert "A clear, pleasant melody plays over a slow chord progression" in sig.prompt
     assert "no melodic development" not in sig.prompt
+
+
+def test_development_asks_for_pitch_not_just_amplitude():
+    # The original bug: every fragment was a *loudness* instruction ("swelling and
+    # receding"), so nothing in the prompt ever asked for notes. Both moving values must
+    # now name harmonic content, and say it pleasantly — a model given only "harmonic
+    # movement" drifts somewhere sour as readily as somewhere warm.
+    for value in ("slow_swell", "motif_evolving"):
+        fragment = DEVELOPMENT_FRAGMENT[value]
+        assert "chord progression" in fragment
+        assert "pleasant" in fragment
+        assert "consonant" in fragment or "resolving" in fragment
+
+
+def test_nothing_in_a_grid_prompt_still_bans_progression():
+    # Companion to the melody-ban guard above: Change 1 removed "melodic hook, catchy
+    # melody" from the focus negative prompt but left "key change, chord progression",
+    # which banned in as many words the thing the development axis exists to request.
+    for goal_name in GOALS:
+        for value in sorted(GOALS[goal_name].allowed_development):
+            sig = build_signature("melodic_instrument", "lofi", goal_name, 60, development=value)
+            for phrase in ("no key changes", "key change", "chord progression"):
+                assert phrase not in sig.negative_prompt, f"{goal_name}/{value}: {phrase!r}"
+    # ...and drama stays banned on focus, which is what actually hurts sustained attention.
+    for phrase in ("dramatic climax", "buildup", "drop", "sudden transitions"):
+        assert phrase in GOALS["focus"].negative_prompt
+
+
+def test_lofi_does_not_ask_for_the_noise_its_negative_prompt_bans():
+    # It read as unpleasant noise because its character *was* a noise floor while the
+    # density clauses removed the music that floor sits under — and it asked for hiss
+    # that NEGATIVE_PROMPT bans, so the style fought its own negative prompt. Scoped to
+    # the text lofi itself contributes: a substrate may still legitimately *negate* noise
+    # (noise_texture's focus timbre says "no harsh hiss"), which is the opposite problem.
+    lofi = STYLES["lofi"]
+    contributed = " ".join(
+        (lofi.character, " ".join(lofi.global_styles), *(o.body for o in lofi.overrides.values()))
+    ).lower()
+    for phrase in ("noise floor", "hiss", "white noise", "dusty"):
+        assert phrase not in contributed, f"lofi still asks for {phrase!r}"
+    assert "tape" in contributed  # the medium, not the noise, is what makes lo-fi pleasant
+    # Every substrate lofi supports gets real chords from it, not just grain.
+    for substrate in ("drone", "melodic_instrument"):
+        assert substrate in lofi.overrides
+        assert "chord" in lofi.overrides[substrate].body.lower()
