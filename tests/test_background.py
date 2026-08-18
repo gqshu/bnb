@@ -1,6 +1,7 @@
 import pytest
 
 from bnb.background import (
+    DEVELOPMENT_FRAGMENT,
     GOALS,
     SPECIAL_GROUPS,
     STYLES,
@@ -11,6 +12,7 @@ from bnb.background import (
     coverage_report,
     fill_special_to_per_cell,
     fill_to_per_cell,
+    mode_filter_summary,
     plan_coverage,
     plan_special_coverage,
     prompt_for_provider,
@@ -278,7 +280,7 @@ def test_every_prompt_bounds_how_busy_it_can_get():
 def test_grid_prompts_carry_motion_and_recording_character():
     # What keeps a 60-minute listen from going flat — and the axes stay untouched.
     prompt = build_signature("drone", "lofi", "relax", 60).prompt
-    assert "evolves slowly" in prompt
+    assert "swelling and receding" in prompt  # default development=slow_swell
     assert "tape saturation" in prompt  # the lofi style's character clause
     assert "very low energy" in prompt  # the MER axes still there
     assert "No vocals, no percussion hits" in prompt
@@ -316,14 +318,19 @@ def test_relax_and_focus_signatures_of_the_same_cell_get_distinct_seeds():
     assert relax.seed != focus.seed
 
 
-def test_focus_prompt_differs_from_relax_in_motion_and_dynamics():
+def test_focus_prompt_differs_from_relax_in_dynamics_and_negative_prompt():
     relax = build_signature("melodic_instrument", "lofi", "relax", 60)
     focus = build_signature("melodic_instrument", "lofi", "focus", 60)
-    assert "never builds, resolves, or arrives anywhere" in relax.prompt
-    assert "repeats in a steady, unsurprising loop" in focus.prompt
+    # Both goals default to development=slow_swell (see test_development_defaults_per_goal),
+    # so the motion clause is now identical by default; dynamics/brightness/negative_prompt
+    # are what still forks by goal.
+    assert relax.development == focus.development == "slow_swell"
+    assert "very soft dynamics" in relax.prompt
+    assert "smooth, controlled dynamics" in focus.prompt
     assert relax.negative_prompt == GOALS["relax"].negative_prompt
     assert focus.negative_prompt == GOALS["focus"].negative_prompt
     assert "lyrics" in focus.negative_prompt
+    assert "melodic hook" not in focus.negative_prompt  # Change 1: no longer globally banned
     # Identity (what the sound is) stays put across goals; only arousal changes.
     assert relax.instrumentation == focus.instrumentation
 
@@ -379,3 +386,98 @@ def test_fill_to_per_cell_respects_goal_restricted_grid():
         if "focus" in STYLES[sty].goals
     }
     assert cells == expected
+
+
+# --- development axis (progression) -------------------------------------------
+
+
+def test_development_defaults_per_goal():
+    relax = build_signature("drone", "lofi", "relax", 60)
+    focus = build_signature("drone", "lofi", "focus", 60)
+    assert relax.development == GOALS["relax"].default_development == "slow_swell"
+    assert focus.development == GOALS["focus"].default_development == "slow_swell"
+    assert relax.spec()["requested_features"]["development"] == "slow_swell"
+
+
+def test_development_gated_by_goal():
+    # relax admits static/slow_swell but not motif_evolving.
+    with pytest.raises(ValueError, match="relax.*motif_evolving"):
+        build_signature("drone", "lofi", "relax", 60, development="motif_evolving")
+    # focus admits slow_swell/motif_evolving but not static.
+    with pytest.raises(ValueError, match="focus.*static"):
+        build_signature("drone", "lofi", "focus", 60, development="static")
+    # both directions succeed within their own allow-list.
+    assert build_signature("drone", "lofi", "relax", 60, development="static").development == "static"
+    assert (
+        build_signature("drone", "lofi", "focus", 60, development="motif_evolving").development
+        == "motif_evolving"
+    )
+
+
+def test_unknown_development_rejected():
+    with pytest.raises(ValueError, match="unknown development"):
+        build_signature("drone", "lofi", "relax", 60, development="bogus")
+
+
+def test_development_fragment_lands_in_the_prompt():
+    for value, fragment in DEVELOPMENT_FRAGMENT.items():
+        goal = "relax" if value in GOALS["relax"].allowed_development else "focus"
+        prompt = build_signature("drone", "lofi", goal, 60, development=value).prompt
+        assert fragment in prompt
+
+
+def test_default_development_track_id_unchanged():
+    # The no-argument call must reproduce the exact pre-axis track_id/seed for every
+    # already-planned/rendered track — the backward-compatibility guarantee.
+    sig = build_signature("drone", "buddhist_meditative", "relax", 60)
+    assert sig.track_id == f"buddhist_meditative_drone_relax_seed{sig.seed}"
+    assert "_dev" not in sig.track_id
+
+
+def test_explicit_development_gets_distinct_seed_and_track_id():
+    default = build_signature("drone", "lofi", "relax", 60)
+    explicit = build_signature("drone", "lofi", "relax", 60, development="static")
+    assert explicit.track_id != default.track_id
+    assert explicit.seed != default.seed
+    assert explicit.track_id.endswith("_devstatic")
+    # Requesting the goal's own default explicitly is identical to omitting it.
+    same = build_signature("drone", "lofi", "relax", 60, development="slow_swell")
+    assert same.track_id == default.track_id
+    assert same.seed == default.seed
+
+
+# --- mode filter summary (Change 3) --------------------------------------------
+
+
+def test_mode_filter_summary_matches_axis_allow_lists():
+    for goal_name in GOALS:
+        summary = mode_filter_summary(goal_name)
+        assert summary["allow_substrate"] == {n for n, s in SUBSTRATES.items() if goal_name in s.goals}
+        assert summary["allow_style"] == {n for n, s in STYLES.items() if goal_name in s.goals}
+        assert summary["allow_development"] == set(GOALS[goal_name].allowed_development)
+        assert summary["default_development"] == GOALS[goal_name].default_development
+
+
+def test_mode_filter_summary_rejects_unknown_goal():
+    with pytest.raises(ValueError, match="unknown goal"):
+        mode_filter_summary("gamma")
+
+
+def test_no_substrate_hardcodes_a_melody_ban_that_fights_the_development_axis():
+    # Change 1's whole point: nothing should hard-suppress melody/harmonic movement
+    # anymore, at any goal — that's now development's job (gated per-goal, Change 2).
+    # Regression guard for SUBSTRATES["drone"].focus_overrides["harmony"] having said
+    # "static, no melodic development", which silently fought development=motif_evolving.
+    banned_phrases = ("no melodic development", "no melodic hook", "melodic hook")
+    for name, substrate in SUBSTRATES.items():
+        for goal_name in substrate.goals:  # "neutral" style supports every goal
+            sig = build_signature(name, "neutral", goal_name, 60)
+            for phrase in banned_phrases:
+                assert phrase not in sig.prompt, f"{name}/{goal_name}: {phrase!r} in prompt"
+                assert phrase not in sig.negative_prompt, f"{name}/{goal_name}: {phrase!r} in negative_prompt"
+
+
+def test_focus_drone_allows_motif_evolving_without_self_contradiction():
+    sig = build_signature("drone", "lofi", "focus", 60, development="motif_evolving")
+    assert "a simple motif that slowly develops and returns" in sig.prompt
+    assert "no melodic development" not in sig.prompt

@@ -51,6 +51,8 @@ import difflib
 from collections.abc import Iterable
 
 from bnb.background import (
+    DEVELOPMENT_FRAGMENT,
+    GOALS,
     SAMPLE_PAIRS,
     SPECIAL_GROUPS,
     STYLES,
@@ -62,6 +64,7 @@ from bnb.background import (
     coverage_report,
     fill_special_to_per_cell,
     fill_to_per_cell,
+    mode_filter_summary,
     plan_coverage,
     plan_special_coverage,
     sample_signatures,
@@ -89,6 +92,13 @@ def parse_args() -> argparse.Namespace:
         choices=["relax", "focus"],
         default="relax",
         help="arousal goal for grid targets/coverage (default: relax); a run plans one goal at a time",
+    )
+    parser.add_argument(
+        "--development",
+        choices=list(DEVELOPMENT_FRAGMENT),
+        default=None,
+        help="progression axis for explicit STYLE:SUBSTRATE targets (default: the goal's own "
+        "default_development); must be one the goal admits (see --list)",
     )
 
     coverage = parser.add_argument_group(
@@ -148,6 +158,11 @@ def print_axes() -> None:
     print("\nStyles (Axis B):")
     for name, sty in STYLES.items():
         print(f"  {name}  [goals: {', '.join(sorted(sty.goals))}]")
+    print("\nDevelopment (progression axis), per-goal mode filter:")
+    for name in GOALS:
+        f = mode_filter_summary(name)
+        allowed = ", ".join(sorted(f["allow_development"]))
+        print(f"  {name}  [development: {allowed}]  (default: {f['default_development']})")
     print("\nDefault sample set (style:substrate):")
     for style, substrate in SAMPLE_PAIRS:
         print(f"  {style}:{substrate}")
@@ -206,7 +221,9 @@ def print_coverage(args: argparse.Namespace, manager: CategoryManager) -> None:
         print_special_coverage(manager, groups)
 
 
-def build_target(target: str, duration_s: int, goal: str) -> list[AnySignature]:
+def build_target(
+    target: str, duration_s: int, goal: str, development: str | None = None
+) -> list[AnySignature]:
     """One CLI target, resolved into the signatures it names.
 
     ``STYLE:SUBSTRATE`` is one grid cell and ``GROUP:KEYWORD`` one special cell (the
@@ -215,6 +232,8 @@ def build_target(target: str, duration_s: int, goal: str) -> list[AnySignature]:
     usually wanted entire. There is no bare-style equivalent: a style spans the grid,
     which is what the coverage guides are for. ``goal`` only applies to grid targets —
     special cells have no goal axis (§ background.py's ``KeywordEntry.goals`` note).
+    ``development`` likewise only applies to grid targets; omitted, ``build_signature``
+    resolves it to the goal's own default.
     """
     if ":" not in target:
         if target in SPECIAL_GROUPS:
@@ -230,7 +249,7 @@ def build_target(target: str, duration_s: int, goal: str) -> list[AnySignature]:
     if left in STYLES:
         if right not in SUBSTRATES:
             raise unknown_value(right, SUBSTRATES, label=f"substrate in {target!r}")
-        return [build_signature(right, left, goal, duration_s)]
+        return [build_signature(right, left, goal, duration_s, development=development)]
     if left in SPECIAL_GROUPS:
         keywords = SPECIAL_GROUPS[left].keywords
         if right not in keywords:
@@ -266,7 +285,11 @@ def planned_signatures(args: argparse.Namespace, manager: CategoryManager) -> li
         return plan_coverage(args.fill, args.duration, **common)
 
     if args.targets:
-        return [sig for target in args.targets for sig in build_target(target, args.duration, args.goal)]
+        return [
+            sig
+            for target in args.targets
+            for sig in build_target(target, args.duration, args.goal, args.development)
+        ]
 
     if args.goal != "relax":
         raise SystemExit(
@@ -307,6 +330,16 @@ def check_axis_filters(args: argparse.Namespace) -> None:
         raise SystemExit("--groups selects special cells; it can't be combined with --substrates/--styles")
     if args.groups and not (args.coverage or args.fill is not None or args.per_cell is not None):
         raise SystemExit("--groups restricts a coverage guide; pass it with --fill, --per-cell or --coverage")
+    if args.development is not None and (args.fill is not None or args.per_cell is not None):
+        raise SystemExit(
+            "--development only applies to explicit STYLE:SUBSTRATE targets, not the coverage "
+            "guides (--fill/--per-cell), which plan the substrate x style grid only"
+        )
+    if args.development is not None and args.development not in GOALS[args.goal].allowed_development:
+        raise SystemExit(
+            f"goal {args.goal!r} does not allow --development {args.development!r} "
+            f"(allowed: {', '.join(sorted(GOALS[args.goal].allowed_development))})"
+        )
 
     for flag, known, label in (
         ("substrates", SUBSTRATES, "substrate"),

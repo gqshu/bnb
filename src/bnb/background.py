@@ -138,7 +138,6 @@ SUBSTRATES: dict[str, Substrate] = {
             "tempo": "a slow, steady pulse underneath, unchanging meter",
             "energy": "low-moderate",
             "timbre": "warm-neutral",
-            "harmony": "static, no melodic development",
             "texture": "sparse, with one subtle repeating rhythmic layer",
             "register": "low-mid",
             "requested": {"energy": "low", "spectral_centroid": "warm_neutral", "texture_density": "sparse"},
@@ -170,7 +169,7 @@ SUBSTRATES: dict[str, Substrate] = {
             "tempo": "a steady 80-100 bpm feel, held constant throughout",
             "energy": "low-moderate",
             "timbre": "warm-neutral",
-            "harmony": "simple and repetitive, no melodic hooks, no key changes",
+            "harmony": "simple and repetitive, no key changes",
             "texture": "steady, unchanging",
             "requested": {"tempo_bpm": 90, "energy": "moderate", "spectral_centroid": "warm_neutral"},
         },
@@ -434,10 +433,17 @@ class Signature:
     instrumentation: tuple[str, ...]
     composition_plan: dict[str, Any]
     requested_features: dict[str, Any]
+    development: str
 
     @property
     def track_id(self) -> str:
-        return f"{self.style.name}_{self.substrate.short}_{self.goal.name}_seed{self.seed}"
+        base = f"{self.style.name}_{self.substrate.short}_{self.goal.name}_seed{self.seed}"
+        # The goal's default development keeps the pre-axis track_id/seed identity exactly
+        # (every already-planned/rendered track stays reproducible); only an explicit,
+        # non-default request earns a suffix, so it can never collide with the default cell.
+        if self.development == self.goal.default_development:
+            return base
+        return f"{base}_dev{self.development}"
 
     def spec(self) -> dict[str, Any]:
         """The render-independent request record (§3), before any audio exists.
@@ -504,32 +510,25 @@ def _dedupe(tags: tuple[str, ...]) -> list[str]:
     return list(dict.fromkeys(tags))
 
 
-# Every track is a bed you sit with for tens of minutes, and the first library came
-# back *correct but plain*: the axes were on target and nothing moved. These two
-# clauses are the fix, and they're deliberately the only thing loosened — motion at
-# the timescale of a breath is what makes a drone worth staying with, and it costs
-# nothing on the MER axes because the mean level, brightness and density don't move.
-# The engines also simply respond better to this register: the SA3 prompt guide's own
-# examples are evocative prose about rooms and gear, not lists of adjectives.
-MOTION = (
-    "It evolves slowly over minutes — long soft swells that rise and fall like breathing, "
-    "faint timbral drift, quiet detail appearing and receding — but it never builds, "
-    "resolves, or arrives anywhere"
-)
-
-# Focus's counterpart to MOTION: predictability, not stillness, is the goal (brainstorm
-# finding — high arousal/"more energy" hurts sustained attention; a steady, unsurprising
-# loop is what the evidence and Brain.fm's own "functional music" framing both argue for).
-FOCUS_MOTION = (
-    "It repeats in a steady, unsurprising loop — the same short pattern held and returned "
-    "to, with only the faintest quiet detail appearing and receding — but it never swells, "
-    "builds, or arrives anywhere new"
-)
+# Every track is a bed you sit with for tens of minutes, and the first library came back
+# *correct but plain*: the axes were on target and nothing moved. Motion at the timescale of
+# a breath is what makes a drone worth staying with, and it costs nothing on the MER axes
+# because the mean level, brightness and density don't move. This used to be a single fixed
+# clause per goal; it's now `development`, a real axis (test feedback wanted tracks that "go
+# somewhere") gated per goal below via `Goal.allowed_development` — sleep-onset wants
+# familiarity/low prediction-error, so the strictest cases stay `static`, while relax and
+# focus both default to `slow_swell`.
+DEVELOPMENT_FRAGMENT: dict[str, str] = {
+    "static": "unchanging and consistent, no development",
+    "slow_swell": "very slowly swelling and receding over minutes, gradual",
+    "motif_evolving": (
+        "a simple motif that slowly develops and returns, gentle harmonic movement over time"
+    ),
+}
 
 FOCUS_NEGATIVE_PROMPT = (
-    "lyrics, vocals, spoken word, key change, chord progression, melodic hook, catchy "
-    "melody, dramatic climax, sudden transitions, EDM, buildup, drop, harsh, distorted, "
-    "chaotic"
+    "lyrics, vocals, spoken word, key change, chord progression, dramatic climax, sudden "
+    "transitions, EDM, buildup, drop, harsh, distorted, chaotic"
 )
 
 FOCUS_NEGATIVE_GLOBAL_STYLES: tuple[str, ...] = (
@@ -548,42 +547,72 @@ class Goal:
 
     Substrate says *what* the sound physically is; style says *what tradition* it evokes;
     goal says *how aroused* it should feel, and owns every phrase in the base template that
-    used to be hardcoded relax language (the opening intent, the motion clause, the
-    dynamics/brightness descriptors, the closing sentence, and the negative prompt).
+    used to be hardcoded relax language (the opening intent, the dynamics/brightness
+    descriptors, the closing sentence, and the negative prompt) plus which points on the
+    `development` axis (:data:`DEVELOPMENT_FRAGMENT`) it admits at all.
     """
 
     name: str
     intent: str  # "...soundscape for {intent}." — the template's opening
-    motion: str
     dynamics: str  # e.g. "very soft dynamics" vs "smooth, controlled dynamics"
     brightness: str  # e.g. "warm and dark, low spectral brightness"
     closing: str
     negative_prompt: str
     negative_global_styles: tuple[str, ...]
+    allowed_development: frozenset[str]
+    default_development: str
 
 
 GOALS: dict[str, Goal] = {
     "relax": Goal(
         name="relax",
         intent="deep relaxation",
-        motion=MOTION,
         dynamics="very soft dynamics",
         brightness="warm and dark, low spectral brightness",
         closing="No vocals, no percussion hits, no sudden transitions. Seamless, calm, continuous.",
         negative_prompt=NEGATIVE_PROMPT,
         negative_global_styles=NEGATIVE_GLOBAL_STYLES,
+        # static is the strictest, sleep-safe end; motif_evolving is excluded here — real
+        # progression is a focus/wind-down affordance, not a down-regulation one (see
+        # docs/BGMUSIC_TAXONOMY_CHANGES.md Change 2).
+        allowed_development=frozenset({"static", "slow_swell"}),
+        default_development="slow_swell",
     ),
     "focus": Goal(
         name="focus",
         intent="sustained focus",
-        motion=FOCUS_MOTION,
         dynamics="smooth, controlled dynamics, no sudden loud or soft jumps",
         brightness="clear and present, natural spectral brightness, never harsh",
         closing="No vocals, no lyrics, no sudden transitions. Seamless and steady, never dramatic.",
         negative_prompt=FOCUS_NEGATIVE_PROMPT,
         negative_global_styles=FOCUS_NEGATIVE_GLOBAL_STYLES,
+        # static is excluded: predictability, not stillness, is the goal — focus tolerates,
+        # even wants, a beat, it just can't have drama (docs/background_music.md §7.2).
+        allowed_development=frozenset({"slow_swell", "motif_evolving"}),
+        default_development="slow_swell",
     ),
 }
+
+
+def mode_filter_summary(goal_name: str) -> dict[str, Any]:
+    """The effective per-goal filter — which cells and ``development`` values a goal admits.
+
+    docs/BGMUSIC_TAXONOMY_CHANGES.md (Change 3) asks for one ``MODE_FILTER`` object as "the
+    single place" this lives. Here that data is already distributed and authoritative on the
+    real per-axis objects — ``Substrate.goals``/``Style.goals`` (checked in
+    :func:`build_signature`) and ``Goal.allowed_development``/``default_development`` — so this
+    is a read-only assembler, not a second copy: it can't drift out of sync with the checks
+    that actually gate a render.
+    """
+    if goal_name not in GOALS:
+        raise ValueError(f"unknown goal {goal_name!r}, expected one of {list(GOALS)}")
+    goal = GOALS[goal_name]
+    return {
+        "allow_substrate": {name for name, sub in SUBSTRATES.items() if goal_name in sub.goals},
+        "allow_style": {name for name, sty in STYLES.items() if goal_name in sty.goals},
+        "allow_development": set(goal.allowed_development),
+        "default_development": goal.default_development,
+    }
 
 
 def _resolve_substrate_for_goal(substrate: Substrate, goal_name: str) -> Substrate:
@@ -603,15 +632,18 @@ def _resolve_substrate_for_goal(substrate: Substrate, goal_name: str) -> Substra
     return replace(substrate, **overrides)
 
 
-def build_prompt(substrate: Substrate, style: Style, body: str, nature_bed: str, goal: Goal) -> str:
+def build_prompt(
+    substrate: Substrate, style: Style, body: str, nature_bed: str, goal: Goal, development: str
+) -> str:
     """Fill the §4 base template: substrate body, style descriptor and character, the
-    MER axes, and the goal-conditioned motion/dynamics/brightness/closing clauses."""
+    MER axes, the `development`-selected motion clause, and the goal-conditioned
+    dynamics/brightness/closing clauses."""
     nature = "" if nature_bed == "none" else "A soft natural bed blended gently underneath. "
     character = f"{style.character}. " if style.character else ""
     return (
         f"Instrumental {style.descriptor} soundscape for {goal.intent}. "
         f"{body}. "
-        f"{goal.motion}. "
+        f"{DEVELOPMENT_FRAGMENT[development]}. "
         f"{density_clause(substrate.event_driven)}. "
         f"{character}"
         f"Tempo {substrate.tempo}, {substrate.energy} energy, {goal.dynamics}. "
@@ -623,7 +655,12 @@ def build_prompt(substrate: Substrate, style: Style, body: str, nature_bed: str,
 
 
 def build_signature(
-    substrate_name: str, style_name: str, goal_name: str, duration_s: int, variant: int = 0
+    substrate_name: str,
+    style_name: str,
+    goal_name: str,
+    duration_s: int,
+    variant: int = 0,
+    development: str | None = None,
 ) -> Signature:
     """Resolve a (substrate, style, goal) triple into a full render spec.
 
@@ -632,6 +669,12 @@ def build_signature(
     see their definitions for why) — where the style has a coherent realization for the
     substrate we use it, otherwise the substrate's generic body is coloured by the style's
     global tags. ``variant`` selects a distinct seed within the cell.
+
+    ``development`` (:data:`DEVELOPMENT_FRAGMENT`) is the progression axis; omitted, it
+    resolves to the goal's ``default_development`` (keeping every pre-axis track_id/seed
+    unchanged, see :attr:`Signature.track_id`). An explicit value must be one the goal's
+    ``allowed_development`` admits — a mode-gate, same shape as the substrate/style ``goals``
+    checks below (docs/BGMUSIC_TAXONOMY_CHANGES.md Change 3).
     """
     if substrate_name not in SUBSTRATES:
         raise ValueError(f"unknown substrate {substrate_name!r}, expected one of {list(SUBSTRATES)}")
@@ -648,6 +691,13 @@ def build_signature(
         raise ValueError(f"style {style_name!r} does not support goal {goal_name!r}")
 
     goal = GOALS[goal_name]
+    if development is None:
+        development = goal.default_development
+    elif development not in DEVELOPMENT_FRAGMENT:
+        raise ValueError(f"unknown development {development!r}, expected one of {list(DEVELOPMENT_FRAGMENT)}")
+    elif development not in goal.allowed_development:
+        raise ValueError(f"goal {goal_name!r} does not allow development {development!r}")
+
     substrate = _resolve_substrate_for_goal(substrate, goal_name)
     override = style.overrides.get(substrate_name)
 
@@ -663,6 +713,7 @@ def build_signature(
         requested["mode"] = style.mode_override
     if style.nature_bed_override is not None:
         requested["nature_bed"] = style.nature_bed_override
+    requested["development"] = development
 
     positive_global_styles = _dedupe(substrate.style_tags + style.global_styles + extra_tags)
 
@@ -682,17 +733,24 @@ def build_signature(
         ],
     }
 
+    # The seed key only grows a development suffix off the default (see track_id): the
+    # common, no-argument call reproduces every seed already on disk.
+    key_style_goal = f"{style_name}:{goal_name}"
+    if development != goal.default_development:
+        key_style_goal = f"{key_style_goal}:{development}"
+
     return Signature(
         substrate=substrate,
         style=style,
         goal=goal,
         duration_s=duration_s,
-        seed=_seed((f"{style_name}:{goal_name}", substrate_name), variant),
-        prompt=build_prompt(substrate, style, body, requested["nature_bed"], goal),
+        seed=_seed((key_style_goal, substrate_name), variant),
+        prompt=build_prompt(substrate, style, body, requested["nature_bed"], goal, development),
         negative_prompt=goal.negative_prompt,
         instrumentation=instrumentation,
         composition_plan=composition_plan,
         requested_features=requested,
+        development=development,
     )
 
 
