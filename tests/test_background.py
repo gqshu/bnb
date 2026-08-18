@@ -1,6 +1,8 @@
 import pytest
 
 from bnb.background import (
+    NEGATIVE_PROMPT,
+    _keyword_prompt as rb_keyword_prompt,
     DEVELOPMENT_FRAGMENT,
     GOALS,
     SPECIAL_GROUPS,
@@ -88,6 +90,7 @@ def test_unknown_axis_names_rejected():
 # --- coverage over special groups ------------------------------------------------
 
 NATURAL = list(SPECIAL_GROUPS["natural_sounds"].keywords)
+ENERGIZER = list(SPECIAL_GROUPS["energizer"].keywords)
 
 
 def _cells(sigs):
@@ -96,11 +99,12 @@ def _cells(sigs):
 
 def test_special_cells_enumerates_every_keyword():
     assert special_cells(["natural_sounds"]) == [("natural_sounds", k) for k in NATURAL]
-    assert special_cells() == special_cells(["natural_sounds"])  # only group, for now
+    assert special_cells(["energizer"]) == [("energizer", k) for k in ENERGIZER]
+    assert special_cells() == special_cells(["natural_sounds"]) + special_cells(["energizer"])
 
 
 def test_plan_special_coverage_spreads_across_keywords():
-    sigs = plan_special_coverage(len(NATURAL), 60)
+    sigs = plan_special_coverage(len(NATURAL), 60, groups=["natural_sounds"])
     assert sorted(k for _, k in _cells(sigs)) == sorted(NATURAL)
 
 
@@ -250,7 +254,9 @@ def test_special_prompts_lead_with_the_subject():
     # The keyword, not 50 words of MER vocabulary, is the first thing the encoder sees.
     for keyword in SPECIAL_GROUPS["natural_sounds"].keywords:
         prompt = build_keyword_signature("natural_sounds", keyword, 60).prompt
-        assert "no music" in prompt
+        # universe words this differently ("A sound, not music: ..."), but every keyword
+        # in this group must still tell the encoder it is not making music.
+        assert "no music" in prompt or "not music" in prompt
         assert prompt.split(",")[0].strip()  # opens on the source, not a genre label
     assert build_keyword_signature("natural_sounds", "rain", 60).prompt.startswith("Steady soft rainfall")
 
@@ -456,6 +462,144 @@ def test_fill_to_per_cell_respects_goal_restricted_grid():
         if "focus" in STYLES[sty].goals
     }
     assert cells == expected
+
+
+# --- special groups ------------------------------------------------------------
+
+
+def test_natural_sounds_has_the_new_keywords():
+    keywords = SPECIAL_GROUPS["natural_sounds"].keywords
+    for name in ("universe", "fireplace"):
+        assert name in keywords
+        # Neither is event-driven. A fire is a flame roar *plus* crackles, and the
+        # event-driven clause would demand "long stretches of near-stillness", detaching
+        # the pops from the bed — the cricket-wash failure. Spacing lives in the wording.
+        assert keywords[name].event_driven is False
+        assert "near-stillness" not in build_keyword_signature("natural_sounds", name, 60).prompt
+    assert "occasional gentle crackle" in keywords["fireplace"].description
+
+
+def test_fireplace_takes_the_groups_stillness_bound():
+    prompt = build_keyword_signature("natural_sounds", "fireplace", 60).prompt
+    assert "Even and unbroken throughout" in prompt
+
+
+def test_universe_overrides_the_group_to_actually_move():
+    # It sits in a still, no-music shell while needing the opposite. Left on the group's
+    # defaults it came back as one undifferentiated hum: "nothing stepping forward out of
+    # it, no separate events and no layering" plus "changing almost imperceptibly".
+    entry = SPECIAL_GROUPS["natural_sounds"].keywords["universe"]
+    assert entry.flowing is not None and entry.body is not None
+    prompt = build_keyword_signature("natural_sounds", "universe", 60).prompt
+    assert "changing almost imperceptibly" not in prompt
+    assert "Even and unbroken throughout" not in prompt  # the group's stillness bound
+    assert "nothing stepping forward out of it" not in prompt
+    assert "It travels" in prompt and "never still and never uniform" in prompt
+    assert "one distinct passage giving way to the next" in prompt
+    # ...and it stays a sound rather than becoming music, by banning the machinery
+    # instead of the tonal content the sweeps are made of.
+    assert "no beat, no drums, no chord progression" in prompt
+    assert "sweeping tones rising and falling" in prompt
+    # The rest of the group is untouched by the override.
+    assert SPECIAL_GROUPS["natural_sounds"].keywords["rain"].flowing is None
+
+
+def test_natural_sounds_bounds_the_rate_not_just_the_character():
+    # "Calm and unhurried" constrains character but says nothing about *rate*, so a bed
+    # could be calm in timbre and still patter or chirp away continuously.
+    for keyword in SPECIAL_GROUPS["natural_sounds"].keywords:
+        entry = SPECIAL_GROUPS["natural_sounds"].keywords[keyword]
+        if entry.body is not None:
+            continue  # universe carries its own shell; see its own test
+        prompt = build_keyword_signature("natural_sounds", keyword, 60).prompt
+        assert "infrequent and widely spaced" in prompt
+        assert "the overall rate stays low and never picks up" in prompt
+
+
+def test_energizer_prompts_meet_every_stated_requirement():
+    for keyword in ENERGIZER:
+        sig = build_keyword_signature("energizer", keyword, 60)
+        prompt = sig.prompt
+        # 1. a real continuous melody, enjoyable, mainstream — not a drone
+        assert "melod" in prompt
+        assert "familiar to an ordinary listener" in prompt
+        # 2. medium-pace beat, but not loud
+        assert "never loud, never intense and never dramatic" in prompt
+        # 3. some energy, not the library's floor
+        assert "Moderate, steady energy" in prompt
+        assert "awake and warm rather than sleepy" in prompt
+        # 4. a continuous body an AM carrier can ride on
+        assert "present at every single moment" in prompt
+        assert "never thins out, never drops to silence" in prompt
+        # ...and it says so once, not three times over.
+        assert prompt.count("never drops to silence") == 1
+
+
+def test_energizer_is_not_saddled_with_the_down_regulation_negatives():
+    # The shared relax negatives ban "energetic, fast, drums, EDM, bright" — this group's
+    # entire purpose. What has to stay out is drama and volume, plus gaps (an AM fault).
+    negative = SPECIAL_GROUPS["energizer"].negative_prompt
+    for wanted in ("energetic", "fast", "drums", "EDM", "bright"):
+        assert wanted not in negative, f"energizer must not ban {wanted!r}"
+    for banned in ("dramatic climax", "buildup", "drop", "loud", "silence", "gaps"):
+        assert banned in negative
+    # ...while natural_sounds keeps the relax pair it always had.
+    assert SPECIAL_GROUPS["natural_sounds"].negative_prompt == NEGATIVE_PROMPT
+
+
+def test_special_group_negatives_reach_the_composition_plan_too():
+    # Not just the prose prompt: ElevenLabs takes its direction from the plan.
+    plan = build_keyword_signature("energizer", "uplift", 60).composition_plan
+    assert plan["negative_global_styles"] == list(SPECIAL_GROUPS["energizer"].negative_global_styles)
+    assert "silence" in plan["negative_global_styles"]
+    assert "drums" not in plan["negative_global_styles"]
+    assert plan["sections"][0]["negative_local_styles"] == plan["negative_global_styles"]
+
+
+def test_energizer_bed_is_asked_to_develop_not_merely_to_keep_playing():
+    # Continuous != developing. The continuity clauses ask the bed to keep *playing*;
+    # nothing asked it to go anywhere — the same gap that made un-banning melody on the
+    # grid produce no melody. It borrows the grid's axis rather than restating it.
+    group = SPECIAL_GROUPS["energizer"]
+    assert group.development == GOALS["focus"].default_development == "motif_evolving"
+    for keyword in ENERGIZER:
+        prompt = build_keyword_signature("energizer", keyword, 60).prompt
+        assert DEVELOPMENT_FRAGMENT["motif_evolving"] in prompt
+        assert "changing audibly every few bars" in prompt
+        assert "never a single held note or a static wash" in prompt
+    # natural_sounds has no progression clause at all.
+    assert SPECIAL_GROUPS["natural_sounds"].development is None
+    assert DEVELOPMENT_FRAGMENT["motif_evolving"] not in build_keyword_signature(
+        "natural_sounds", "rain", 60
+    ).prompt
+
+
+def test_special_group_development_must_be_a_known_value():
+    from dataclasses import replace
+
+    bad = replace(SPECIAL_GROUPS["energizer"], development="bogus")
+    with pytest.raises(ValueError, match="unknown development"):
+        rb_keyword_prompt(bad, bad.keywords["uplift"])
+
+
+def test_energizer_reuses_the_focus_goals_continuity_clause_verbatim():
+    # This group *is* the focus pack; one wording means one thing to keep true.
+    assert SPECIAL_GROUPS["energizer"].flowing == GOALS["focus"].flowing
+    assert SPECIAL_GROUPS["natural_sounds"].flowing is None
+
+
+def test_energizer_keywords_are_focus_only():
+    for keyword, entry in SPECIAL_GROUPS["energizer"].keywords.items():
+        assert entry.goals == frozenset({"focus"}), keyword
+
+
+def test_energizer_cells_get_distinct_ids_and_seeds():
+    ids = {k: build_keyword_signature("energizer", k, 60) for k in ENERGIZER}
+    assert len({s.track_id for s in ids.values()}) == len(ENERGIZER)
+    assert len({s.seed for s in ids.values()}) == len(ENERGIZER)
+    for keyword, sig in ids.items():
+        assert sig.track_id.startswith(f"energizer_{keyword}_seed")
+        assert sig.spec()["kind"] == "special" and sig.spec()["group"] == "energizer"
 
 
 # --- development axis (progression) -------------------------------------------

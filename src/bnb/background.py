@@ -933,21 +933,47 @@ class KeywordEntry:
     masking-for-focus), so this doesn't gate :func:`build_keyword_signature` or change
     ``track_id`` — it just documents which goals a keyword is expected to suit, for a future
     caller (e.g. background selection) that wants to filter by it.
+
+    ``flowing`` and ``body`` override the group's corresponding clause for this one
+    keyword. Both exist because a group is not always uniform: ``natural_sounds`` is a
+    still, no-music shell that suits rain and fire, and ``universe`` sits inside it while
+    needing the opposite — movement, and tonal content the shell's "no music, no
+    instruments" tail would otherwise argue away. Overriding one keyword beats either
+    loosening the shell for all of them or inventing a group for one member.
     """
 
     description: str
     event_driven: bool = False
     goals: frozenset[str] = field(default_factory=lambda: frozenset({"relax", "focus"}))
+    flowing: str | None = None
+    body: str | None = None
 
 
 @dataclass(frozen=True)
 class SpecialGroup:
-    """A keyword-driven category, independent of the substrate x style grid."""
+    """A keyword-driven category, independent of the substrate x style grid.
+
+    The three defaulted fields exist because a special group is *not* necessarily a
+    down-regulation one. ``natural_sounds`` shares the library's relax negatives, but a
+    group like ``energizer`` is up-regulating: the shared :data:`NEGATIVE_PROMPT` bans
+    "energetic, fast, drums, EDM, bright", which would forbid the group's whole point. So
+    the negatives are per-group, defaulting to the relax pair that ``natural_sounds`` was
+    already using.
+
+    ``flowing`` overrides the density bound the same way :attr:`Goal.flowing` does for the
+    grid: left ``None`` a keyword gets the stillness bound suited to how it is produced
+    (:func:`density_clause`), which is right for a field recording and wrong for anything
+    that has to sustain a continuous musical body.
+    """
 
     name: str
     body: str  # the shared prompt shell every keyword in the group layers onto
     keywords: dict[str, KeywordEntry]
     global_styles: tuple[str, ...] = ()  # composition-plan styles common to the group
+    negative_prompt: str = NEGATIVE_PROMPT
+    negative_global_styles: tuple[str, ...] = NEGATIVE_GLOBAL_STYLES
+    flowing: str | None = None
+    development: str | None = None  # a key of DEVELOPMENT_FRAGMENT; None = no progression clause
 
 
 SPECIAL_GROUPS: dict[str, SpecialGroup] = {
@@ -961,9 +987,17 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
         # — the first rain renders measured a 150 Hz spectral centroid (a bass drone;
         # real rainfall lands nearer 5 kHz). Everything the grid says about tempo,
         # harmony and register is meaningless here and is gone.
+        # "Calm and unhurried" alone left the renders too busy: it constrains *character*
+        # but says nothing about *rate*, so a bed could be calm in timbre and still patter,
+        # chirp or lap away continuously. The pacing is now stated as a rate, and stated
+        # for both kinds of keyword at once — event-driven ones get "infrequent and widely
+        # spaced", continuous ones "the overall rate never picks up" (a slow drizzle rather
+        # than heavy rainfall), since the density clause only reaches the former.
         body=(
-            "Calm and unhurried, with no sudden events and no build. Natural stereo "
-            "field recording, unprocessed, no music, no instruments, no voices."
+            "Slow-paced throughout: the overall rate stays low and never picks up, and "
+            "anything that stands out from the bed is infrequent and widely spaced. Calm "
+            "and unhurried, with no sudden events, no busy passages and no build. Natural "
+            "stereo field recording, unprocessed, no music, no instruments, no voices."
         ),
         global_styles=("field recording", "nature ambience", "instrumental", "wide stereo"),
         keywords={
@@ -1002,6 +1036,130 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
                 "metallic notes at a time with long shimmering decays, then quiet garden "
                 "air until the next gust",
                 event_driven=True,
+            ),
+            # Space is silent, so there is no field recording to imitate — but there is a
+            # well-known referent that *is* one: the plasma-wave recordings spacecraft
+            # return, which is a far more concrete instruction than "space ambience" and
+            # keeps the group's recordist framing intact. Continuous, so it takes the
+            # steadiness bound rather than being broken into discrete events.
+            "universe": KeywordEntry(
+                "Deep space ambience, like a spacecraft's plasma-wave recording — a vast "
+                "low resonant hum with slow sweeping tones rising and falling through it, "
+                "distant shimmer passing by, and deep sub-bass swells arriving and receding",
+                # The one keyword in this group that has to *move*. The group's stillness
+                # bound ("nothing stepping forward out of it, no separate events and no
+                # layering") and its "changing almost imperceptibly" original were the
+                # whole reason it came back as an undifferentiated hum.
+                flowing=(
+                    "It travels: always moving somewhere across minutes — tones sweeping "
+                    "slowly up and down in pitch, layers drifting in and then away, one "
+                    "distinct passage giving way to the next so it is never the same for "
+                    "long. Vast and unhurried, but never still and never uniform"
+                ),
+                # The shared shell's "no music, no instruments" tail would argue away the
+                # tonal content that makes those sweeps audible. This keeps it a *sound*
+                # rather than music by banning the musical machinery instead — beat, drums,
+                # chord progression — which leaves pitch and timbre free to move.
+                body=(
+                    "Immense, dark and open, with a real sense of enormous empty space and "
+                    "depth. Wide stereo, deep sub-bass, weightless and unhurried. A sound, "
+                    "not music: no beat, no drums, no chord progression, no voices."
+                ),
+            ),
+            # A fire is both things at once: a continuous soft roar of flame *and* separate
+            # crackles. Marked continuous on purpose — the event-driven clause would demand
+            # "long stretches of near-stillness", which breaks the flame bed into detached
+            # pops (the same failure the cricket wash has). The crackle spacing is stated in
+            # the description instead, which is how "night" handles it.
+            "fireplace": KeywordEntry(
+                "A log fire burning low in a stone fireplace, a steady soft roar of flame "
+                "close by, with only an occasional gentle crackle or pop well spaced apart, "
+                "recorded a few feet from the hearth in a quiet room"
+            ),
+        },
+    ),
+    # docs/BGMUSIC_TAXONOMY_CHANGES.md Change 4 asks for the focus/Brain.fm-competing beds
+    # to live in their own curated pack rather than folded into the down-regulation grid,
+    # defined by purpose and by a hard technical gate: every member must be AM-compatible.
+    # This is the prompt half of that — it asks for the continuous musical body an AM
+    # carrier needs. The *measured* half (`am_depth_by_band[active_band] < THRESHOLD`, via
+    # scripts/audio_features.py) is still unimplemented, so membership here is asserted,
+    # not yet verified; see the note in that doc.
+    "energizer": SpecialGroup(
+        name="energizer",
+        # Continuity is not restated here: `flowing` (FOCUS_FLOWING) already carries it,
+        # and saying it three times in one prompt only dilutes everything else. This
+        # carries what that clause does not — energy level, volume ceiling, and taste.
+        body=(
+            "Moderate, steady energy — awake and warm rather than sleepy — but never loud, "
+            "never intense and never dramatic. Easy and familiar to an ordinary listener, "
+            "the kind of thing that is pleasant to have playing for an hour without ever "
+            "asking for attention."
+        ),
+        global_styles=(
+            "instrumental",
+            "melodic",
+            "warm",
+            "steady groove",
+            "background music",
+            "high production quality",
+        ),
+        # The relax negatives would ban this group's entire purpose ("energetic", "fast",
+        # "drums", "EDM", "bright"). What actually has to stay out is *drama* and *volume* —
+        # plus silence and gaps, which are a technical fault here rather than a taste one:
+        # a gap in the bed is a gap in the AM carrier (§ FOCUS_FLOWING).
+        negative_prompt=(
+            "lyrics, vocals, spoken word, rap, dramatic climax, buildup, drop, sudden "
+            "transitions, aggressive, distorted, harsh, loud, frantic, chaotic, sparse, "
+            "silence, gaps, fade out, ambient drone"
+        ),
+        negative_global_styles=(
+            "vocals",
+            "lyrics",
+            "aggressive",
+            "distorted",
+            "harsh",
+            "buildup",
+            "drop",
+            "silence",
+        ),
+        # Reused verbatim from the focus goal rather than restated: this group *is* the
+        # focus pack, and the requirement is identical — one wording, one thing to keep true.
+        flowing=FOCUS_FLOWING,
+        # Continuous is not the same as developing: the clauses above ask the bed to keep
+        # *playing*, and nothing asked it to go anywhere, which is the same gap that made
+        # un-banning melody produce no melody on the grid. This borrows the grid's axis
+        # wholesale — motif_evolving is what the focus goal already defaults to.
+        development="motif_evolving",
+        keywords={
+            "uplift": KeywordEntry(
+                "Warm, gently uplifting instrumental music in a major key — a simple "
+                "hopeful melody on soft synth and electric piano over a light steady pulse, "
+                "open and unhurried",
+                goals=frozenset({"focus"}),
+            ),
+            "chillhop": KeywordEntry(
+                "Relaxed instrumental chillhop — a mellow melodic hook on electric piano "
+                "over a soft unhurried head-nodding groove and a round warm bass, easy and "
+                "familiar",
+                goals=frozenset({"focus"}),
+            ),
+            "daydream": KeywordEntry(
+                "Airy melodic instrumental — a clear simple synth melody floating over warm "
+                "sustained chords and a soft steady pulse, spacious and pleasant",
+                goals=frozenset({"focus"}),
+            ),
+            "momentum": KeywordEntry(
+                "Steady, gently propulsive instrumental — a repeating melodic figure over an "
+                "even soft beat and a moving bass line, forward-moving but calm and never "
+                "urgent",
+                goals=frozenset({"focus"}),
+            ),
+            "warmth": KeywordEntry(
+                "Soft neo-soul-flavoured instrumental — warm electric piano chords and a "
+                "simple singing melody over a light brushed groove and a mellow bass, "
+                "comfortable and unhurried",
+                goals=frozenset({"focus"}),
             ),
         },
     ),
@@ -1050,6 +1208,24 @@ class KeywordSignature:
         }
 
 
+def _keyword_prompt(group: SpecialGroup, entry: KeywordEntry) -> str:
+    """Assemble one special cell's prompt, most specific override winning.
+
+    Same clause order as the grid (:func:`build_prompt`): subject, then how it develops,
+    then how dense it may get, then the shared shell.
+    """
+    if group.development is not None and group.development not in DEVELOPMENT_FRAGMENT:
+        raise ValueError(
+            f"group {group.name!r} has unknown development {group.development!r}, "
+            f"expected one of {list(DEVELOPMENT_FRAGMENT)}"
+        )
+    density = entry.flowing or group.flowing or density_clause(entry.event_driven)
+    lead = entry.description
+    if group.development is not None:
+        lead = f"{lead}. {DEVELOPMENT_FRAGMENT[group.development]}"
+    return f"{lead}. {density}. {entry.body or group.body}"
+
+
 def build_keyword_signature(
     group_name: str, keyword: str, duration_s: int, variant: int = 0
 ) -> KeywordSignature:
@@ -1066,12 +1242,12 @@ def build_keyword_signature(
 
     composition_plan: dict[str, Any] = {
         "positive_global_styles": _dedupe(group.global_styles + (keyword,)),
-        "negative_global_styles": list(NEGATIVE_GLOBAL_STYLES),
+        "negative_global_styles": list(group.negative_global_styles),
         "sections": [
             {
                 "section_name": "loop",
                 "positive_local_styles": list(instrumentation),
-                "negative_local_styles": list(NEGATIVE_GLOBAL_STYLES),
+                "negative_local_styles": list(group.negative_global_styles),
                 "duration_ms": duration_s * 1000,
                 "lines": [],
             }
@@ -1083,8 +1259,8 @@ def build_keyword_signature(
         keyword=keyword,
         duration_s=duration_s,
         seed=_seed((group_name, keyword), variant),
-        prompt=f"{entry.description}. {density_clause(entry.event_driven)}. {group.body}",
-        negative_prompt=NEGATIVE_PROMPT,
+        prompt=_keyword_prompt(group, entry),
+        negative_prompt=group.negative_prompt,
         instrumentation=instrumentation,
         composition_plan=composition_plan,
     )

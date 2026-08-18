@@ -27,8 +27,10 @@ fails fast with setup instructions if not, before touching any spec. For elevenl
 key is *verified*, not just read: --dry-run is exactly when you want a bad credential to
 surface, before any credits are committed.
 
-Default is credit-safe and idempotent: specs that already have audio are skipped
-unless you pass --force. Each render lands in its spec's category cell directory
+Default is credit-safe and idempotent: specs whose audio file is actually on disk are
+skipped unless you pass --force. "Actually on disk" is checked per run rather than read
+off the catalog's `rendered` flag, so a master that was deleted or lost since the last
+rebuild is re-rendered and its spec refilled, instead of being skipped forever. Each render lands in its spec's category cell directory
 (assets/tracks/<cell>/, see src/bnb/assets.py) via the CategoryManager.
 
 Three things make a batch cheaper, safer and more accurate than a loop of one-off renders:
@@ -487,6 +489,34 @@ def target_ids(args: argparse.Namespace, manager: CategoryManager) -> list[str]:
     return sorted(available)
 
 
+def select_todo(
+    targets: Iterable[str], manager: CategoryManager, *, force: bool = False
+) -> tuple[list[str], int]:
+    """Split ``targets`` into what still needs rendering, and count how many of those are
+    *orphans* — tracks the catalog calls rendered whose audio file is not actually there.
+
+    The catalog's ``rendered`` flag is a snapshot from its last rebuild, so it goes stale
+    the moment a master is deleted, moved or lost — and a track skipped on a stale flag is
+    skipped *forever*: never re-rendered, while its spec still advertises a render whose
+    file is gone. So the skip decision asks the filesystem, and the flag is kept only to
+    report the discrepancy. Nothing further is needed to repair the spec:
+    :func:`assets.record_render` replaces the whole ``render`` block, so re-rendering
+    refills it.
+    """
+    catalog_rendered = {e["track_id"] for e in manager.search(rendered=True)}
+    todo: list[str] = []
+    orphaned = 0
+    for track_id in targets:
+        if not force and assets.find_track(track_id, root=manager.root) is not None:
+            print(f"skip (audio)   {track_id}")
+            continue
+        if not force and track_id in catalog_rendered:
+            orphaned += 1
+            print(f"re-render      {track_id}  (catalog says rendered, audio file is missing)")
+        todo.append(track_id)
+    return todo, orphaned
+
+
 def main() -> None:
     args = parse_args()
     license = LICENSES[args.provider]
@@ -497,15 +527,10 @@ def main() -> None:
     readiness = check_elevenlabs_credential(args.model_id) if args.provider == "elevenlabs" else None
     manager = CategoryManager()
 
-    rendered_ids = {e["track_id"] for e in manager.search(rendered=True)}
     targets = target_ids(args, manager)
-    todo = []
-    for track_id in targets:
-        if track_id in rendered_ids and not args.force:
-            print(f"skip (audio)   {track_id}")
-        else:
-            todo.append(track_id)
+    todo, orphaned = select_todo(targets, manager, force=args.force)
     skipped = len(targets) - len(todo)
+    repair = f", {orphaned} missing audio" if orphaned else ""
 
     # Preflight against the engines this batch actually needs — which depends on what
     # is in it, since special cells route to a different checkpoint than the grid.
@@ -522,7 +547,10 @@ def main() -> None:
                 spec = assets.load_spec(track_id, root=manager.root)
                 print(f"planned        {track_id}  ({describe(spec)}, {engine})")
         catalog = manager.rebuild()
-        print(f"\ndry run: {len(todo)} would render, {skipped} skipped; catalog: {catalog['count']} tracks")
+        print(
+            f"\ndry run: {len(todo)} would render{repair}, {skipped} skipped; "
+            f"catalog: {catalog['count']} tracks"
+        )
         return
 
     rendered = failed = 0
@@ -556,7 +584,10 @@ def main() -> None:
                 print(f"rendered       {track_id}  -> {audio_path.relative_to(manager.root)}{note}")
 
     catalog = manager.rebuild()
-    print(f"\n{rendered} rendered, {skipped} skipped, {failed} failed qc; catalog: {catalog['count']} tracks")
+    print(
+        f"\n{rendered} rendered{repair}, {skipped} skipped, {failed} failed qc; "
+        f"catalog: {catalog['count']} tracks"
+    )
     if failed:
         # Non-zero so a pipeline notices, and the specs stay unrendered so the next run retries.
         raise SystemExit(f"{failed} track(s) never passed qc; inspect with scripts/check_background.py")

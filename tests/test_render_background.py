@@ -450,3 +450,115 @@ def test_session_never_starts_a_worker_for_mlx_or_elevenlabs(monkeypatch):
         assert render(spec) == Path("/tmp/x.wav")
     with rb.render_session(_args(provider="elevenlabs"), rb.Engine("elevenlabs", "music_v2")) as render:
         assert render(spec) == Path("/tmp/y.wav")
+
+
+# --- skip decision: the catalog flag is a snapshot, the filesystem is the truth ---
+
+
+def _rendered_spec(manager):
+    """One spec with real audio on disk, and a catalog that knows about it."""
+    from bnb.background import build_signature
+
+    spec = build_signature("drone", "buddhist_meditative", "relax", 60).spec()
+    manager.add_spec(spec, rebuild=False)
+    manager.add_render(
+        spec,
+        b"\x00\x00" * 4410,
+        output_format="pcm_44100",
+        provider="elevenlabs",
+        model_version="music_v1",
+        license="x",
+        generated_at="now",
+    )
+    return spec
+
+
+def test_select_todo_skips_a_track_whose_audio_is_really_there(tmp_path):
+    from bnb.catalog import CategoryManager
+
+    manager = CategoryManager(tmp_path)
+    spec = _rendered_spec(manager)
+    todo, orphaned = rb.select_todo([spec["track_id"]], manager)
+    assert todo == [] and orphaned == 0
+
+
+def test_select_todo_re_renders_when_the_audio_file_is_gone(tmp_path):
+    # The bug this fixes: the catalog's `rendered` flag is a snapshot from its last
+    # rebuild. Trusting it means a master that was deleted or lost is skipped *forever* —
+    # never re-rendered, while its spec still advertises a render whose file is missing.
+    from bnb import assets
+    from bnb.catalog import CategoryManager
+
+    manager = CategoryManager(tmp_path)
+    spec = _rendered_spec(manager)
+    track_id = spec["track_id"]
+
+    audio = assets.find_track(track_id, root=tmp_path)
+    audio.unlink()
+    # Deliberately do NOT rebuild: the catalog still claims this track is rendered.
+    assert manager.search(rendered=True)[0]["track_id"] == track_id
+
+    todo, orphaned = rb.select_todo([track_id], manager)
+    assert todo == [track_id]
+    assert orphaned == 1
+
+
+def test_select_todo_reports_a_missing_master_distinctly(tmp_path, capsys):
+    # An unrendered spec and an orphaned one both need rendering, but only one of them
+    # means something is wrong on disk — worth saying so rather than silently queueing it.
+    from bnb import assets
+    from bnb.background import build_signature
+    from bnb.catalog import CategoryManager
+
+    manager = CategoryManager(tmp_path)
+    orphan = _rendered_spec(manager)
+    fresh = build_signature("drone", "lofi", "relax", 60).spec()
+    manager.add_spec(fresh, rebuild=False)
+    assets.find_track(orphan["track_id"], root=tmp_path).unlink()
+
+    todo, orphaned = rb.select_todo([orphan["track_id"], fresh["track_id"]], manager)
+    assert sorted(todo) == sorted([orphan["track_id"], fresh["track_id"]])
+    assert orphaned == 1
+    out = capsys.readouterr().out
+    assert f"re-render      {orphan['track_id']}" in out
+    assert "audio file is missing" in out
+    assert fresh["track_id"] not in out  # a never-rendered spec is not a discrepancy
+
+
+def test_select_todo_force_takes_everything_without_flagging_orphans(tmp_path):
+    from bnb.catalog import CategoryManager
+
+    manager = CategoryManager(tmp_path)
+    spec = _rendered_spec(manager)
+    todo, orphaned = rb.select_todo([spec["track_id"]], manager, force=True)
+    assert todo == [spec["track_id"]]
+    assert orphaned == 0  # --force re-renders by intent, not because anything is missing
+
+
+def test_re_rendering_an_orphan_refills_the_spec_render_block(tmp_path):
+    # The other half of the ask: the spec must stop advertising a file that isn't there.
+    # No extra step is needed — record_render replaces the whole block.
+    from bnb import assets
+    from bnb.catalog import CategoryManager
+
+    manager = CategoryManager(tmp_path)
+    spec = _rendered_spec(manager)
+    assets.find_track(spec["track_id"], root=tmp_path).unlink()
+
+    stale = assets.load_spec(spec["track_id"], root=tmp_path)
+    assert stale["render"]["generated_at"] == "now"
+
+    manager.add_render(
+        stale,
+        b"\x00\x00" * 4410,
+        output_format="pcm_44100",
+        provider="stable_audio",
+        model_version="medium",
+        license="y",
+        generated_at="later",
+    )
+    refilled = assets.load_spec(spec["track_id"], root=tmp_path)
+    assert refilled["render"]["generated_at"] == "later"
+    assert refilled["render"]["provider"] == "stable_audio"
+    assert assets.find_track(spec["track_id"], root=tmp_path) is not None
+    assert rb.select_todo([spec["track_id"]], manager) == ([], 0)
