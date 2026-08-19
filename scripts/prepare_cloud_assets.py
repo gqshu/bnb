@@ -8,6 +8,7 @@ This produces everything the mini program reads at runtime, so that a session ne
 backend at all:
 
     <out>/
+      mastering_report.json      what the audio pass measured and fixed (NOT uploaded)
       bg/
         manifest.json            the background catalogue    (see `build_manifest`)
         profiles.json            the mode-profile catalogue  (see `build_profiles`)
@@ -18,12 +19,22 @@ Upload ``bg/`` to the **root** of the WeChat cloud storage bucket (云开发控�
 and point the mini program's ``CLOUD_FILE_PREFIX`` at that root. The output directory is a
 literal mirror of the bucket, so there is one thing to drag and nothing to rearrange. It
 lives under ``run/`` by default, which is gitignored — these are derived artifacts,
-regenerable from the sources at any time.
+regenerable from the sources at any time. Only ``bg/`` gets uploaded; the report sits
+outside it deliberately.
 
-The rendered masters are 60 s stereo 16-bit WAVs — about 10.6 MB each, 1.2 GB for the
-whole library. That's fine for a service that encodes on demand (``/background/{id}.mp3``
-does exactly that, cached per track) but hopeless as something to upload by hand and pull
-down over mobile data, hence the transcode.
+The rendered masters are 60 s stereo 16-bit WAVs — about 10.6 MB each. That's fine for a
+service that encodes on demand (``/background/{id}.mp3`` does exactly that, cached per
+track) but hopeless as something to upload by hand and pull down over mobile data, hence
+the transcode.
+
+**Transcoding is not the whole audio pass.** The client loops each MP3 forever
+(``audio.ts``: ``src.loop = true``) with nothing crossfading the wrap, so a master that
+fades out at 60 s and starts at full level lurches audibly once a minute — which is most
+of this library. :mod:`bnb.mastering` fixes that (trim the fade, fold the tail back over
+the head) and repairs true sample-scale clicks on the way past; this script only chooses
+the settings and reports what happened. The encoder is left at its original bitrate: the
+artifacts people hear are seams, not bits. Encoder *effort* is raised, though — it costs
+build time rather than bytes, and a batch job has build time to spare.
 
 **The manifest is the point of this script**, more than the transcoding is. Moving track
 selection to the client means the client needs the taxonomy, and the taxonomy has a shape
@@ -36,10 +47,21 @@ that split to the client, this resolves it here: every track comes out with a fl
 and the grid/special distinction disappears entirely. The taxonomy stays owned by Python;
 only its resolved output crosses the wire.
 
-``profiles.json`` goes out in the same envelope ``GET /api/profiles`` serves, so the
-client parses one shape either way. The only thing that changes is ``image``: the served
-form is a route (``/profile/<file>``, resolved against the backend's host) and the cloud
-form is a bucket-relative path (``bg/profile/<file>``) the client turns into a fileID.
+``profiles.json`` is the authored ``assets/profiles.json``, copied out in the same
+envelope ``GET /api/profiles`` serves so the client parses one shape either way. Two
+things change on the way. ``image`` is rewritten from the served route form
+(``/profile/<file>``, which only means anything relative to the backend's host) to a
+bucket-relative path (``bg/profile/<file>``) the client turns into a fileID. And only
+``source: community`` cards go: the mini program ships the personal cards (the manual
+panel, the EEG-driven preset) built in, so publishing them again would duplicate them in
+the grid.
+
+The cards are read through :func:`bnb.profiles.list_profiles`, so everything that guards
+the endpoint guards the upload too. One check belongs to the build alone, because it is
+the only place both halves are in the same room: a card's ``spec`` names a ``type`` and a
+``goal``, and :func:`unplayable_profiles` asks the finished manifest whether any track
+actually satisfies that pair. A card that no track can answer is a dead tile in the grid —
+it looks fine right up until someone taps it.
 """
 
 from __future__ import annotations
@@ -56,9 +78,10 @@ import lameenc
 import numpy as np
 import soundfile as sf
 
-from bnb import assets
+from bnb import assets, mastering
 from bnb.background import SPECIAL_GROUPS
 from bnb.catalog import CategoryManager
+from bnb.mastering import MasterReport
 from bnb.profiles import list_profiles, profiles_image_dir
 from bnb.stream import to_int16_bytes
 
@@ -70,7 +93,12 @@ from bnb.server import _bg_display_name
 
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / "run" / "cloud_assets"
 DEFAULT_BITRATE_KBPS = 96  # stereo; ~720 KB per 60 s track, ~15x smaller than the master
-DEFAULT_QUALITY = 5  # lameenc: 0=best/slowest … 9=fastest. Matches the service's setting.
+DEFAULT_QUALITY = 2
+"""lameenc effort: 0=best/slowest … 9=fastest. The service uses 5 because it encodes on
+the request path; this is a batch job run once per library, so it buys the better psycho-
+acoustic search for nothing that matters. Same bitrate, same file size, fewer artifacts
+on the hiss-like beds (rain, stream, noise_texture) where 96 kbps is worked hardest."""
+
 # Everything the app reads lives under one directory in the bucket, so the output tree is
 # a literal mirror of what gets uploaded: drop `bg/` at the bucket root and you're done.
 # Every path *written into* the catalogues stays relative to the bucket root (not to this
@@ -81,6 +109,7 @@ AUDIO_SUBDIR = BUCKET_ROOT  # the mp3s sit directly in it
 PROFILE_SUBDIR = f"{BUCKET_ROOT}/profile"
 MANIFEST_NAME = f"{BUCKET_ROOT}/manifest.json"
 PROFILES_NAME = f"{BUCKET_ROOT}/profiles.json"
+REPORT_NAME = "mastering_report.json"  # sibling of BUCKET_ROOT, so it is never uploaded
 MANIFEST_VERSION = 1
 
 
@@ -145,21 +174,59 @@ def build_manifest(entries: list[dict[str, Any]], bitrate_kbps: int) -> dict[str
     }
 
 
+def playable_pairs(manifest: dict[str, Any]) -> set[tuple[str | None, str]]:
+    """Every ``(type, goal)`` the published library can actually satisfy.
+
+    Read off the manifest rather than the catalog so it describes what is *in the bucket*:
+    a track whose master went missing was already dropped from the manifest, and so it
+    can't vouch for a card here either.
+    """
+    return {(track["type"], goal) for track in manifest["tracks"] for goal in track["goals"]}
+
+
+def unplayable_profiles(profiles: list[dict[str, Any]], manifest: dict[str, Any]) -> list[str]:
+    """Cards whose ``spec`` no published track can answer — a dead tile in the grid.
+
+    Selection is the client's job now, and the client's whole filter is
+    ``goals.includes(goal)`` plus an optional ``type`` match. So a card asking for a
+    combination the manifest doesn't hold isn't merely unlucky: it throws at play time
+    (``cloud.ts``: "没有 goal=… type=… 的背景"). Reported rather than fatal — the fix is
+    usually to render the missing track, not to delete the card.
+    """
+    playable = playable_pairs(manifest)
+    goals_only = {goal for _, goal in playable}
+    dead: list[str] = []
+    for profile in profiles:
+        spec = profile.get("spec")
+        if not spec:
+            continue
+        goal, typ = spec.get("goal"), spec.get("type")
+        ok = (typ, goal) in playable if typ else goal in goals_only
+        if not ok:
+            where = f"goal={goal}" + (f" type={typ}" if typ else "")
+            dead.append(f"{profile.get('id')}: no track with {where}")
+    return dead
+
+
 def build_profiles(out: Path) -> tuple[list[dict[str, Any]], list[str]]:
-    """The mode-profile catalogue, with card art copied into the output tree.
+    """The community mode-profile catalogue, with card art copied into the output tree.
 
     Read through :func:`bnb.profiles.list_profiles`, so the same validation that guards
-    ``GET /api/profiles`` guards the upload: a card with a duplicate id, too many badges,
-    or a ``spec.goal``/``spec.type`` the taxonomy doesn't know fails here rather than
+    ``GET /api/profiles`` guards the upload: a card with a duplicate id, an unknown
+    ``source``, a ``spec.goal``/``spec.type`` the taxonomy doesn't know, a ``spec.mode``
+    the app can't build, or a gradient that contradicts its goal fails here rather than
     shipping to a bucket where nothing checks it again.
 
-    ``image`` is rewritten from the served route form (``/profile/<file>``, which only
-    means anything relative to the backend's host) to a bucket-relative path
-    (``profile/<file>``). A profile naming art that isn't on disk has its ``image``
-    dropped rather than carried over broken — the client already falls back to
-    ``gradient``, so the card still renders. Returns the profiles and any such misses.
+    Only ``source: community`` cards are published — the mini program ships the personal
+    ones built in.
+
+    ``image`` is rewritten from the served route form (``/profile/<file>``) to a
+    bucket-relative path (``profile/<file>``). A profile naming art that isn't on disk has
+    its ``image`` dropped rather than carried over broken — the client already falls back
+    to ``gradient``, so the card still renders. Returns the profiles and any such misses.
     """
-    profiles = list_profiles()
+    profiles = [p for p in list_profiles() if p.get("source") == "community"]
+
     missing: list[str] = []
     for profile in profiles:
         image = profile.get("image")
@@ -178,8 +245,8 @@ def build_profiles(out: Path) -> tuple[list[dict[str, Any]], list[str]]:
     return profiles, missing
 
 
-def encode_mp3(src: Path, dst: Path, bitrate_kbps: int, quality: int) -> int:
-    """Transcode one rendered WAV master to MP3. Returns the bytes written.
+def transcode(src: Path, dst: Path, args: argparse.Namespace) -> tuple[int, MasterReport]:
+    """Master one rendered WAV for looping and encode it. Returns ``(bytes, report)``.
 
     Mono sources are widened to stereo rather than encoded as mono, so every file in the
     bucket has the same channel count and the client never has to special-case one.
@@ -187,15 +254,38 @@ def encode_mp3(src: Path, dst: Path, bitrate_kbps: int, quality: int) -> int:
     data, sample_rate = sf.read(str(src), dtype="float32", always_2d=True)
     if data.shape[1] == 1:
         data = np.repeat(data, 2, axis=1)
+    data, report = mastering.master_for_loop(
+        data,
+        sample_rate,
+        declick=not args.no_declick,
+        loop=not args.no_loop_prep,
+        crossfade_s=args.crossfade,
+        click_z=args.click_sensitivity,
+        peak_dbfs=args.peak_dbfs,
+    )
     encoder = lameenc.Encoder()
-    encoder.set_bit_rate(bitrate_kbps)
+    encoder.set_bit_rate(args.bitrate)
     encoder.set_in_sample_rate(sample_rate)
     encoder.set_channels(2)
-    encoder.set_quality(quality)
+    encoder.set_quality(args.quality)
     mp3 = bytes(encoder.encode(to_int16_bytes(data))) + bytes(encoder.flush())
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_bytes(mp3)
-    return len(mp3)
+    return len(mp3), report
+
+
+def stray_mp3s(out: Path, published: set[str]) -> list[Path]:
+    """MP3s sitting in the output tree that the manifest no longer lists.
+
+    They matter because the output directory is what gets dragged into the bucket: a
+    track dropped from the taxonomy leaves its audio behind, and every later upload
+    carries the corpse along. The client never asks for them, so this is dead weight
+    rather than a bug — but it is dead weight that grows.
+    """
+    audio_dir = out / AUDIO_SUBDIR
+    if not audio_dir.is_dir():
+        return []
+    return sorted(p for p in audio_dir.glob("*.mp3") if p.stem not in published)
 
 
 def human(n_bytes: float) -> str:
@@ -212,13 +302,14 @@ def main() -> int:
     )
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help=f"output directory (default: {DEFAULT_OUT})")
     parser.add_argument("--bitrate", type=int, default=DEFAULT_BITRATE_KBPS, help="MP3 bitrate in kbps")
-    parser.add_argument("--quality", type=int, default=DEFAULT_QUALITY, help="lameenc quality, 0=best … 9=fastest")
+    parser.add_argument("--quality", type=int, default=DEFAULT_QUALITY, help="lameenc effort, 0=best … 9=fastest")
     parser.add_argument("--limit", type=int, default=None, help="only process the first N tracks (for a trial run)")
     parser.add_argument(
         "--force",
         action="store_true",
         help="re-encode tracks whose MP3 already exists (default: skip them, so a "
-        "interrupted run resumes instead of starting over)",
+        "interrupted run resumes instead of starting over). Needed after changing any "
+        "of the audio settings below — an existing file is never re-examined.",
     )
     parser.add_argument(
         "--catalog-only",
@@ -226,7 +317,50 @@ def main() -> int:
         help="rewrite manifest.json and profiles.json (and re-copy card art) without "
         "touching any audio",
     )
+
+    audio = parser.add_argument_group(
+        "audio",
+        "The mastering pass (bnb.mastering). Defaults are what the library ships with; "
+        "the switches exist to A/B a suspect track, not for routine use.",
+    )
+    audio.add_argument(
+        "--no-loop-prep",
+        action="store_true",
+        help="don't trim the edges or crossfade the loop seam — encode the master as-is",
+    )
+    audio.add_argument(
+        "--crossfade",
+        type=float,
+        default=mastering.CROSSFADE_S,
+        help=f"seconds of tail folded back over the head (default: {mastering.CROSSFADE_S:g})",
+    )
+    audio.add_argument("--no-declick", action="store_true", help="skip click detection and repair")
+    audio.add_argument(
+        "--click-sensitivity",
+        type=float,
+        default=mastering.CLICK_Z,
+        help=f"how far above its neighbourhood an impulse must sit to count as a click "
+        f"(default: {mastering.CLICK_Z:g}; lower catches more, and eventually eats real "
+        f"transients like fireplace crackle)",
+    )
+    audio.add_argument(
+        "--peak-dbfs",
+        type=float,
+        default=mastering.PEAK_DBFS,
+        help=f"ceiling applied before encoding (default: {mastering.PEAK_DBFS:g})",
+    )
+    audio.add_argument(
+        "--prune",
+        action="store_true",
+        help="delete MP3s in the output tree that the manifest no longer lists (they are "
+        "only reported otherwise). Refused alongside --limit, where every unprocessed "
+        "track looks stale.",
+    )
     args = parser.parse_args()
+
+    if args.prune and args.limit is not None:
+        print("--prune with --limit would delete the tracks --limit skipped; refusing", file=sys.stderr)
+        return 2
 
     categories = CategoryManager()
     entries = sorted(categories.search(rendered=True), key=lambda e: e["track_id"])
@@ -245,6 +379,7 @@ def main() -> int:
     skipped = 0
     missing: list[str] = []
     total_bytes = 0
+    reports: dict[str, dict[str, Any]] = {}
 
     if not args.catalog_only:
         for i, entry in enumerate(entries, 1):
@@ -261,10 +396,12 @@ def main() -> int:
                 # other 116 transcodes.
                 missing.append(track_id)
                 continue
-            size = encode_mp3(src, dst, args.bitrate, args.quality)
+            size, report = transcode(src, dst, args)
+            reports[track_id] = report.as_dict()
             total_bytes += size
             written += 1
-            print(f"[{i}/{len(entries)}] {track_id}  {human(size)}")
+            notes = f"  ({', '.join(report.notes)})" if report.notes else ""
+            print(f"[{i}/{len(entries)}] {track_id}  {human(size)}{notes}")
 
     # The manifest lists what's actually in the bucket, so a track whose master was
     # missing is left out of it too — otherwise the client would pick an id it can't
@@ -283,14 +420,62 @@ def main() -> int:
     (out / PROFILES_NAME).write_text(
         json.dumps({"profiles": profiles}, ensure_ascii=False, indent=2)
     )
+    dead_cards = unplayable_profiles(profiles, manifest)
+
+    if reports:
+        (out / REPORT_NAME).write_text(
+            json.dumps(
+                {
+                    "generated_at": manifest["generated_at"],
+                    "settings": {
+                        "bitrate_kbps": args.bitrate,
+                        "quality": args.quality,
+                        "declick": not args.no_declick,
+                        "click_sensitivity": args.click_sensitivity,
+                        "loop_prep": not args.no_loop_prep,
+                        "crossfade_s": args.crossfade,
+                        "peak_dbfs": args.peak_dbfs,
+                    },
+                    "tracks": reports,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+
+    strays = stray_mp3s(out, {e["track_id"] for e in publishable})
+    if strays and args.prune:
+        for path in strays:
+            path.unlink()
 
     print()
     print(f"output      {out}")
     print(f"manifest    {MANIFEST_NAME} — {len(publishable)} tracks")
-    print(f"profiles    {PROFILES_NAME} — {len(profiles)} cards")
+    print(f"profiles    {PROFILES_NAME} — {len(profiles)} community cards")
     if not args.catalog_only:
         print(f"encoded     {written} new, {skipped} already present")
         print(f"total size  {human(total_bytes)} at {args.bitrate} kbps")
+    if reports:
+        repaired = sum(r["clicks_repaired"] for r in reports.values())
+        touched = sum(1 for r in reports.values() if r["clicks_repaired"])
+        impulsive = [t for t, r in reports.items() if r["clicks_impulsive"]]
+        trimmed = sum(r["trimmed_head_s"] + r["trimmed_tail_s"] for r in reports.values())
+        print(f"mastering   {repaired} click(s) repaired across {touched} track(s); "
+              f"{trimmed:.0f}s of silence and fade trimmed")
+        if impulsive:
+            # Not a warning: these are rain, fire and running water. Naming them is how
+            # you'd notice a track that landed here by mistake.
+            print(f"            {len(impulsive)} track(s) read as impulsive content, "
+                  f"declick skipped: {', '.join(sorted(impulsive)[:3])}"
+                  + (f" (+{len(impulsive) - 3} more)" if len(impulsive) > 3 else ""))
+        print(f"            per-track detail in {REPORT_NAME} (not uploaded)")
+    if skipped and not args.force:
+        print("            (skipped tracks kept whatever settings they were encoded with; "
+              "use --force after changing any audio option)")
+    if strays:
+        verb = "deleted" if args.prune else "left in place"
+        print(f"stale       {len(strays)} MP3(s) not in the manifest, {verb}"
+              + ("" if args.prune else " — pass --prune to remove them"))
     if missing:
         print(f"\nWARNING: {len(missing)} track(s) marked rendered but with no audio on disk:", file=sys.stderr)
         for track_id in missing:
@@ -301,6 +486,12 @@ def main() -> int:
         for item in missing_art:
             print(f"  {item}", file=sys.stderr)
         print("Their 'image' was dropped; the client falls back to the gradient.", file=sys.stderr)
+    if dead_cards:
+        print(f"\nWARNING: {len(dead_cards)} profile(s) name a combination no track can play:", file=sys.stderr)
+        for item in dead_cards:
+            print(f"  {item}", file=sys.stderr)
+        print("They ship anyway, but the grid tile throws when tapped — render the "
+              "missing track or retarget the card.", file=sys.stderr)
 
     print()
     print(f"Next: upload '{out / BUCKET_ROOT}' to the ROOT of the WeChat cloud storage")

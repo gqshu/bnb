@@ -1,63 +1,64 @@
 {
   "profiles": [
     {
-      "id": "manual",
-      "title": "手动配置",
-      "subtitle": "自由调节节拍与背景",
-      "manual": true,
-      "gradient": "linear-gradient(135deg, #2a2f45, #14161d)"
-    },
-    {
-      "id": "quick_focus",
-      "title": "快速聚焦",
-      "subtitle": "提神 · 短时任务",
-      "badges": [
-        { "text": "限时免费", "kind": "free" },
-        { "text": "热门", "kind": "new" }
-      ],
-      "spec": { "goal": "focus", "mode": "binaural", "beat_hz": 14, "carrier": 400, "beat_volume": 0.4 },
-      "gradient": "linear-gradient(135deg, #5b6bff, #3a2f7a)"
-    },
-    {
-      "id": "eeg_flow",
-      "title": "私人订制",
-      "subtitle": "跟随实时脑波自适应",
-      "badges": [
-        { "text": "脑波驱动", "kind": "eeg" },
-        { "text": "限时免费", "kind": "free" },
-        { "text": "新", "kind": "new" }
-      ],
-      "spec": { "goal": "relax", "mode": "binaural", "eeg_driven": true },
-      "gradient": "linear-gradient(135deg, #7d4fe3, #3a2f7a)"
-    },
-    {
-      "id": "deep_relax",
-      "title": "深度放松",
-      "subtitle": "舒缓 · 减压",
-      "spec": { "goal": "relax", "mode": "binaural", "beat_hz": 8, "carrier": 300, "beat_volume": 0.4 },
-      "gradient": "linear-gradient(135deg, #1f6f6a, #143a4a)"
-    },
-    {
       "id": "nature_relax",
       "title": "聆听自然",
       "subtitle": "自然音 · 白噪",
-      "badges": [{ "text": "脑波驱动", "kind": "eeg" }],
-      "spec": { "goal": "relax", "type": "natural_sounds", "mode": "binaural", "beat_hz": 6, "carrier": 280, "beat_volume": 0.2 },
-      "gradient": "linear-gradient(135deg, #2e7d4f, #16402e)"
+      "spec": {
+        "goal": "relax",
+        "type": "natural_sounds",
+        "mode": "monaural",
+        "beat_hz": 6,
+        "carrier": 280,
+        "beat_volume": 0.2
+      },
+      "source": "community",
+      "gradient": "linear-gradient(135deg, #2f8fb0, #123742)"
     },
     {
-      "id": "sleep",
-      "title": "安然入睡",
-      "subtitle": "助眠 · 长时",
-      "spec": { "goal": "relax", "mode": "binaural", "beat_hz": 4, "carrier": 400, "beat_volume": 0.25 },
-      "gradient": "linear-gradient(135deg, #2b3a7a, #0f1430)"
+      "id": "community_energizer_focus",
+      "title": "活力唤醒 · 专注",
+      "subtitle": "魔改 · 18 Hz",
+      "spec": {
+        "goal": "focus",
+        "type": "energizer",
+        "mode": "isochronic",
+        "beat_hz": 18.0,
+        "carrier": 250.0,
+        "beat_volume": 0.2
+      },
+      "source": "community",
+      "gradient": "linear-gradient(135deg, #c2453f, #3a1518)"
     },
     {
-      "id": "caffeine_free",
-      "title": "电子咖啡",
-      "subtitle": "清醒 · 不焦虑",
-      "spec": { "goal": "focus", "mode": "binaural", "beat_hz": 40, "carrier": 400, "beat_volume": 0.40 },
-      "gradient": "linear-gradient(135deg, #2e7d6a, #16402e)"
+      "id": "community_melodic_instrument_relax",
+      "title": "旋律器乐 · 放松",
+      "subtitle": "双耳节拍 · 10 Hz",
+      "spec": {
+        "goal": "relax",
+        "type": "melodic_instrument",
+        "mode": "binaural",
+        "beat_hz": 10.0,
+        "carrier": 300.0,
+        "beat_volume": 0.3
+      },
+      "source": "community",
+      "gradient": "linear-gradient(135deg, #4a56b8, #1d2050)"
+    },
+    {
+      "id": "community_percussive_with_tail_relax",
+      "title": "颂钵余韵 · 放松",
+      "subtitle": "单耳节拍 · 10 Hz",
+      "spec": {
+        "goal": "relax",
+        "type": "percussive_with_tail",
+        "mode": "monaural",
+        "beat_hz": 10.0,
+        "carrier": 250.0,
+        "beat_volume": 0.2
+      },
+      "source": "community",
+      "gradient": "linear-gradient(135deg, #3568a8, #152a44)"
     }
   ]
 }

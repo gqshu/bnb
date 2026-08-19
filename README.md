@@ -233,11 +233,13 @@ uv run scripts/prepare_cloud_assets.py --limit 5       # a trial batch first
 uv run scripts/prepare_cloud_assets.py --catalog-only  # re-emit the catalogues, skip audio
 ```
 
-It transcodes every rendered master to MP3 (96 kbps stereo by default — a 60 s track goes
-from a 10.6 MB WAV to about 700 KB) and writes both catalogues the app reads:
+It masters every rendered track for looping, encodes it to MP3 (96 kbps stereo by default
+— a 60 s track goes from a 10.6 MB WAV to about 650 KB) and writes both catalogues the app
+reads:
 
 ```
 run/cloud_assets/
+  mastering_report.json    what the audio pass measured and fixed — NOT uploaded
   bg/
     manifest.json          the background catalogue
     profiles.json          the mode-profile catalogue
@@ -255,6 +257,38 @@ library over; `--force` overrides that.
 Every path written *into* the catalogues stays relative to the bucket root — `bg/<id>.mp3`
 for audio, `bg/profile/<id>.jpg` for card art — so the client resolves any fileID by plain
 concatenation with `CLOUD_FILE_PREFIX`, one rule for all three kinds of file.
+
+**Transcoding is not the whole audio pass.** The client loops each MP3 forever
+(`audio.ts`: `src.loop = true`) and nothing crossfades the wrap — the streaming path's
+`StreamEngine` does, which is why `qc.py` deliberately skips the loop-seam check, but the
+bucket path has no engine in it. Most of this library fades out at 60 s and starts at full
+level, so every lap ended with a fade to nothing and a step straight back into a loud head.
+Measured through the client's own loop logic, the level across the loop point stepped by a
+**median 38 dB**. `bnb.mastering` runs before the encoder:
+
+    declick  ->  trim  ->  crossfade  ->  peak limit
+
+`trim` drops the leading silence and the trailing fade (relative to the track's own level,
+since the defect is a fade and not silence), `crossfade` folds the new tail back over the
+new head so the last sample runs into the first, and the peak limit keeps MP3 decoder
+overshoot off the ceiling. Same measurement after: a **median 2.3 dB** step, and the two
+tracks still above 6 dB are fireplace and chillhop beds where a 50 ms window straddles a
+crackle rather than a seam.
+
+`declick` is the conservative half, and the interesting problem there is that a fireplace
+crackle and a splice step look identical as single events — set a threshold high enough to
+spare the crackle and it sleeps through half the real clicks. What separates them is *how
+often* they happen: a defect is a handful a minute, a fireplace is a thousand. So detection
+runs sensitive and a per-track rate floor decides whether to act on it. On this library
+that repairs 82 isolated events across 27 tracks and quarantines nine impulsive-by-design
+beds (both fireplaces, both streams, rain, and so on) untouched — they're listed by name at
+the end of the run, which is how you'd spot one that landed there by mistake.
+
+Each stage has an off switch (`--no-loop-prep`, `--no-declick`, `--crossfade`,
+`--click-sensitivity`, `--peak-dbfs`) for A/B'ing a suspect track. They are not routine:
+an existing MP3 is never re-examined, so changing any of them needs `--force` to take
+effect. `--prune` deletes MP3s the manifest no longer lists — otherwise a track dropped
+from the taxonomy leaves its audio behind for every later upload to carry along.
 
 **The manifest matters more than the transcoding.** Serving from a bucket means the
 bucket can't *choose* a track, so selection moves to the client — and selection needs the
@@ -287,15 +321,54 @@ A track the catalog marks rendered but whose audio is missing from disk is repor
 end of the run and left out of the manifest, so the client never picks an id the bucket
 can't serve.
 
-**Profiles ship the same way.** `profiles.json` goes out in the exact envelope
-`GET /api/profiles` serves, read through `bnb.profiles.list_profiles` so the validation
-guarding the endpoint also guards the upload — a duplicate id, too many badges, or a
-`spec.goal`/`spec.type` the taxonomy doesn't know aborts the run rather than shipping to a
-bucket where nothing checks it again. The one field that changes is `image`, which is a
-backend route (`/profile/<file>`) in the served form and a bucket-relative path
-(`bg/profile/<file>`) in the cloud form, with the art copied into `bg/profile/`. A profile
-naming art that isn't on disk has its `image` dropped and is reported at the end, so the
-card falls back to its `gradient` instead of rendering broken.
+**Profiles are copied, not generated.** `assets/profiles.json` is authored, hand-editable
+source; the script copies it into the bucket in the exact envelope `GET /api/profiles`
+serves, read through `bnb.profiles.list_profiles` so the validation guarding the endpoint
+also guards the upload.
+
+Every card declares a `source`. The mini program ships its *personal* cards built in — the
+manual panel and the EEG-driven preset both describe the listener's own session rather than
+a shared piece of music, so there is nothing for a catalogue to say about them — and only
+`source: community` cards are published. The served endpoint is unaffected: it returns the
+authored file whole, since the server has no bucket to curate.
+
+`validate_profiles` guards the things that only break in front of a user:
+
+| check | what it catches |
+| --- | --- |
+| `source` in `{community, personal}` | a card that would silently fail to publish |
+| `spec.goal` / `spec.type` in the taxonomy | a tile that picks nothing |
+| `spec.mode` in `BEAT_MODES` | a beat that plays but doesn't entrain — see below |
+| gradient hue matches `spec.goal` | a card whose colour lies about what it does |
+| id unique, title present, ≤ 3 badges | layout and lookup breakage |
+
+The `mode` check earns its place. `audio.ts` builds anything that isn't `binaural` or
+`monaural` as the AM path, so a spec saying `am_music` *sounds* like it works — but
+`applyBeatLevel` routes the beat level by an exact `=== 'isochronic'` test, so the level
+lands on the disconnected beat gain instead of the modulation depth and the entrainment
+never turns on. The card plays; it just isn't doing anything. `isochronic` is this
+codebase's name for that AM path (the app labels it 魔改).
+
+The gradient check is presentation, but load-bearing presentation: **warm is focus, cool is
+relax**, and the grid uses that to say what a card does before anyone reads it. It's stated
+as hue *bands* (`GOAL_HUES`: 330–40° for focus, 185–260° for relax) rather than fixed
+gradients, because the cards are meant to differ from one another — a teal, an indigo and a
+slate blue all read as relax; a green doesn't read as anything. Every colour stop is
+checked, not just the first, so a card that starts blue and ends green is caught; stops too
+dark or too desaturated to have a hue are exempt, since the bottom of a gradient is a
+shadow rather than a statement.
+
+One check belongs to the build alone, because it's the only place both halves are in the
+same room: a card names a `(type, goal)`, and `unplayable_profiles` asks the finished
+manifest whether any track answers it. A card nothing answers is a dead tile — it looks
+fine right up until someone taps it and `cloud.ts` throws `没有 goal=… type=… 的背景`. It's
+reported rather than fatal, since the fix is usually to render the missing track.
+
+The one field rewritten on the way out is `image`, a backend route (`/profile/<file>`) in
+the served form and a bucket-relative path (`bg/profile/<file>`) in the cloud form, with the
+art copied into `bg/profile/`. A profile naming art that isn't on disk has its `image`
+dropped and is reported at the end, so the card falls back to its `gradient` instead of
+rendering broken.
 
 Card art needs one extra hop on the client that the audio doesn't. The cards are drawn
 with CSS `background-image`, and a `cloud://` fileID doesn't resolve in CSS — so the app
@@ -616,6 +689,7 @@ helpers read the current beat, change one field, and send it back.
 - `src/bnb/catalog.py` — `CategoryManager`: add/delete/search/pick over the asset repository
 - `src/bnb/stable_audio.py` — self-hosted Stable Audio 3 render backend (out-of-process)
 - `src/bnb/qc.py` — listenability checks (silence, clipping, noise) for rendered audio
+- `src/bnb/mastering.py` — loop mastering for the cloud build (declick, trim, seam crossfade, peak limit)
 - `src/bnb/stream.py` — the live stream engine (phase-continuous beat + background mix)
 - `src/bnb/server.py` — FastAPI service and endpoints
 - `src/bnb/client.py` — control client for the stream service
@@ -626,8 +700,8 @@ helpers read the current beat, change one field, and send it back.
 - `scripts/try_stable_audio.py` — spec-free Stable Audio 3 smoke test
 - `scripts/serve.py` — run the stream service
 - `scripts/control.py` — command-line control client
-- `scripts/prepare_cloud_assets.py` — transcode the library + emit the client catalogues for
-  WeChat cloud storage
+- `scripts/prepare_cloud_assets.py` — master + transcode the library and emit the client
+  catalogues for WeChat cloud storage
 - `scripts/` — dev utilities, not shipped
 - `tests/` — test suite
 - `docs/` — product and feasibility docs
