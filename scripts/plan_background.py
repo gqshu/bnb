@@ -14,9 +14,14 @@ request records into the asset repository, one subdirectory per category cell:
     uv run scripts/plan_background.py buddhist_meditative:drone neutral:noise_texture
 
   Planning never overwrites: a cell's seed is deterministic, so a target whose spec
-  already exists on disk is reported and skipped. Replanning one is a deliberate,
-  manual act — delete the spec file (or the whole cell directory) and run again.
-  That is also how you change a spec's --duration or pick up a prompt edit.
+  already exists on disk is reported and skipped. Replanning one is a deliberate act —
+  pass --replan to clear every spec *and rendered track* for the given targets first,
+  then plan them fresh (clearing the render too matters: the same deterministic
+  track_id would otherwise make render_background.py skip re-rendering and silently
+  keep the stale audio). That is also how you pick up a prompt edit or change --duration:
+
+    uv run scripts/plan_background.py unwind:piano --replan
+    uv run scripts/plan_background.py unwind:piano --replan --fill 3   # then 3 fresh variants
 
   Special cells (a keyword-driven category outside the substrate × style grid; for
   now only natural_sounds) take the same STYLE:SUBSTRATE-shaped syntax with a group
@@ -70,6 +75,7 @@ from bnb.background import (
     sample_signatures,
     special_coverage_report,
 )
+from bnb import assets
 from bnb.catalog import CategoryManager
 
 AnySignature = Signature | KeywordSignature
@@ -99,6 +105,14 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="progression axis for explicit STYLE:SUBSTRATE targets (default: the goal's own "
         "default_development); must be one the goal admits (see --list)",
+    )
+    parser.add_argument(
+        "--replan",
+        action="store_true",
+        help="clear every existing spec (and any rendered audio) for the given targets "
+        "first, then plan them fresh — the scripted form of 'delete its spec to replan', "
+        "and the only way to actually pick up a prompt edit (a bare spec delete would "
+        "leave the old render in place under the same deterministic track_id)",
     )
 
     coverage = parser.add_argument_group(
@@ -312,6 +326,43 @@ def _planned_for_targets(args: argparse.Namespace, manager: CategoryManager) -> 
     return out
 
 
+def _cell_entries(kind: str, a: str, b: str, goal: str, manager: CategoryManager) -> list[dict]:
+    """Every catalog entry (any variant) belonging to one target atom's cell."""
+    if kind == "grid":
+        return manager.search(kind="grid", substrate=a, style=b, goal=goal)
+    return manager.search(kind="special", group=a, keyword=b)
+
+
+def replan_targets(args: argparse.Namespace, manager: CategoryManager) -> None:
+    """Clear every spec and rendered track for the named targets, so the next plan starts
+    from a clean slate instead of silently reusing what's already there.
+
+    Deleting only the spec is not enough to actually replan: track_id/seed are
+    deterministic per cell+variant (:func:`bnb.background._seed`), so a fresh spec at the
+    same variant names the exact same track_id as before — render_background.py finds the
+    old audio still sitting at that path and skips re-rendering it (see its own ``--force``
+    note), silently keeping the stale render under what looks like a fresh spec. Clearing
+    both is what makes a prompt edit actually take effect on the next render. Clears every
+    variant of the cell, not just variant 0 — a "replan" is meant to be a clean slate.
+    """
+    cleared_specs = cleared_tracks = 0
+    for target in args.targets:
+        for kind, a, b in _target_atoms(target):
+            for entry in _cell_entries(kind, a, b, args.goal, manager):
+                track_id = entry["track_id"]
+                spec_file = assets.find_spec(track_id, root=manager.root)
+                if spec_file is not None:
+                    spec_file.unlink()
+                    cleared_specs += 1
+                track_file = assets.find_track(track_id, root=manager.root)
+                if track_file is not None:
+                    track_file.unlink()
+                    cleared_tracks += 1
+                print(f"cleared        {track_id}")
+    manager.rebuild()
+    print(f"replan: {cleared_specs} spec(s) and {cleared_tracks} rendered track(s) cleared\n")
+
+
 def planned_signatures(args: argparse.Namespace, manager: CategoryManager) -> list[AnySignature]:
     """Resolve the CLI into the signatures to write as specs."""
     if args.fill is not None or args.per_cell is not None:
@@ -397,6 +448,12 @@ def check_axis_filters(args: argparse.Namespace) -> None:
             f"goal {args.goal!r} does not allow --development {args.development!r} "
             f"(allowed: {', '.join(sorted(GOALS[args.goal].allowed_development))})"
         )
+    if args.replan and not args.targets:
+        raise SystemExit(
+            "--replan clears specific targets; pass one or more STYLE:SUBSTRATE / "
+            "GROUP:KEYWORD / GROUP targets (it doesn't apply to the coverage guides or "
+            "the curated sample set, which never overwrite by design)"
+        )
 
     for flag, known, label in (
         ("substrates", SUBSTRATES, "substrate"),
@@ -430,6 +487,9 @@ def main() -> None:
         print(f"rebuilt catalog.json ({catalog['count']} tracks)")
         return
 
+    if args.replan:
+        replan_targets(args, manager)
+
     existing = manager.spec_ids()
     written = skipped = 0
     try:
@@ -440,7 +500,7 @@ def main() -> None:
         spec = sig.spec()
         if spec["track_id"] in existing:
             skipped += 1
-            print(f"exists         {spec['track_id']}  (delete its spec to replan)")
+            print(f"exists         {spec['track_id']}  (pass --replan to clear and replan it)")
             continue
         manager.add_spec(spec, rebuild=False)
         existing.add(spec["track_id"])

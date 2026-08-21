@@ -155,7 +155,7 @@ def test_existing_specs_are_skipped_not_rewritten(run, capsys):
     run("natural_sounds:rain", "--duration", "90")
 
     assert json.loads(path.read_text())["prompt"] == "hand-edited"
-    assert "delete its spec to replan" in capsys.readouterr().out
+    assert "--replan" in capsys.readouterr().out
 
 
 def test_deleting_a_spec_is_what_allows_a_replan(run):
@@ -166,6 +166,78 @@ def test_deleting_a_spec_is_what_allows_a_replan(run):
     manager = run("natural_sounds:rain", "--duration", "90")
 
     assert manager.search()[0]["duration_s"] == 90
+
+
+# --- --replan ----------------------------------------------------------------
+
+
+def _fake_track_file(manager, track_id):
+    """Simulate a rendered audio file at the exact path render_background.py would
+    have written it to, the same way test_orphan_audio_is_reported does."""
+    from bnb import assets
+
+    spec = json.loads(_spec_file(manager, track_id).read_text())
+    path = assets.track_path(spec, "wav", root=manager.root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"fake")
+    return path
+
+
+def test_replan_requires_explicit_targets(run):
+    with pytest.raises(SystemExit, match="clears specific targets"):
+        run("--replan", "--fill", "2")
+
+
+def test_replan_rewrites_a_hand_edited_spec(run):
+    track_id = build_keyword_signature("natural_sounds", "rain", 60).track_id
+    manager = run("natural_sounds:rain")
+    path = _spec_file(manager, track_id)
+    path.write_text(json.dumps(json.loads(path.read_text()) | {"prompt": "hand-edited"}))
+
+    run("natural_sounds:rain", "--replan")
+
+    assert json.loads(path.read_text())["prompt"] != "hand-edited"
+
+
+def test_replan_deletes_the_rendered_track_too(run):
+    track_id = build_keyword_signature("natural_sounds", "rain", 60).track_id
+    manager = run("natural_sounds:rain")
+    audio = _fake_track_file(manager, track_id)
+    assert audio.exists()
+
+    run("natural_sounds:rain", "--replan")
+
+    assert not audio.exists()
+
+
+def test_replan_clears_every_variant_of_the_cell(run):
+    manager = run("--per-cell", "2", "--groups", "natural_sounds")
+    assert len(manager.search(keyword="rain")) == 2
+
+    manager = run("natural_sounds:rain", "--replan")
+
+    # replan itself only writes variant 0 back; the point is both old variants are gone.
+    assert len(manager.search(keyword="rain")) == 1
+
+
+def test_replan_combines_with_fill_for_fresh_variants(run):
+    # Plant 2 variants, then replan + --fill 2 in one call: if the old pair weren't
+    # actually cleared first, this would land on 3 or 4 rain entries instead of 2.
+    run("--per-cell", "2", "--groups", "natural_sounds")
+
+    manager = run("natural_sounds:rain", "--replan", "--fill", "2")
+
+    assert len(manager.search(keyword="rain")) == 2
+
+
+def test_replan_leaves_other_targets_alone(run):
+    manager = run("natural_sounds:rain", "natural_sounds:ocean")
+    ocean_before = manager.search(keyword="ocean")[0]["track_id"]
+
+    manager = run("natural_sounds:rain", "--replan")
+
+    assert manager.search(keyword="ocean")[0]["track_id"] == ocean_before
+    assert len(manager.search()) == 2  # rain replanned, not dropped
 
 
 def test_a_repeated_target_in_one_run_is_only_written_once(run):

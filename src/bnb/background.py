@@ -1170,11 +1170,14 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
             ),
             # No overrides: this is squarely what the group's own defaults (FOCUS_FLOWING,
             # the "awake and warm" body) were written for.
+            # v1 leaned on "crisp", "precise", "clinical" to keep it functional rather than
+            # danceable — instead it rendered dry, cold, occasionally unsettling. Warmth and
+            # an actual beat were never in tension with "functional"; this asks for both.
             "clarity": KeywordEntry(
-                "Modern instrumental electronica for sustained focus — a clean arpeggiated "
-                "synth line looping steadily over warm evolving pads and a soft, unaccented "
-                "electronic pulse, crisp and precise, clinical and functional rather than "
-                "danceable or emotional",
+                "Warm ambient electronica for sustained focus — a soft, clearly melodic "
+                "synth line floating over lush evolving pads, with a slow, gentle beat "
+                "keeping steady time underneath, inviting and warm throughout, never cold, "
+                "clinical or unsettling",
                 goals=frozenset({"focus"}),
             ),
         },
@@ -1221,16 +1224,20 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
         flowing=RELAX_FLOWING,
         development="motif_evolving",
         keywords={
-            # Melody-led on purpose, as distinct from the grid's buddhist_meditative x
-            # percussive_with_tail cell (singing bowls doing the leading): here the bowl is
-            # texture, the flute carries the tune. Same instrumentation vocabulary the grid
-            # already established (shakuhachi + singing-bowl drone + a temple bell) rather
-            # than inventing new instruments, and wordless throughout (§6 guardrail — no
+            # v1 opened on a scene ("temple courtyard at dusk") before naming an instrument,
+            # and called the bowl a "drone" — it rendered as ambience/noise, no music. Named
+            # instruments come first now, two of them carrying the tune together (so there
+            # is always a melodic voice playing, not one flute alone against silence), and
+            # the bowl is demoted to "very quiet ... underneath" so it reads as backing
+            # texture rather than the competing instruction "drone" was. Same instrumentation
+            # family the grid already established (shakuhachi, singing bowl) plus a plucked
+            # guzheng for a second clear melodic line; wordless throughout (§6 guardrail — no
             # rendered sacred text).
             "temple": KeywordEntry(
-                "A quiet temple courtyard at dusk — a solo shakuhachi and a soft singing-bowl "
-                "drone trading a slow, wordless melody, with only the faintest temple bell "
-                "tone in the far distance; melody leads throughout, never the strikes",
+                "A Buddhist temple ensemble — a solo shakuhachi playing a clear, breathy "
+                "melody, answered and layered by a soft plucked guzheng carrying the tune "
+                "together, with only a very quiet singing-bowl resonance underneath, warm "
+                "and meditative, wordless throughout",
                 goals=frozenset({"relax"}),
             ),
             "lounge": KeywordEntry(
@@ -1241,11 +1248,16 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
                 goals=frozenset({"relax"}),
             ),
             # Solo, not the ensemble lounge already carries — a distinct instrumentation
-            # rather than a mood variant of it.
+            # rather than a mood variant of it. v1 asked for "rubato" (no steady tempo) and
+            # nothing but a held melody over pedal resonance, which rendered pleasant but
+            # inert — no pace, nowhere to go. This gives the left hand a steady, flowing
+            # part to carry pace, and states the chords have to move and resolve, so there
+            # is somewhere for the piece to go.
             "piano": KeywordEntry(
-                "A solo grand piano, warm and close-mic'd — a slow, tender melody with "
-                "gentle sustain and soft pedal resonance, played rubato and unhurried, like "
-                "a quiet room recording late in the evening",
+                "A solo grand piano playing a warm, clearly melodic tune at a gentle, "
+                "flowing pace — a singable right-hand line moving over a steady left-hand "
+                "arpeggio, with the chords shifting and resolving warmly every few bars, "
+                "tender and full of quiet forward motion",
                 goals=frozenset({"relax"}),
             ),
         },
