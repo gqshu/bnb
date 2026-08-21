@@ -91,6 +91,7 @@ def test_unknown_axis_names_rejected():
 
 NATURAL = list(SPECIAL_GROUPS["natural_sounds"].keywords)
 ENERGIZER = list(SPECIAL_GROUPS["energizer"].keywords)
+UNWIND = list(SPECIAL_GROUPS["unwind"].keywords)
 
 
 def _cells(sigs):
@@ -100,7 +101,10 @@ def _cells(sigs):
 def test_special_cells_enumerates_every_keyword():
     assert special_cells(["natural_sounds"]) == [("natural_sounds", k) for k in NATURAL]
     assert special_cells(["energizer"]) == [("energizer", k) for k in ENERGIZER]
-    assert special_cells() == special_cells(["natural_sounds"]) + special_cells(["energizer"])
+    assert special_cells(["unwind"]) == [("unwind", k) for k in UNWIND]
+    assert special_cells() == (
+        special_cells(["natural_sounds"]) + special_cells(["energizer"]) + special_cells(["unwind"])
+    )
 
 
 def test_plan_special_coverage_spreads_across_keywords():

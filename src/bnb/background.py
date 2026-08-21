@@ -1085,6 +1085,13 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
     # carrier needs. The *measured* half (`am_depth_by_band[active_band] < THRESHOLD`, via
     # scripts/audio_features.py) is still unimplemented, so membership here is asserted,
     # not yet verified; see the note in that doc.
+    #
+    # Deliberately focus-only, uniformly (test_energizer_keywords_are_focus_only,
+    # test_energizer_prompts_meet_every_stated_requirement — every member shares this
+    # group's body/flowing verbatim, no per-keyword mood). The AM-compatibility mechanism
+    # (a continuous, gap-free bed) isn't inherently focus-specific, but this pack's taste —
+    # "awake and warm", a steady beat — is; relax-goal AM content with a different taste
+    # lives in the parallel `unwind` group below instead of diluting this one.
     "energizer": SpecialGroup(
         name="energizer",
         # Continuity is not restated here: `flowing` (FOCUS_FLOWING) already carries it,
@@ -1160,6 +1167,86 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
                 "simple singing melody over a light brushed groove and a mellow bass, "
                 "comfortable and unhurried",
                 goals=frozenset({"focus"}),
+            ),
+            # No overrides: this is squarely what the group's own defaults (FOCUS_FLOWING,
+            # the "awake and warm" body) were written for.
+            "clarity": KeywordEntry(
+                "Modern instrumental electronica for sustained focus — a clean arpeggiated "
+                "synth line looping steadily over warm evolving pads and a soft, unaccented "
+                "electronic pulse, crisp and precise, clinical and functional rather than "
+                "danceable or emotional",
+                goals=frozenset({"focus"}),
+            ),
+        },
+    ),
+    # energizer's relax-goal counterpart: same AM-compatibility requirement (a continuous,
+    # gap-free bed — see energizer's comment above), different taste. "Moderate, steady
+    # energy — awake and warm" is wrong for something meant to destress or meditate to, so
+    # this is its own group with its own body/flowing rather than per-keyword overrides
+    # inside energizer (which test_energizer_prompts_meet_every_stated_requirement locks to
+    # one shared mood on purpose).
+    "unwind": SpecialGroup(
+        name="unwind",
+        body=(
+            "Calm, settled and easy rather than sleepy — spacious and unhurried, gently "
+            "absorbing without ever asking for attention, the kind of thing that can sit "
+            "underneath an hour of rest, meditation or quiet unwinding without ever feeling "
+            "urgent."
+        ),
+        global_styles=(
+            "instrumental",
+            "melodic",
+            "warm",
+            "background music",
+            "high production quality",
+        ),
+        # Same AM-continuity concern as energizer (a gap in the bed is a gap in the
+        # carrier), so the same negative list — the shared relax negatives ban "energetic,
+        # fast" language this group doesn't need, but say nothing about silence/gaps.
+        negative_prompt=(
+            "lyrics, vocals, spoken word, rap, dramatic climax, buildup, drop, sudden "
+            "transitions, aggressive, distorted, harsh, loud, frantic, chaotic, sparse, "
+            "silence, gaps, fade out, ambient drone"
+        ),
+        negative_global_styles=(
+            "vocals",
+            "lyrics",
+            "aggressive",
+            "distorted",
+            "harsh",
+            "buildup",
+            "drop",
+            "silence",
+        ),
+        flowing=RELAX_FLOWING,
+        development="motif_evolving",
+        keywords={
+            # Melody-led on purpose, as distinct from the grid's buddhist_meditative x
+            # percussive_with_tail cell (singing bowls doing the leading): here the bowl is
+            # texture, the flute carries the tune. Same instrumentation vocabulary the grid
+            # already established (shakuhachi + singing-bowl drone + a temple bell) rather
+            # than inventing new instruments, and wordless throughout (§6 guardrail — no
+            # rendered sacred text).
+            "temple": KeywordEntry(
+                "A quiet temple courtyard at dusk — a solo shakuhachi and a soft singing-bowl "
+                "drone trading a slow, wordless melody, with only the faintest temple bell "
+                "tone in the far distance; melody leads throughout, never the strikes",
+                goals=frozenset({"relax"}),
+            ),
+            "lounge": KeywordEntry(
+                "A late-night slow jazz quartet — soft brushed-drum swing, a warm upright "
+                "bass walking gently underneath, a Rhodes electric piano comping soft "
+                "chords, and a muted trumpet playing an unhurried, tender melody, close and "
+                "intimate like a dim, half-empty room",
+                goals=frozenset({"relax"}),
+            ),
+            # Solo, not the ensemble lounge already carries — a distinct instrumentation
+            # rather than a mood variant of it.
+            "piano": KeywordEntry(
+                "A solo grand piano, warm and close-mic'd — a slow, tender melody with "
+                "gentle sustain and soft pedal resonance, played rubato and unhurried, like "
+                "a quiet room recording late in the evening",
+                goals=frozenset({"relax"}),
             ),
         },
     ),
