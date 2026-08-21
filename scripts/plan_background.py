@@ -221,24 +221,23 @@ def print_coverage(args: argparse.Namespace, manager: CategoryManager) -> None:
         print_special_coverage(manager, groups)
 
 
-def build_target(
-    target: str, duration_s: int, goal: str, development: str | None = None
-) -> list[AnySignature]:
-    """One CLI target, resolved into the signatures it names.
+Atom = tuple[str, str, str]  # ("grid", substrate, style) or ("special", group, keyword)
 
-    ``STYLE:SUBSTRATE`` is one grid cell and ``GROUP:KEYWORD`` one special cell (the
-    left side disambiguates them). A bare ``GROUP`` is every keyword in that special
-    group — the whole of natural_sounds in one go, since a group is small, fixed, and
-    usually wanted entire. There is no bare-style equivalent: a style spans the grid,
-    which is what the coverage guides are for. ``goal`` only applies to grid targets —
-    special cells have no goal axis (§ background.py's ``KeywordEntry.goals`` note).
-    ``development`` likewise only applies to grid targets; omitted, ``build_signature``
-    resolves it to the goal's own default.
+
+def _target_atoms(target: str) -> list[Atom]:
+    """One CLI target, resolved into the grid/special cell(s) it names — without building
+    any signatures, so both the plain-target path (:func:`build_target`) and the counted
+    path (:func:`_planned_for_targets`) share one parser and can't drift apart.
+
+    ``STYLE:SUBSTRATE`` is one grid cell and ``GROUP:KEYWORD`` one special cell (the left
+    side disambiguates them). A bare ``GROUP`` is every keyword in that special group — the
+    whole of natural_sounds in one go, since a group is small, fixed, and usually wanted
+    entire. There is no bare-style equivalent: a style spans the grid, which is what the
+    coverage guides are for.
     """
     if ":" not in target:
         if target in SPECIAL_GROUPS:
-            group = SPECIAL_GROUPS[target]
-            return [build_keyword_signature(target, kw, duration_s) for kw in group.keywords]
+            return [("special", target, kw) for kw in SPECIAL_GROUPS[target].keywords]
         raise unknown_value(
             target,
             SPECIAL_GROUPS,
@@ -249,18 +248,76 @@ def build_target(
     if left in STYLES:
         if right not in SUBSTRATES:
             raise unknown_value(right, SUBSTRATES, label=f"substrate in {target!r}")
-        return [build_signature(right, left, goal, duration_s, development=development)]
+        return [("grid", right, left)]
     if left in SPECIAL_GROUPS:
         keywords = SPECIAL_GROUPS[left].keywords
         if right not in keywords:
             raise unknown_value(right, keywords, label=f"keyword in {target!r}")
-        return [build_keyword_signature(left, right, duration_s)]
+        return [("special", left, right)]
     raise unknown_value(left, [*STYLES, *SPECIAL_GROUPS], label=f"style or special group in {target!r}")
+
+
+def build_target(
+    target: str, duration_s: int, goal: str, development: str | None = None
+) -> list[AnySignature]:
+    """One CLI target, resolved into the signatures it names (one each, at variant 0).
+
+    ``goal`` only applies to grid atoms — special cells have no goal axis (§
+    background.py's ``KeywordEntry.goals`` note). ``development`` likewise only applies to
+    grid atoms; omitted, ``build_signature`` resolves it to the goal's own default.
+    """
+    sigs: list[AnySignature] = []
+    for kind, a, b in _target_atoms(target):
+        if kind == "grid":
+            sigs.append(build_signature(a, b, goal, duration_s, development=development))
+        else:
+            sigs.append(build_keyword_signature(a, b, duration_s))
+    return sigs
+
+
+def _planned_for_targets(args: argparse.Namespace, manager: CategoryManager) -> list[AnySignature]:
+    """``--fill``/``--per-cell`` restricted to the named targets: N (or up-to-N) variants of
+    *each* one, rather than spread across the whole grid/group the way the untargeted
+    coverage guides do. Each target is resolved to its own atom(s) and planned
+    independently — a bare special-group target still expands to every keyword in it, each
+    getting its own N, but naming several targets together never cross-products them into
+    cells nobody asked for (unlike restricting via --substrates/--styles, which would).
+    """
+    out: list[AnySignature] = []
+    for target in args.targets:
+        for kind, a, b in _target_atoms(target):
+            if kind == "grid":
+                common = dict(
+                    existing_cells=existing_grid_cells(manager, args.goal),
+                    used_track_ids={e["track_id"] for e in manager.search(kind="grid", goal=args.goal)},
+                    substrates=[a],
+                    styles=[b],
+                    goal=args.goal,
+                )
+                if args.per_cell is not None:
+                    out.extend(fill_to_per_cell(args.per_cell, args.duration, **common))
+                else:
+                    out.extend(plan_coverage(args.fill, args.duration, **common))
+            else:
+                common = dict(
+                    existing_cells=existing_special_cells(manager),
+                    used_track_ids={e["track_id"] for e in manager.search(kind="special")},
+                    groups=[a],
+                    keywords=[b],
+                )
+                if args.per_cell is not None:
+                    out.extend(fill_special_to_per_cell(args.per_cell, args.duration, **common))
+                else:
+                    out.extend(plan_special_coverage(args.fill, args.duration, **common))
+    return out
 
 
 def planned_signatures(args: argparse.Namespace, manager: CategoryManager) -> list[AnySignature]:
     """Resolve the CLI into the signatures to write as specs."""
     if args.fill is not None or args.per_cell is not None:
+        if args.targets:
+            return _planned_for_targets(args, manager)
+
         # --groups switches the guide's domain from the grid to special cells; the
         # two taxonomies have different axes, so a run fills one or the other.
         if args.groups:

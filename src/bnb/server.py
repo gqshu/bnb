@@ -592,6 +592,11 @@ _BG_NAMES = {
     "daydream": "遐想",
     "momentum": "律动",
     "warmth": "暖意",
+    "clarity": "清晰",
+    # unwind
+    "temple": "梵乐",
+    "lounge": "爵士",
+    "piano": "钢琴",
 }
 
 # Per-group fallback for a keyword with no curated name yet. The old single fallback was
@@ -600,6 +605,7 @@ _BG_NAMES = {
 _GROUP_NAMES = {
     "natural_sounds": "自然音",
     "energizer": "活力",
+    "unwind": "舒缓",
 }
 _STYLE_NAMES = {
     "buddhist_meditative": "梵音冥想",

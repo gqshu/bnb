@@ -1600,13 +1600,26 @@ def fill_to_per_cell(
 SpecialCell = Cell  # (group, keyword)
 
 
-def special_cells(groups: Sequence[str] | None = None) -> list[SpecialCell]:
-    """Every (group, keyword) cell in the named special groups (default: all of them)."""
+def special_cells(
+    groups: Sequence[str] | None = None, keywords: Sequence[str] | None = None
+) -> list[SpecialCell]:
+    """Every (group, keyword) cell in the named special groups (default: all of them),
+    optionally narrowed to specific keyword names within them — the special-cell analogue
+    of ``plan_coverage``'s ``substrates``/``styles``, for targeting one or a few keywords
+    (e.g. topping up a single new keyword) rather than a whole group."""
     names = list(groups) if groups is not None else list(SPECIAL_GROUPS)
     for name in names:
         if name not in SPECIAL_GROUPS:
             raise ValueError(f"unknown special group {name!r}, expected one of {list(SPECIAL_GROUPS)}")
-    return [(name, keyword) for name in names for keyword in SPECIAL_GROUPS[name].keywords]
+    cells = [(name, keyword) for name in names for keyword in SPECIAL_GROUPS[name].keywords]
+    if keywords is not None:
+        wanted = set(keywords)
+        known = {keyword for _, keyword in cells}
+        unknown = wanted - known
+        if unknown:
+            raise ValueError(f"unknown keyword(s) {sorted(unknown)}, expected one of {sorted(known)}")
+        cells = [cell for cell in cells if cell[1] in wanted]
+    return cells
 
 
 def special_coverage_report(
@@ -1631,11 +1644,17 @@ def plan_special_coverage(
     existing_cells: Iterable[SpecialCell] = (),
     used_track_ids: Iterable[str] = (),
     groups: Sequence[str] | None = None,
+    keywords: Sequence[str] | None = None,
 ) -> list[KeywordSignature]:
-    """Pick the next ``n`` keyword signatures that most evenly fill the special groups."""
+    """Pick the next ``n`` keyword signatures that most evenly fill the special groups.
+
+    ``keywords`` narrows to specific keywords the same way ``groups`` narrows to specific
+    groups (see :func:`special_cells`) — with both a single group and a single keyword given,
+    this fills exactly one cell, e.g. ``n`` more variants of one specific keyword.
+    """
     if n <= 0:
         return []
-    cells = special_cells(groups)
+    cells = special_cells(groups, keywords)
     counts = Counter(cell for cell in existing_cells if cell in set(cells))
 
     def priority(cell: SpecialCell) -> tuple[Any, ...]:
@@ -1663,9 +1682,10 @@ def fill_special_to_per_cell(
     existing_cells: Iterable[SpecialCell] = (),
     used_track_ids: Iterable[str] = (),
     groups: Sequence[str] | None = None,
+    keywords: Sequence[str] | None = None,
 ) -> list[KeywordSignature]:
     """Coverage guide: bring every keyword of the selected groups up to ``target`` tracks."""
-    cells = special_cells(groups)
+    cells = special_cells(groups, keywords)
     counts = Counter(cell for cell in existing_cells if cell in set(cells))
     needed = sum(max(0, target - counts[cell]) for cell in cells)
     return plan_special_coverage(
@@ -1674,4 +1694,5 @@ def fill_special_to_per_cell(
         existing_cells=existing_cells,
         used_track_ids=used_track_ids,
         groups=groups,
+        keywords=keywords,
     )
