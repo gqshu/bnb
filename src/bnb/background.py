@@ -1171,13 +1171,21 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
             # No overrides: this is squarely what the group's own defaults (FOCUS_FLOWING,
             # the "awake and warm" body) were written for.
             # v1 leaned on "crisp", "precise", "clinical" to keep it functional rather than
-            # danceable — instead it rendered dry, cold, occasionally unsettling. Warmth and
-            # an actual beat were never in tension with "functional"; this asks for both.
+            # danceable — instead it rendered dry, cold, occasionally unsettling. v2 warmed
+            # the language up but still came back dry and thin: naming the arpeggio and the
+            # beat but only gesturing at "lush evolving pads" as a modifier left nothing to
+            # actually fill out the body. This gives the pad its own sentence as a named,
+            # continuously-present layer — which is also the AM half of the fix: FOCUS_FLOWING
+            # already asks for a sustained layer under everything so the carrier is never
+            # thin/silent for the modulation to ride on, but a layer only mentioned in passing
+            # is easy for the model to shortchange, and a thin bed is a weak AM carrier.
+            # Calling it out explicitly is what makes both problems the same fix.
             "clarity": KeywordEntry(
                 "Warm ambient electronica for sustained focus — a soft, clearly melodic "
-                "synth line floating over lush evolving pads, with a slow, gentle beat "
-                "keeping steady time underneath, inviting and warm throughout, never cold, "
-                "clinical or unsettling",
+                "synth arpeggio over a slow, steady beat, and underneath it a slow-moving "
+                "ambient pad layer that continuously swells and shifts, filling out the "
+                "sound with real low-end warmth and depth; full-bodied throughout, never "
+                "dry, thin, cold, clinical or unsettling",
                 goals=frozenset({"focus"}),
             ),
         },
