@@ -73,6 +73,21 @@ instead of the modulation depth and the entrainment never actually turns on. The
 plays; it just isn't doing anything. ``isochronic`` is this codebase's name for that AM
 path — the app labels it 魔改."""
 
+
+BEAT_MODE_ALIASES = {"am_music": "isochronic"}
+"""Other names for a mode, accepted in authored JSON and resolved on the way out.
+
+``am_music`` is what the **stream API** calls this AM path (``bnb.stream``'s ``BeatSpec``),
+so it is the name that comes to mind when authoring a card, and rejecting it was pedantry
+about which of two of our own vocabularies a hand-edited file happened to use.
+
+Resolved rather than merely allowed, and resolved *here* rather than in the app
+(:func:`load_profiles`), so exactly one spelling ever crosses the wire. That matters more
+than it looks: ``audio.ts`` builds anything that isn't binaural or monaural as the AM
+graph, so a second spelling *plays* — it just used to route the strength control to the
+disconnected beat gain instead of the modulation depth, and the entrainment silently never
+turned on. One name on the wire means that mismatch has nowhere to live."""
+
 # Focus is warm, relax is cool, and the grid leans on that to say what a card does before
 # anyone reads it. Stated as hue *bands* rather than fixed gradients because the cards are
 # authored and meant to differ from one another — a teal, an indigo and a slate blue are
@@ -137,12 +152,19 @@ def load_profiles(root: Path = ASSETS_DIR) -> list[dict[str, Any]]:
     Accepts either the served envelope (``{"profiles": [...]}``) or a bare list, so the
     file can be hand-edited in whichever shape is convenient. Read fresh on every call —
     the file is tiny and this is what lets an edit show up without a server restart.
+    ``spec.mode`` comes out canonical: an alias like ``am_music`` is resolved to the name
+    the app knows (:data:`BEAT_MODE_ALIASES`).
     Raises ``ValueError`` (via :func:`validate_profiles`) on a malformed list, or
     ``OSError`` / ``json.JSONDecodeError`` if the file is missing or unparseable.
     """
     raw = json.loads(profiles_path(root).read_text())
     profiles = raw.get("profiles", []) if isinstance(raw, dict) else raw
     validate_profiles(profiles)
+    for profile in profiles:
+        spec = profile.get("spec") or {}
+        canonical = BEAT_MODE_ALIASES.get(spec.get("mode"))
+        if canonical:
+            spec["mode"] = canonical
     return profiles
 
 
@@ -208,8 +230,9 @@ def validate_profiles(profiles: list[dict[str, Any]]) -> None:
                 for keyword in soundscape:
                     problems.extend(f"{where}: {p}" for p in soundscape_problems(keyword))
         mode = spec.get("mode")
-        if mode is not None and mode not in BEAT_MODES:
-            problems.append(f"{where}: spec.mode {mode!r} not in {sorted(BEAT_MODES)}")
+        if mode is not None and mode not in BEAT_MODES and mode not in BEAT_MODE_ALIASES:
+            known = sorted([*BEAT_MODES, *BEAT_MODE_ALIASES])
+            problems.append(f"{where}: spec.mode {mode!r} not in {known}")
         gradient = p.get("gradient")
         # Community cards only. The goal-hue convention earns its keep on cards the
         # listener has never seen — colour tells them what it does before they read it.

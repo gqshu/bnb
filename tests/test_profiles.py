@@ -67,6 +67,20 @@ def test_every_profile_is_well_formed():
                 assert spec["mode"] in BEAT_MODES
 
 
+def test_am_music_is_accepted_and_resolved_to_the_app_s_name(tmp_path):
+    """``am_music`` is the stream API's name for the AM path, and the obvious thing to
+    write by hand. It validates — and comes back out as ``isochronic``, so only one
+    spelling ever reaches the app (where an unresolved one used to play while silently
+    leaving the modulation depth at zero)."""
+    from bnb.profiles import BEAT_MODE_ALIASES
+
+    authored = card(spec={"goal": "relax", "mode": "am_music"})
+    validate_profiles([authored])  # accepted as authored
+    (tmp_path / "profiles.json").write_text(json.dumps({"profiles": [authored]}))
+    assert load_profiles(tmp_path)[0]["spec"]["mode"] == "isochronic"
+    assert BEAT_MODE_ALIASES["am_music"] == "isochronic"
+
+
 def test_a_card_may_leave_its_gradient_out():
     """Colour is optional: the client generates one from the goal (§ connect.ts
     gradientFor), so a card that has no identity of its own doesn't have to invent one —
@@ -125,7 +139,8 @@ def test_endpoint_500s_on_a_broken_config(tmp_path, monkeypatch):
         pytest.param([card(badges=[{"text": str(n)} for n in range(4)])], id="too many badges"),
         pytest.param([card(source=None)], id="missing source"),
         pytest.param([card(source="curated")], id="unknown source"),
-        pytest.param([card(spec={"goal": "relax", "mode": "am_music"})], id="mode the app can't build"),
+        # am_music is a legal alias now (§ BEAT_MODE_ALIASES); this one names nothing
+        pytest.param([card(spec={"goal": "relax", "mode": "sidechain"})], id="mode the app can't build"),
         pytest.param(
             [card(spec={"goal": "focus", "mode": "binaural"})],  # blue gradient, focus goal
             id="gradient contradicts goal",
@@ -140,7 +155,7 @@ def test_validate_rejects_malformed_profiles(bad):
 def test_the_error_names_every_problem_at_once():
     """One bad hand-edit should report all its issues, not one per fix-and-retry."""
     with pytest.raises(ValueError) as exc:
-        validate_profiles([card(source="curated", spec={"goal": "focus", "mode": "am_music"})])
+        validate_profiles([card(source="curated", spec={"goal": "focus", "mode": "sidechain"})])
     message = str(exc.value)
     assert "source" in message and "spec.mode" in message and "gradient hue" in message
 
