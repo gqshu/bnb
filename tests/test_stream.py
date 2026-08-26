@@ -665,8 +665,15 @@ def test_random_background_endpoint_accepts_a_goal_query_param():
     assert client.get("/api/backgrounds/random", params={"goal": "gamma"}).status_code == 422
 
 
-def test_random_background_unknown_type_is_400():
-    res = client.get("/api/backgrounds/random", params={"type": "techno"})
+def test_random_background_unknown_soundscape_is_400():
+    res = client.get("/api/backgrounds/random", params={"soundscape": "techno"})
+    assert res.status_code == 400
+
+
+def test_random_background_impossible_soundscape_pair_is_400():
+    """Two terms no track can carry at once is a typo, not an empty library — and an
+    empty pool would otherwise read as "nothing rendered yet"."""
+    res = client.get("/api/backgrounds/random", params={"soundscape": "drone.noise_texture"})
     assert res.status_code == 400
 
 
@@ -675,9 +682,9 @@ def _install_fake_catalog(monkeypatch):
     natural_sounds special track, wired through ``categories.search`` so the selection
     helpers run for real against known data instead of the live (rebuilding) asset repo."""
     fake = [
-        {"track_id": "drone_focus", "kind": "grid", "substrate": "drone", "goal": "focus", "rendered": True},
-        {"track_id": "drone_relax", "kind": "grid", "substrate": "drone", "goal": "relax", "rendered": True},
-        {"track_id": "noise_relax", "kind": "grid", "substrate": "noise_texture", "goal": "relax", "rendered": True},
+        {"track_id": "drone_focus", "kind": "grid", "substrate": "drone", "style": "lofi", "goal": "focus", "rendered": True},
+        {"track_id": "drone_relax", "kind": "grid", "substrate": "drone", "style": "neutral", "goal": "relax", "rendered": True},
+        {"track_id": "noise_relax", "kind": "grid", "substrate": "noise_texture", "style": "lofi", "goal": "relax", "rendered": True},
         {"track_id": "rain", "kind": "special", "group": "natural_sounds", "keyword": "rain", "rendered": True},
     ]
 
@@ -704,26 +711,53 @@ def test_random_background_without_type_spans_all_compatible_types(monkeypatch):
     assert "drone_focus" not in relax_ids
 
 
-def test_random_background_type_filter_pins_one_type(monkeypatch):
+def test_soundscape_filter_pins_the_tracks_it_names(monkeypatch):
     """A grid **substrate** routes through the per-track ``goal`` field; a special group
     routes through the keyword-goal allow-list."""
     _install_fake_catalog(monkeypatch)
+    pick = server._random_background_entry
     # a substrate picks only its own tracks, and only the entry whose goal field matches
-    assert server._random_background_entry("focus", category="drone")["track_id"] == "drone_focus"
-    assert server._random_background_entry("relax", category="drone")["track_id"] == "drone_relax"
+    assert pick("focus", soundscape=["drone"])["track_id"] == "drone_focus"
+    assert pick("relax", soundscape=["drone"])["track_id"] == "drone_relax"
     # a substrate with nothing rendered for that goal returns None (endpoint -> 404)
-    assert server._random_background_entry("focus", category="noise_texture") is None
+    assert pick("focus", soundscape=["noise_texture"]) is None
     # a special group routes through the keyword path, not the grid goal field
-    assert server._random_background_entry("relax", category="natural_sounds")["kind"] == "special"
+    assert pick("relax", soundscape=["natural_sounds"])["kind"] == "special"
+    # ...and so does one of its keywords on its own
+    assert pick("relax", soundscape=["rain"])["track_id"] == "rain"
 
 
-def test_random_background_switch_respects_goal_and_type(monkeypatch):
-    """The switch button's ``exclude`` stays inside the current goal + type pool: with two
-    relax drone beds it never returns the excluded one and never escapes to another type."""
-    fake = _install_fake_catalog(monkeypatch)
-    fake.append({"track_id": "drone_relax2", "kind": "grid", "substrate": "drone", "goal": "relax", "rendered": True})
+def test_soundscape_matches_the_other_axis_and_both_at_once(monkeypatch):
+    """The point of the keyword list: style is filterable too, and a dotted keyword pins
+    the one track carrying both tags — in whichever order it was written."""
+    _install_fake_catalog(monkeypatch)
+    pick = server._random_background_entry
+    assert pick("relax", soundscape=["lofi"])["track_id"] == "noise_relax"  # style, not substrate
+    assert pick("focus", soundscape=["drone.lofi"])["track_id"] == "drone_focus"
+    assert pick("focus", soundscape=["lofi.drone"])["track_id"] == "drone_focus"  # order-free
+    assert pick("relax", soundscape=["drone.lofi"]) is None  # that cell is focus-only
+
+
+def test_a_soundscape_list_is_a_union(monkeypatch):
+    """Several keywords widen the pool rather than narrowing it — one card can offer
+    "rainfall or a drone bed" without a taxonomy node meaning both."""
+    _install_fake_catalog(monkeypatch)
     picks = {
-        server._random_background_entry("relax", category="drone", exclude="drone_relax")["track_id"]
+        server._random_background_entry("relax", soundscape=["drone", "rain"])["track_id"]
+        for _ in range(60)
+    }
+    assert picks == {"drone_relax", "rain"}  # both keywords' tracks, nothing else
+
+
+def test_random_background_switch_respects_goal_and_soundscape(monkeypatch):
+    """The switch button's ``exclude`` stays inside the current goal + soundscape pool: with
+    two relax drone beds it never returns the excluded one and never escapes the filter."""
+    fake = _install_fake_catalog(monkeypatch)
+    fake.append(
+        {"track_id": "drone_relax2", "kind": "grid", "substrate": "drone", "style": "neutral", "goal": "relax", "rendered": True}
+    )
+    picks = {
+        server._random_background_entry("relax", soundscape=["drone"], exclude="drone_relax")["track_id"]
         for _ in range(60)
     }
     assert picks == {"drone_relax2"}  # excluded one gone; noise/rain/focus never leak in

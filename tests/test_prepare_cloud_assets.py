@@ -12,23 +12,29 @@ from bnb.profiles import validate_profiles  # noqa: E402
 RELAX_GRADIENT = "linear-gradient(135deg, #4a56b8, #1d2050)"
 
 
-def card(pid, goal, typ=None, source="community"):
+def card(pid, goal, soundscape=None, source="community"):
     spec = {"goal": goal, "mode": "binaural"}
-    if typ:
-        spec["type"] = typ
+    if soundscape:
+        spec["soundscape"] = list(soundscape)
     return {"id": pid, "title": pid, "source": source, "gradient": RELAX_GRADIENT, "spec": spec}
 
 
 def manifest(pairs):
     return {
         "tracks": [
-            {"id": f"t{i}", "file": f"bg/t{i}.mp3", "name": "x", "type": t, "goals": [g]}
-            for i, (t, g) in enumerate(pairs)
+            {"id": f"t{i}", "file": f"bg/t{i}.mp3", "name": "x", "tags": list(tags), "goals": [g]}
+            for i, (tags, g) in enumerate(pairs)
         ]
     }
 
 
-LIBRARY = manifest([("natural_sounds", "relax"), ("drone", "focus"), ("energizer", "relax")])
+LIBRARY = manifest(
+    [
+        (["natural_sounds", "rain"], "relax"),
+        (["drone", "lofi"], "focus"),
+        (["energizer", "uplift"], "relax"),
+    ]
+)
 
 
 def test_the_bucket_carries_community_music_only(tmp_path, monkeypatch):
@@ -50,8 +56,8 @@ def test_the_shipped_catalogue_survives_the_round_trip(tmp_path):
 
 
 def test_the_shipped_catalogue_is_playable_against_the_real_library(tmp_path):
-    """Every card in the bucket must name a (type, goal) some track can answer, or the
-    grid tile throws the moment someone taps it."""
+    """Every card in the bucket must name a (soundscape, goal) some track can answer, or
+    the grid tile throws the moment someone taps it."""
     from bnb.catalog import CategoryManager
 
     entries = sorted(CategoryManager().search(rendered=True), key=lambda e: e["track_id"])
@@ -60,19 +66,23 @@ def test_the_shipped_catalogue_is_playable_against_the_real_library(tmp_path):
 
 
 def test_a_card_no_track_can_answer_is_reported(tmp_path):
-    """Selection is the client's job now, and its whole filter is goals + type — so a
-    card asking for a combination the manifest doesn't hold throws at play time."""
+    """Selection is the client's job now, and its whole filter is goals + soundscape — so
+    a card asking for a combination the manifest doesn't hold throws at play time."""
     dead = prep.unplayable_profiles(
         [
-            card("fine", "relax", "natural_sounds"),
-            card("wrong_type", "relax", "drone"),  # drone exists, but only for focus
-            card("wrong_goal", "focus", "natural_sounds"),
-            card("any_relax", "relax"),  # no type: any relax track will do
+            card("fine", "relax", ["natural_sounds"]),
+            card("by_keyword", "relax", ["rain"]),  # the group's keyword, not the group
+            card("by_pair", "focus", ["drone.lofi"]),  # both tags of one track
+            card("one_of_two", "relax", ["techno", "energizer"]),  # a union: one hit is enough
+            card("wrong_sound", "relax", ["drone"]),  # drone exists, but only for focus
+            card("wrong_goal", "focus", ["natural_sounds"]),
+            card("wrong_pair", "focus", ["drone.neutral"]),  # right track, wrong style
+            card("any_relax", "relax"),  # no soundscape: any relax track will do
         ],
         LIBRARY,
     )
-    assert [d.split(":")[0] for d in dead] == ["wrong_type", "wrong_goal"]
-    assert "goal=relax type=drone" in dead[0]
+    assert [d.split(":")[0] for d in dead] == ["wrong_sound", "wrong_goal", "wrong_pair"]
+    assert "goal=relax soundscape=['drone']" in dead[0]
 
 
 def test_a_card_with_no_spec_is_not_called_unplayable():
@@ -80,12 +90,13 @@ def test_a_card_with_no_spec_is_not_called_unplayable():
     assert prep.unplayable_profiles([{"id": "manual", "manual": True}], LIBRARY) == []
 
 
-def test_playable_pairs_reads_every_goal_a_track_serves():
+def test_playable_tracks_reads_every_goal_a_track_serves():
     """A special-group bed suits more than one goal — rainfall relaxes and masks — so one
     track can vouch for cards on both sides."""
-    both = manifest([("natural_sounds", "relax")])
+    both = manifest([(["natural_sounds", "rain"], "relax")])
     both["tracks"][0]["goals"] = ["focus", "relax"]
-    assert prep.playable_pairs(both) == {("natural_sounds", "focus"), ("natural_sounds", "relax")}
+    assert prep.playable_tracks(both) == [(["natural_sounds", "rain"], {"focus", "relax"})]
+    assert prep.unplayable_profiles([card("f", "focus", ["rain"])], both) == []
 
 
 def test_strays_are_the_mp3s_the_manifest_stopped_listing(tmp_path):

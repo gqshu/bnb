@@ -43,9 +43,10 @@ while special-group tracks carry none, and their goal compatibility lives on the
 definition instead (``background.KeywordEntry.goals``) — which is why the server needs
 both `_goal_compatible_pool` and `_special_pool` to answer one question. Rather than ship
 that split to the client, this resolves it here: every track comes out with a flat
-``goals`` list and a flat ``type``, so the client's filter is one predicate over one array
-and the grid/special distinction disappears entirely. The taxonomy stays owned by Python;
-only its resolved output crosses the wire.
+``goals`` list and a flat ``tags`` list — its two taxonomy axes, ``[substrate, style]`` for
+a grid track and ``[group, keyword]`` for a special one — so the client's filter is one
+predicate over two arrays and the grid/special distinction disappears entirely. The
+taxonomy stays owned by Python; only its resolved output crosses the wire.
 
 ``profiles.json`` is the authored ``assets/profiles.json``, copied out in the same
 envelope ``GET /api/profiles`` serves so the client parses one shape either way. Two
@@ -58,9 +59,9 @@ the grid.
 
 The cards are read through :func:`bnb.profiles.list_profiles`, so everything that guards
 the endpoint guards the upload too. One check belongs to the build alone, because it is
-the only place both halves are in the same room: a card's ``spec`` names a ``type`` and a
-``goal``, and :func:`unplayable_profiles` asks the finished manifest whether any track
-actually satisfies that pair. A card that no track can answer is a dead tile in the grid —
+the only place both halves are in the same room: a card's ``spec`` names a ``goal`` and a
+``soundscape`` list, and :func:`unplayable_profiles` asks the finished manifest whether any
+track actually satisfies them. A card that no track can answer is a dead tile in the grid —
 it looks fine right up until someone taps it.
 """
 
@@ -79,7 +80,7 @@ import numpy as np
 import soundfile as sf
 
 from bnb import assets, mastering
-from bnb.background import SPECIAL_GROUPS
+from bnb.background import SPECIAL_GROUPS, soundscape_selects, soundscape_tags
 from bnb.catalog import CategoryManager
 from bnb.mastering import MasterReport
 from bnb.profiles import list_profiles, profiles_image_dir
@@ -110,7 +111,10 @@ PROFILE_SUBDIR = f"{BUCKET_ROOT}/profile"
 MANIFEST_NAME = f"{BUCKET_ROOT}/manifest.json"
 PROFILES_NAME = f"{BUCKET_ROOT}/profiles.json"
 REPORT_NAME = "mastering_report.json"  # sibling of BUCKET_ROOT, so it is never uploaded
-MANIFEST_VERSION = 1
+# 2: per-track ``type`` (one substrate-or-group string) became ``tags`` (both taxonomy
+# axes), so a client can filter on style and on group keywords too. Clients written
+# against v1 fall back to reading ``tags[0]`` as the old type.
+MANIFEST_VERSION = 2
 
 
 def resolve_goals(entry: dict[str, Any]) -> list[str]:
@@ -135,14 +139,6 @@ def resolve_goals(entry: dict[str, Any]) -> list[str]:
     return [goal] if goal else []
 
 
-def resolve_type(entry: dict[str, Any]) -> str | None:
-    """The track's filterable ``type``: its substrate (grid) or its group (special).
-
-    Deliberately the same axis ``GET /api/backgrounds/random?type=`` accepts and the same
-    one a profile's ``spec.type`` names, so a profile authored against the server keeps
-    working unchanged when the client is reading from cloud storage.
-    """
-    return entry.get("substrate") or entry.get("group")
 
 
 def manifest_entry(entry: dict[str, Any]) -> dict[str, Any]:
@@ -153,7 +149,9 @@ def manifest_entry(entry: dict[str, Any]) -> dict[str, Any]:
         "file": f"{AUDIO_SUBDIR}/{track_id}.mp3",
         "name": _bg_display_name(entry),
         "goals": resolve_goals(entry),
-        "type": resolve_type(entry),
+        # Both axes, in the taxonomy's own vocabulary — the exact strings a profile's
+        # ``spec.soundscape`` keywords are built from (§ :func:`bnb.background.soundscape_tags`).
+        "tags": soundscape_tags(entry),
     }
 
 
@@ -162,7 +160,7 @@ def build_manifest(entries: list[dict[str, Any]], bitrate_kbps: int) -> dict[str
 
     Everything the backend keeps for its own purposes — prompts, seeds, requested and
     measured features, provider, spec paths — stays out. The client selects on ``goals``
-    and ``type``, displays ``name``, and fetches ``file``; shipping the rest would just be
+    and ``tags``, displays ``name``, and fetches ``file``; shipping the rest would just be
     a second copy of the catalog to keep in sync.
     """
     return {
@@ -174,36 +172,40 @@ def build_manifest(entries: list[dict[str, Any]], bitrate_kbps: int) -> dict[str
     }
 
 
-def playable_pairs(manifest: dict[str, Any]) -> set[tuple[str | None, str]]:
-    """Every ``(type, goal)`` the published library can actually satisfy.
+def playable_tracks(manifest: dict[str, Any]) -> list[tuple[list[str], set[str]]]:
+    """Every published track as ``(tags, goals)`` — what a card's spec has to hit.
 
     Read off the manifest rather than the catalog so it describes what is *in the bucket*:
     a track whose master went missing was already dropped from the manifest, and so it
     can't vouch for a card here either.
     """
-    return {(track["type"], goal) for track in manifest["tracks"] for goal in track["goals"]}
+    return [(track["tags"], set(track["goals"])) for track in manifest["tracks"]]
 
 
 def unplayable_profiles(profiles: list[dict[str, Any]], manifest: dict[str, Any]) -> list[str]:
     """Cards whose ``spec`` no published track can answer — a dead tile in the grid.
 
     Selection is the client's job now, and the client's whole filter is
-    ``goals.includes(goal)`` plus an optional ``type`` match. So a card asking for a
+    ``goals.includes(goal)`` plus an optional ``soundscape`` match. So a card asking for a
     combination the manifest doesn't hold isn't merely unlucky: it throws at play time
-    (``cloud.ts``: "没有 goal=… type=… 的背景"). Reported rather than fatal — the fix is
-    usually to render the missing track, not to delete the card.
+    (``cloud.ts``: "没有 goal=… soundscape=… 的背景"). Reported rather than fatal — the fix
+    is usually to render the missing track, not to delete the card.
+
+    The whole list has to miss for a card to be dead: a soundscape is a union, so one
+    keyword with tracks behind it carries the card even if the others name nothing yet.
     """
-    playable = playable_pairs(manifest)
-    goals_only = {goal for _, goal in playable}
+    tracks = playable_tracks(manifest)
     dead: list[str] = []
     for profile in profiles:
         spec = profile.get("spec")
         if not spec:
             continue
-        goal, typ = spec.get("goal"), spec.get("type")
-        ok = (typ, goal) in playable if typ else goal in goals_only
+        goal, soundscape = spec.get("goal"), spec.get("soundscape")
+        ok = any(
+            goal in goals and soundscape_selects(tags, soundscape) for tags, goals in tracks
+        )
         if not ok:
-            where = f"goal={goal}" + (f" type={typ}" if typ else "")
+            where = f"goal={goal}" + (f" soundscape={soundscape}" if soundscape else "")
             dead.append(f"{profile.get('id')}: no track with {where}")
     return dead
 
@@ -213,7 +215,7 @@ def build_profiles(out: Path) -> tuple[list[dict[str, Any]], list[str]]:
 
     Read through :func:`bnb.profiles.list_profiles`, so the same validation that guards
     ``GET /api/profiles`` guards the upload: a card with a duplicate id, an unknown
-    ``source``, a ``spec.goal``/``spec.type`` the taxonomy doesn't know, a ``spec.mode``
+    ``source``, a ``spec.goal``/``spec.soundscape`` the taxonomy doesn't know, a ``spec.mode``
     the app can't build, or a gradient that contradicts its goal fails here rather than
     shipping to a bucket where nothing checks it again.
 

@@ -137,14 +137,14 @@ Each `Profile` is presentation plus the spec it expands to on tap:
   "title": "快速聚焦",              // card title (required)
   "subtitle": "提神 · 短时任务",     // optional second line
   "image": "/profile/quick_focus.jpg", // optional; card art via GET /profile/<file>. Wins over gradient
-  "gradient": "linear-gradient(135deg, #5b6bff, #3a2f7a)", // fallback background when no image
+  "gradient": "linear-gradient(135deg, #5b6bff, #3a2f7a)", // optional; generated from goal if absent
   "badges": [                       // optional, max 3; kind drives colour: free|eeg|new
     { "text": "限时免费", "kind": "free" },
     { "text": "热门", "kind": "new" }
   ],
   "spec": {                         // omitted only for the special "manual" card
     "goal": "focus",                // relax | focus — required; picks the goal-compatible pool
-    "type": "drone",                // optional background filter: a substrate or a group
+    "soundscape": ["drone", "unwind.temple"], // optional background filter; see below
     "mode": "isochronic",           // client-side beat synth: binaural | monaural | isochronic
     "beat_hz": 14, "carrier": 300, "beat_volume": 0.4, // beat params (client synthesises)
     "eeg_driven": false             // when true, omit beat_hz — the beat tracks live EEG (future)
@@ -154,10 +154,27 @@ Each `Profile` is presentation plus the spec it expands to on tap:
 
 The special `"manual": true` card carries no `spec` — it opens the manual control panel.
 Card art is optional: drop a `profiles/<id>.jpg` and set `"image"`, or leave it and the
-client renders the `gradient`. `spec.type` is a **background substrate** (`drone`,
-`noise_texture`, `percussive_with_tail`, `field_recording`, `melodic_instrument`) or a
-**special group** (`natural_sounds`) — the same values `GET /api/backgrounds/random`
-accepts, so a profile's filter and the switch button agree.
+client renders the `gradient`. `gradient` is optional too — with neither, the client
+generates one from `spec.goal` (`connect.ts`'s `gradientFor`), picking a hue from the same
+warm-focus / cool-relax bands `validate_profiles` checks authored gradients against, seeded
+by the card id so the tile keeps its colour between launches. Author a gradient when a card
+should have its *own* identity; otherwise let the convention colour it.
+
+`spec.soundscape` is the background filter: a **list of keywords**, and the card's pool is
+every track matching **any** of them, so one card can offer "temple bowls or a felt piano"
+without needing a taxonomy node that means both. Each keyword is one of the taxonomy's own
+axis values — a **substrate** (`drone`, `noise_texture`, `percussive_with_tail`,
+`field_recording`, `melodic_instrument`), a **style** (`lofi`, `neutral`, `neoclassical`,
+`buddhist_meditative`, `nature_ambient`), a **special group** (`natural_sounds`,
+`energizer`, `unwind`) or one of its keywords (`rain`, `temple`, `uplift`…) — or two of
+those joined by a dot to mean *both at once*: `lofi.melodic_instrument`, `unwind.temple`.
+
+A track carries exactly two tags (`[substrate, style]` on the grid, `[group, keyword]` in a
+special group), so a dotted keyword is a set, not a path: `lofi.drone` and `drone.lofi` are
+the same filter. Pairs no track can carry (`drone.noise_texture`, `unwind.rain`) are
+rejected by `validate_profiles` rather than left to select nothing. These are the same
+values `GET /api/backgrounds/random?soundscape=` accepts, so a profile's filter and the
+switch button agree.
 
 **Specifying AM mode in a profile: `"mode": "isochronic"`.** This is the one genuinely
 confusing corner of the format, because `spec.mode` is *client* vocabulary and does not
@@ -298,7 +315,7 @@ rendered once and suits both goals, so its compatibility lives on the keyword de
 (`background.KeywordEntry.goals`) instead. That split is why the server needs both
 `_goal_compatible_pool` and `_special_pool` to answer a single question. Rather than
 reproduce it in TypeScript, the script resolves it: every track leaves with a flat `goals`
-list and a flat `type`, and the client's filter collapses to one predicate.
+list and a flat `tags` list, and the client's filter collapses to one predicate.
 
 ```jsonc
 {
@@ -306,13 +323,16 @@ list and a flat `type`, and the client's filter collapses to one predicate.
   "file": "bg/natural_sounds_rain_seed21288.mp3",
   "name": "雨声",              // via server._bg_display_name — same label the API returns
   "goals": ["focus", "relax"], // grid: its own goal. special: the keyword's goals
-  "type": "natural_sounds"     // substrate (grid) or group (special) — what `?type=` takes
+  "tags": ["natural_sounds", "rain"] // [substrate, style] on the grid, [group, keyword] here
 }
 ```
 
-`type` is deliberately the same axis `GET /api/backgrounds/random?type=` accepts and the
-same one a profile's `spec.type` names, so a profile authored against the service keeps
-working unchanged when the client is reading from the bucket. The taxonomy stays owned by
+`tags` is deliberately the same vocabulary `GET /api/backgrounds/random?soundscape=` accepts
+and the same one a profile's `spec.soundscape` keywords are built from, so a profile
+authored against the service keeps working unchanged when the client is reading from the
+bucket. (Manifest v2. A v1 manifest carried a single `type` — the substrate or group — and
+the client falls back to reading it as a one-element `tags`, so bucket and app can be
+updated in either order; only style and group-keyword filters need the newer file.) The taxonomy stays owned by
 Python; only its resolved output crosses the wire. Nothing but presentation and selection
 keys ships — prompts, seeds, requested/measured features and provider stay here rather
 than becoming a second catalog to keep in sync.
@@ -337,9 +357,9 @@ authored file whole, since the server has no bucket to curate.
 | check | what it catches |
 | --- | --- |
 | `source` in `{community, personal}` | a card that would silently fail to publish |
-| `spec.goal` / `spec.type` in the taxonomy | a tile that picks nothing |
+| `spec.goal` / `spec.soundscape` in the taxonomy | a tile that picks nothing |
 | `spec.mode` in `BEAT_MODES` | a beat that plays but doesn't entrain — see below |
-| gradient hue matches `spec.goal` | a card whose colour lies about what it does |
+| gradient hue matches `spec.goal` (community cards) | a card whose colour lies about what it does |
 | id unique, title present, ≤ 3 badges | layout and lookup breakage |
 
 The `mode` check earns its place. `audio.ts` builds anything that isn't `binaural` or
@@ -361,7 +381,7 @@ shadow rather than a statement.
 One check belongs to the build alone, because it's the only place both halves are in the
 same room: a card names a `(type, goal)`, and `unplayable_profiles` asks the finished
 manifest whether any track answers it. A card nothing answers is a dead tile — it looks
-fine right up until someone taps it and `cloud.ts` throws `没有 goal=… type=… 的背景`. It's
+fine right up until someone taps it and `cloud.ts` throws `没有 goal=… soundscape=… 的背景`. It's
 reported rather than fatal, since the fix is usually to render the missing track.
 
 The one field rewritten on the way out is `image`, a backend route (`/profile/<file>`) in

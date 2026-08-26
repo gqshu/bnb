@@ -3,10 +3,12 @@
 A profile is a ready-to-play preset the app renders as a card: presentation
 (``title``, ``subtitle``, corner ``badges``, a background ``image`` or ``gradient``)
 plus the ``spec`` it expands to on tap. The spec is a **superset of what the client
-already sends to** ``/api/backgrounds/random`` (``goal`` and optional ``type``), carrying
+already sends to** ``/api/backgrounds/random`` (``goal`` and optional ``soundscape``), carrying
 in addition the client-side beat-synth parameters the app's WebAudio engine needs
 (``mode``, ``beat_hz``, ``carrier``, ``beat_volume``) — the beat is synthesized on the
-device, so these describe it rather than the server rendering anything.
+device, so these describe it rather than the server rendering anything. ``spec.soundscape``
+is a *list* of taxonomy keywords and the card's pool is their union
+(§ :func:`bnb.background.soundscape_matches`).
 
 The list is **authored, hand-editable content** living at ``assets/profiles.json`` next
 to the rest of the asset repository (its images go in ``assets/profiles/``, served by
@@ -24,13 +26,18 @@ server has no bucket to curate. A ``manual`` card carries no spec at all, and a 
 ``eeg_driven`` omits ``beat_hz`` (the beat tracks live EEG instead).
 
 :func:`validate_profiles` cross-checks every card against the things that only break at
-play time: a ``spec.goal``/``spec.type`` the taxonomy doesn't know, a ``spec.mode`` the
+play time: a ``spec.goal``/``spec.soundscape`` the taxonomy doesn't know, a ``spec.mode`` the
 app's WebAudio engine can't build, and a ``gradient`` whose colour contradicts the card's
 goal. That last one is presentation, but it is *load-bearing* presentation — the grid uses
 warm cards for focus and cool cards for relax, so a card is telling the user what it does
-before they read it, and a green one is a lie rather than a taste difference. Card
-background: ``image`` wins when present; otherwise the client uses ``gradient``; the
-client has its own neutral fallback if a profile gives neither.
+before they read it, and a green one is a lie rather than a taste difference. It holds for
+``community`` cards, the ones a listener meets cold; the built-in ``personal`` grid is
+colour-coded by mode identity instead and is exempt (:func:`validate_profiles`). Card
+background: ``image`` wins when present; otherwise the client uses ``gradient``. Both are
+optional — given neither, the client generates a gradient from the card's ``goal``, in the
+same hue bands this validates against, seeded by the card id so it stays put between
+launches. So authoring a colour is for cards that want *their own* identity; a card content
+with the convention can just say what it does and let the grid colour it.
 """
 
 from __future__ import annotations
@@ -42,7 +49,7 @@ from pathlib import Path
 from typing import Any
 
 from .assets import ASSETS_DIR
-from .background import GOALS, SPECIAL_GROUPS, SUBSTRATES
+from .background import GOALS, soundscape_problems
 
 MAX_BADGES = 3
 
@@ -148,14 +155,13 @@ def validate_profiles(profiles: list[dict[str, Any]]) -> None:
 
     Guards the things a card can get wrong that only surface as an empty grid, a 404, or
     a beat that plays silently: a duplicate/missing id, too many badges, an unknown
-    ``source``, a spec naming a goal or type ``/api/backgrounds/random`` would reject, a
-    ``mode`` the app can't build (:data:`BEAT_MODES`), or a gradient whose colour
-    contradicts the goal (:data:`GOAL_HUES`). Raises ``ValueError`` listing every problem
-    at once, so one bad hand-edit reports all its issues rather than one per
+    ``source``, a spec naming a goal or soundscape keyword ``/api/backgrounds/random``
+    would reject, a ``mode`` the app can't build (:data:`BEAT_MODES`), or — on a community
+    card — a gradient whose colour contradicts the goal (:data:`GOAL_HUES`). Raises
+    ``ValueError`` listing every problem at once, so one bad hand-edit reports all its issues rather than one per
     fix-and-retry."""
     if not isinstance(profiles, list):
         raise ValueError(f"profiles must be a list, got {type(profiles).__name__}")
-    known_types = set(SUBSTRATES) | set(SPECIAL_GROUPS)
     problems: list[str] = []
     seen: set[str] = set()
     for i, p in enumerate(profiles):
@@ -186,13 +192,33 @@ def validate_profiles(profiles: list[dict[str, Any]]) -> None:
         goal = spec.get("goal")
         if goal not in GOALS:
             problems.append(f"{where}: spec.goal {goal!r} not in {sorted(GOALS)}")
-        typ = spec.get("type")
-        if typ is not None and typ not in known_types:
-            problems.append(f"{where}: spec.type {typ!r} not in {sorted(known_types)}")
+        # ``type`` was this filter's previous, single-valued shape. Rejected rather than
+        # ignored: a leftover ``type`` would silently stop filtering, and "card plays the
+        # wrong bed" is exactly the failure nobody reports as a bug.
+        if "type" in spec:
+            problems.append(f"{where}: spec.type is gone — use spec.soundscape (a list of keywords)")
+        soundscape = spec.get("soundscape")
+        if soundscape is not None:
+            if not isinstance(soundscape, list):
+                problems.append(
+                    f"{where}: spec.soundscape must be a list of keywords, got "
+                    f"{type(soundscape).__name__}"
+                )
+            else:
+                for keyword in soundscape:
+                    problems.extend(f"{where}: {p}" for p in soundscape_problems(keyword))
         mode = spec.get("mode")
         if mode is not None and mode not in BEAT_MODES:
             problems.append(f"{where}: spec.mode {mode!r} not in {sorted(BEAT_MODES)}")
         gradient = p.get("gradient")
+        # Community cards only. The goal-hue convention earns its keep on cards the
+        # listener has never seen — colour tells them what it does before they read it.
+        # The built-in grid is the opposite case: six fixed cards seen every session,
+        # colour-coded by *mode identity* (电子咖啡 green, 能量小憩 amber), which a listener
+        # learns once and then reads faster than any convention. Holding those to the goal
+        # bands would cost them that identity to restate what the card already says.
+        if source == "personal":
+            gradient = None
         if gradient and goal in GOAL_HUES and not gradient_matches_goal(gradient, goal):
             bands = "/".join(f"{lo:g}-{hi:g}°" for lo, hi in GOAL_HUES[goal])
             hues = ", ".join(f"{h:.0f}°" for h in gradient_hues(gradient))

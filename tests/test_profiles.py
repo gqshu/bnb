@@ -3,7 +3,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from bnb.background import GOALS, SPECIAL_GROUPS, SUBSTRATES
+from bnb.background import GOALS, soundscape_problems
 from bnb.profiles import (
     BEAT_MODES,
     GOAL_HUES,
@@ -48,21 +48,32 @@ def test_the_endpoint_serves_personal_cards_too():
 
 
 def test_every_profile_is_well_formed():
-    known_types = set(SUBSTRATES) | set(SPECIAL_GROUPS)
     for p in load_profiles():
         assert p["id"] and p["title"]
         assert p["source"] in SOURCES
         assert len(p.get("badges") or []) <= MAX_BADGES
-        assert p.get("image") or p.get("gradient")  # a card must have a background
+        # image and gradient are both optional: a card with neither gets a gradient
+        # generated from its goal on the client (§ connect.ts gradientFor)
+        assert p.get("image") or p.get("gradient") or (p.get("spec") or {}).get("goal")
         spec = p.get("spec")
         if spec is None:
             assert p.get("manual"), f"{p['id']} has no spec but isn't the manual card"
         else:
             assert spec["goal"] in GOALS
-            if spec.get("type") is not None:
-                assert spec["type"] in known_types
+            assert "type" not in spec, f"{p['id']} still uses spec.type; it is spec.soundscape now"
+            for keyword in spec.get("soundscape") or []:
+                assert soundscape_problems(keyword) == []
             if spec.get("mode") is not None:
                 assert spec["mode"] in BEAT_MODES
+
+
+def test_a_card_may_leave_its_gradient_out():
+    """Colour is optional: the client generates one from the goal (§ connect.ts
+    gradientFor), so a card that has no identity of its own doesn't have to invent one —
+    and can't invent one that contradicts its goal."""
+    bare = card()
+    bare.pop("gradient")
+    validate_profiles([bare])
 
 
 def test_profiles_are_reread_each_call(tmp_path):
@@ -96,7 +107,19 @@ def test_endpoint_500s_on_a_broken_config(tmp_path, monkeypatch):
     "bad",
     [
         pytest.param([card(spec={"goal": "gamma"})], id="unknown goal"),
-        pytest.param([card(spec={"goal": "relax", "type": "techno"})], id="unknown type"),
+        pytest.param(
+            [card(spec={"goal": "relax", "soundscape": ["techno"]})], id="unknown soundscape term"
+        ),
+        pytest.param(
+            [card(spec={"goal": "relax", "soundscape": ["drone.noise_texture"]})],
+            id="soundscape pair no track can carry",
+        ),
+        pytest.param(
+            [card(spec={"goal": "relax", "soundscape": "drone"})], id="soundscape not a list"
+        ),
+        pytest.param(
+            [card(spec={"goal": "relax", "type": "drone"})], id="legacy spec.type is rejected"
+        ),
         pytest.param([card(spec=None)], id="no spec, not manual"),
         pytest.param([card(id="x"), card(id="x")], id="duplicate id"),
         pytest.param([card(badges=[{"text": str(n)} for n in range(4)])], id="too many badges"),

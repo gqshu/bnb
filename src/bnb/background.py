@@ -1273,6 +1273,119 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
 }
 
 
+# ── Soundscape keywords ──────────────────────────────────────────────────────────
+#
+# What a client filters the library by. A profile card names a *list* of these
+# (``spec.soundscape``), and the pool is every track matching any of them.
+#
+# The vocabulary is the taxonomy's own axis values, because a track sits on exactly two
+# axes and both are worth filtering by: a grid track is a (substrate, style) pair, a
+# special one is a (group, keyword) pair. So "lofi" and "melodic_instrument" each name a
+# slice of the grid, "unwind" and "temple" each name a slice of a group, and a dotted
+# keyword intersects two — "lofi.melodic_instrument" is the one cell where they overlap.
+#
+# Matching is order-free: a dotted keyword is a *set* of tags a track must carry, not a
+# path through a hierarchy. There is no hierarchy to walk — substrate and style are
+# orthogonal, neither contains the other — and inventing a canonical order would just be
+# one more thing to get wrong in hand-authored JSON, with a silently empty pool as the
+# only feedback. :func:`soundscape_problems` rejects the pairs that *can't* co-occur
+# (two substrates, a group with another group's keyword), which is the real error.
+SOUNDSCAPE_SEPARATOR = "."
+
+
+def soundscape_tags(entry: dict[str, Any]) -> list[str]:
+    """The taxonomy tags a catalog entry is filterable by: its two axis values.
+
+    Grid tracks give ``[substrate, style]``, special ones ``[group, keyword]``. This is
+    what the published manifest carries per track (``tracks[].tags``) and what the client
+    matches a profile's ``spec.soundscape`` against, so both ends filter on exactly the
+    same strings.
+    """
+    if entry.get("kind") == "special":
+        pair = (entry.get("group"), entry.get("keyword"))
+    else:
+        pair = (entry.get("substrate"), entry.get("style"))
+    return [tag for tag in pair if tag]
+
+
+def soundscape_matches(tags: Iterable[str], keyword: str) -> bool:
+    """Whether a track carrying ``tags`` is selected by one soundscape ``keyword``.
+
+    A bare keyword matches when the track carries it; a dotted one when the track carries
+    every part, in any order. An empty keyword matches nothing — a blank string in an
+    authored list is a mistake, and treating it as "everything" would silently widen the
+    pool to the whole library.
+    """
+    parts = keyword.split(SOUNDSCAPE_SEPARATOR)
+    if not keyword or not all(parts):
+        return False
+    tag_set = set(tags)
+    return all(part in tag_set for part in parts)
+
+
+def soundscape_selects(tags: Iterable[str], soundscape: Sequence[str] | None) -> bool:
+    """Whether a track is in the pool a whole ``soundscape`` list describes (any match).
+
+    An empty or absent list is "no filter" — every track qualifies, which is what a card
+    that names no soundscape means.
+    """
+    if not soundscape:
+        return True
+    tag_set = set(tags)
+    return any(soundscape_matches(tag_set, keyword) for keyword in soundscape)
+
+
+def soundscape_vocabulary() -> list[str]:
+    """Every term a soundscape keyword may be built from, for error messages."""
+    terms = {*SUBSTRATES, *STYLES, *SPECIAL_GROUPS}
+    for group in SPECIAL_GROUPS.values():
+        terms.update(group.keywords)
+    return sorted(terms)
+
+
+def _keyword_groups(term: str) -> set[str]:
+    """The special groups ``term`` is a keyword of (usually one, possibly none)."""
+    return {name for name, group in SPECIAL_GROUPS.items() if term in group.keywords}
+
+
+def _can_co_occur(first: str, second: str) -> bool:
+    """Whether any single track could carry both terms — i.e. they name the two axes of
+    one grid cell, or a group and one of *its own* keywords."""
+    one_grid_cell = (first in SUBSTRATES and second in STYLES) or (
+        first in STYLES and second in SUBSTRATES
+    )
+    own_keyword = (first in SPECIAL_GROUPS and first in _keyword_groups(second)) or (
+        second in SPECIAL_GROUPS and second in _keyword_groups(first)
+    )
+    return one_grid_cell or own_keyword
+
+
+def soundscape_problems(keyword: str) -> list[str]:
+    """What is wrong with one authored soundscape keyword, as human-readable strings.
+
+    Catches the three ways a keyword ends up selecting nothing — which is invisible until
+    someone taps the card and gets whatever the fallback hands them: a term the taxonomy
+    doesn't know, more than the two levels a track has, and a pair no track can carry at
+    once (``drone.noise_texture``, ``unwind.rain``).
+    """
+    if not keyword or not isinstance(keyword, str):
+        return [f"soundscape keyword {keyword!r} is not a non-empty string"]
+    parts = keyword.split(SOUNDSCAPE_SEPARATOR)
+    known = set(soundscape_vocabulary())
+    problems = [f"soundscape {keyword!r}: unknown term {part!r}" for part in parts if part not in known]
+    if problems:
+        return problems
+    if len(parts) > 2:
+        return [
+            f"soundscape {keyword!r}: {len(parts)} levels, but a track carries only two "
+            f"tags (substrate.style, or group.keyword)"
+        ]
+    if len(parts) == 2 and not _can_co_occur(*parts):
+        return [f"soundscape {keyword!r}: no track can carry both {parts[0]!r} and {parts[1]!r}"]
+    return []
+
+
+
 @dataclass(frozen=True)
 class KeywordSignature:
     """A fully resolved render spec for one (group, keyword, duration) special cell.

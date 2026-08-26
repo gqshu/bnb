@@ -25,6 +25,7 @@ import random
 import sys
 import time
 import uuid
+from collections.abc import Sequence
 from pathlib import Path
 from threading import Lock
 from typing import Any, Literal
@@ -35,7 +36,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from .background import SPECIAL_GROUPS, SUBSTRATES
+from .background import (
+    SPECIAL_GROUPS,
+    soundscape_problems,
+    soundscape_selects,
+    soundscape_tags,
+)
 from .catalog import CategoryManager
 from .profiles import list_profiles, profiles_image_dir
 from .stream import Beat, StreamEngine, to_int16_bytes, wav_stream_header
@@ -422,22 +428,25 @@ def _random_special_background(group: str = NATURAL_SOUNDS_GROUP, goal: str = "r
     return entry["track_id"] if entry else None
 
 
-def _typed_pool(category: str, goal: str) -> list[dict]:
-    """Rendered backgrounds of one ``type`` compatible with ``goal``.
+def _soundscape_pool(soundscape: Sequence[str], goal: str) -> list[dict]:
+    """Rendered backgrounds matching **any** keyword in ``soundscape``, compatible with ``goal``.
 
-    ``category`` names either a grid **substrate** — the physical kind of bed (``drone``,
-    ``noise_texture``, ``percussive_with_tail``…), matched on the track's per-track ``goal``
-    field — or a special **group** (``natural_sounds``, ``energizer``), matched on the
-    keyword goal allow-list (§ :func:`_special_pool`). Substrate rather than cultural style is the axis
-    a listener actually picks a background by. Raises 400 for a type in neither."""
-    if category in SUBSTRATES:
-        return categories.search(substrate=category, goal=goal, rendered=True)
-    if category in SPECIAL_GROUPS:
-        return _special_pool(category, goal)
-    raise HTTPException(
-        status_code=400,
-        detail=f"unknown background type {category!r}, expected one of {sorted([*SUBSTRATES, *SPECIAL_GROUPS])}",
-    )
+    The keywords are the taxonomy's own axis values (§ :func:`bnb.background.soundscape_tags`):
+    a substrate or a style names a slice of the grid, a group or one of its keywords a slice
+    of a special group, and a dotted keyword the intersection of two — ``lofi.melodic_instrument``.
+    A list is a union, so one card can offer "temple bowls or a felt piano" without needing
+    a taxonomy node that means both.
+
+    Goal compatibility is still whatever each half of the library means by it — a per-track
+    field on the grid, a keyword allow-list for the groups — so this filters
+    :func:`_goal_compatible_pool` rather than re-deriving it. Raises 400 on a keyword the
+    taxonomy can't answer, since an unnoticed typo would otherwise read as an empty library.
+    """
+    problems = [problem for keyword in soundscape for problem in soundscape_problems(keyword)]
+    if problems:
+        raise HTTPException(status_code=400, detail="; ".join(problems))
+    pool = _goal_compatible_pool(goal)
+    return [entry for entry in pool if soundscape_selects(soundscape_tags(entry), soundscape)]
 
 
 def _goal_compatible_pool(goal: str) -> list[dict]:
@@ -452,14 +461,17 @@ def _goal_compatible_pool(goal: str) -> list[dict]:
     return pool
 
 
-def _random_background_entry(goal: str, category: str | None = None, exclude: str | None = None) -> dict | None:
+def _random_background_entry(
+    goal: str, soundscape: Sequence[str] | None = None, exclude: str | None = None
+) -> dict | None:
     """A random rendered background compatible with ``goal``, or None if nothing matches.
 
-    ``category`` is the optional ``type`` filter: given, the pool is that one type
-    (§ :func:`_typed_pool`); omitted, it's every compatible type (§ :func:`_goal_compatible_pool`).
+    ``soundscape`` is the optional keyword filter: given, the pool is everything matching
+    any of its keywords (§ :func:`_soundscape_pool`); omitted or empty, it's every track
+    compatible with the goal (§ :func:`_goal_compatible_pool`).
     ``exclude`` drops one track_id (the one already playing) so the switch button lands on
     a different bed, falling back to the full pool if that's the only compatible track."""
-    pool = _goal_compatible_pool(goal) if category is None else _typed_pool(category, goal)
+    pool = _soundscape_pool(soundscape, goal) if soundscape else _goal_compatible_pool(goal)
     if exclude is not None:
         pool = [e for e in pool if e["track_id"] != exclude] or pool
     return random.choice(pool) if pool else None
@@ -666,24 +678,39 @@ def _background_mp3_path(track_id: str) -> str:
 @app.get("/api/backgrounds/random")
 def random_background(
     goal: Literal["relax", "focus"] = "relax",
-    type: str | None = None,
+    soundscape: str | None = None,
     exclude: str | None = None,
 ) -> dict:
     """Pick a random rendered background compatible with ``goal``; returns its id, display
-    name, and file URL.
+    name, taxonomy tags, and file URL.
 
-    ``type`` is an optional filter — a background **substrate** (``drone``,
-    ``noise_texture``, ``percussive_with_tail``, ``field_recording``, ``melodic_instrument``)
-    or a special **group** (``natural_sounds``, ``energizer``). Omit it and the pick spans every type
-    compatible with the goal; pass it to pin one type. Unknown types 400. ``exclude`` is
-    the track_id already playing, so the switch button lands on a different bed while still
-    respecting ``goal`` + ``type``. 404 if nothing rendered matches."""
-    entry = _random_background_entry(goal, category=type, exclude=exclude)
+    ``soundscape`` is an optional comma-separated keyword filter, and the pick spans the
+    **union** of what its keywords name — a substrate (``drone``, ``melodic_instrument``…),
+    a style (``lofi``, ``buddhist_meditative``…), a special group (``natural_sounds``,
+    ``energizer``, ``unwind``) or one of its keywords (``temple``, ``rain``…), or two of
+    those intersected with a dot (``lofi.melodic_instrument``, ``unwind.temple``). Comma
+    rather than a repeated parameter because the mini program builds its query from a flat
+    object. Omit it and the pick spans everything compatible with the goal; a keyword the
+    taxonomy doesn't know 400s. ``exclude`` is the track_id already playing, so the switch
+    button lands on a different bed while still respecting the filter. 404 if nothing
+    rendered matches.
+
+    ``tags`` is the picked track's own two taxonomy tags — the same strings a soundscape
+    keyword is built from, so the client can label what it got without a second lookup."""
+    keywords = [part.strip() for part in soundscape.split(",") if part.strip()] if soundscape else []
+    entry = _random_background_entry(goal, soundscape=keywords, exclude=exclude)
     if entry is None:
-        detail = f"no rendered background for goal={goal!r}" + (f", type={type!r}" if type else "")
+        detail = f"no rendered background for goal={goal!r}" + (
+            f", soundscape={keywords!r}" if keywords else ""
+        )
         raise HTTPException(status_code=404, detail=detail)
     tid = entry["track_id"]
-    return {"track_id": tid, "name": _bg_display_name(entry), "url": f"/background/{tid}.mp3"}
+    return {
+        "track_id": tid,
+        "name": _bg_display_name(entry),
+        "tags": soundscape_tags(entry),
+        "url": f"/background/{tid}.mp3",
+    }
 
 
 @app.get("/background/{track_id}.mp3")

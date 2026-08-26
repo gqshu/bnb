@@ -1,64 +1,123 @@
 {
   "profiles": [
     {
+      "id": "relax_body",
+      "title": "身心放松",
+      "subtitle": "舒缓减压 · 深度放松",
+      "spec": {
+        "goal": "relax",
+        "mode": "binaural",
+        "beat_hz": 8,
+        "carrier": 400,
+        "beat_volume": 0.1,
+        "eyes_closed": false
+      },
+      "source": "community"
+    },
+    {
+      "id": "e_coffee",
+      "title": "电子咖啡",
+      "subtitle": "清醒专注 · 不焦虑",
+      "spec": {
+        "goal": "focus",
+        "mode": "monaural",
+        "beat_hz": 20,
+        "carrier": 400,
+        "beat_volume": 0.2
+      },
+      "source": "community"
+    },
+    {
       "id": "nature_relax",
       "title": "聆听自然",
       "subtitle": "自然音 · 白噪",
       "spec": {
         "goal": "relax",
-        "type": "natural_sounds",
+        "soundscape": [
+          "natural_sounds"
+        ],
         "mode": "monaural",
         "beat_hz": 6,
         "carrier": 280,
         "beat_volume": 0.2
       },
-      "source": "community",
-      "gradient": "linear-gradient(135deg, #2f8fb0, #123742)"
+      "source": "community"
     },
     {
       "id": "community_energizer_focus",
-      "title": "活力唤醒 · 专注",
-      "subtitle": "魔改 · 18 Hz",
+      "title": "活力唤醒",
       "spec": {
         "goal": "focus",
-        "type": "energizer",
-        "mode": "isochronic",
-        "beat_hz": 18.0,
+        "soundscape": [
+          "energizer"
+        ],
+        "mode": "am_music",
+        "beat_hz": 40.0,
         "carrier": 250.0,
         "beat_volume": 0.2
       },
-      "source": "community",
-      "gradient": "linear-gradient(135deg, #c2453f, #3a1518)"
+      "source": "community"
     },
     {
-      "id": "community_melodic_instrument_relax",
-      "title": "旋律器乐 · 放松",
-      "subtitle": "双耳节拍 · 10 Hz",
+      "id": "electronic_latte",
+      "title": "电音拿铁",
+      "spec": {
+        "goal": "focus",
+        "soundscape": [
+          "energizer.clarity"
+        ],
+        "mode": "am_music",
+        "beat_hz": 40.0,
+        "carrier": 250.0,
+        "beat_volume": 0.2
+      },
+      "source": "community"
+    },
+    {
+      "id": "jazz_relax",
+      "title": "爵士放松",
+      "subtitle": "减压 · 舒缓",
       "spec": {
         "goal": "relax",
-        "type": "melodic_instrument",
-        "mode": "binaural",
-        "beat_hz": 10.0,
-        "carrier": 300.0,
-        "beat_volume": 0.3
+        "soundscape": [
+          "unwind.lounge"
+        ],
+        "mode": "monaural",
+        "beat_hz": 10,
+        "carrier": 280,
+        "beat_volume": 0.2
       },
-      "source": "community",
-      "gradient": "linear-gradient(135deg, #4a56b8, #1d2050)"
+      "source": "community"
+    },
+    {
+      "id": "temple_relax",
+      "title": "专注礼佛",
+      "spec": {
+        "goal": "relax",
+        "soundscape": [
+          "unwind.temple"
+        ],
+        "mode": "binaural",
+        "beat_hz": 12,
+        "carrier": 280,
+        "beat_volume": 0.2
+      },
+      "source": "community"
     },
     {
       "id": "community_percussive_with_tail_relax",
-      "title": "颂钵余韵 · 放松",
-      "subtitle": "单耳节拍 · 10 Hz",
+      "title": "颂钵余韵",
       "spec": {
         "goal": "relax",
-        "type": "percussive_with_tail",
-        "mode": "monaural",
+        "soundscape": [
+          "percussive_with_tail"
+        ],
+        "mode": "binaural",
         "beat_hz": 10.0,
         "carrier": 250.0,
         "beat_volume": 0.2
       },
-      "source": "community",
-      "gradient": "linear-gradient(135deg, #3568a8, #152a44)"
+      "source": "community"
     }
   ]
 }
