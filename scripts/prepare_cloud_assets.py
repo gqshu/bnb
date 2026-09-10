@@ -212,6 +212,38 @@ def chunk_ids(track_id: str, n_parts: int) -> list[str]:
     return [f"{track_id}_part{i:0{width}d}" for i in range(1, n_parts + 1)]
 
 
+def keyword_chunk_totals(
+    entries: list[dict[str, Any]], chunk_s: float, *, bitrate_kbps: float, min_chunk_bytes: float
+) -> dict[tuple[str, str], tuple[int, int]]:
+    """Per ``(group, keyword)`` special cell: ``(source track count, published file
+    count)`` — how much chunking multiplies what ``plan_background.py --per-cell``
+    controls into what actually lands in the manifest.
+
+    These are two independent knobs by design (``--per-cell`` is about how many
+    distinct *recordings* exist for a keyword — variety; ``--chunk-minutes`` is about
+    one mobile download staying a reasonable size), so this doesn't try to reconcile
+    them — it's read-only, for ``main`` to print so the multiplication is visible
+    rather than a surprise in the published file count. Grid tracks (``kind`` !=
+    ``"special"``) never chunk, so they're excluded; loopable special tracks always
+    report ``1`` part, same rule :func:`manifest_entries_for` uses.
+    """
+    totals: dict[tuple[str, str], list[int]] = {}
+    for entry in entries:
+        if entry.get("kind") != "special" or not entry.get("group") or not entry.get("keyword"):
+            continue
+        loopable = entry.get("loopable", True)
+        n_parts = (
+            chunk_count(entry.get("duration_s"), chunk_s, bitrate_kbps=bitrate_kbps, min_chunk_bytes=min_chunk_bytes)
+            if not loopable
+            else 1
+        )
+        key = (entry["group"], entry["keyword"])
+        counts = totals.setdefault(key, [0, 0])
+        counts[0] += 1
+        counts[1] += n_parts
+    return {key: (source, published) for key, (source, published) in totals.items()}
+
+
 def manifest_entries_for(
     entry: dict[str, Any],
     chunk_s: float,
@@ -692,9 +724,21 @@ def main() -> int:
         for path in strays:
             path.unlink()
 
+    breakdown = keyword_chunk_totals(publishable, chunk_s, bitrate_kbps=args.bitrate, min_chunk_bytes=min_chunk_bytes)
+    chunked = {k: v for k, v in breakdown.items() if v[1] != v[0]}
+
     print()
     print(f"output      {out}")
-    print(f"manifest    {MANIFEST_NAME} — {len(publishable)} tracks")
+    print(f"manifest    {MANIFEST_NAME} — {len(publishable)} source track(s), {manifest['count']} published file(s)")
+    if chunked:
+        print("            long tracks publish as more than one file per source recording:")
+        for (group, keyword), (source, published) in sorted(chunked.items()):
+            print(
+                f"              {group}:{keyword}  {source} source -> {published} published "
+                f"(avg {published / source:.1f} chunks/track)"
+            )
+        print("            --per-cell counts recordings, not published files; tune --chunk-minutes "
+              "if the total is more than you want")
     print(f"profiles    {PROFILES_NAME} — {len(profiles)} community cards")
     if not args.catalog_only:
         print(f"encoded     {written} new, {skipped} already present")

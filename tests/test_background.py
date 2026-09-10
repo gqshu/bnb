@@ -4,7 +4,9 @@ from bnb.background import (
     NEGATIVE_PROMPT,
     _keyword_prompt as rb_keyword_prompt,
     DEVELOPMENT_FRAGMENT,
+    DownloadSource,
     GOALS,
+    KeywordEntry,
     SPECIAL_GROUPS,
     STYLES,
     SUBSTRATES,
@@ -147,14 +149,32 @@ def test_fill_special_to_per_cell_reaches_target():
     assert report["per_group"]["natural_sounds"] == 3 * len(NATURAL)
 
 
-def test_fill_special_to_per_cell_caps_download_keywords_at_one():
-    # A fixed source recording (master's goldberg/gymnopedies) has no second take to
-    # seed differently — asking every keyword up to 3 tracks must still leave those two
-    # at 1, and must not spill their unmet demand onto the group's prompted keywords.
+def test_fill_special_to_per_cell_caps_a_fixed_url_download_keyword_at_one(monkeypatch):
+    # A manual=False download keyword is a single fixed URL — no second take to seed
+    # differently — so asking up to 3 tracks must still leave it at 1, and must not
+    # spill its unmet demand onto the group's other keywords. Both of master's own
+    # download keywords are manual=True now (see the two below), so this exercises
+    # the fixed-URL branch directly via a synthetic keyword rather than losing
+    # coverage of it entirely.
+    fixed_url = KeywordEntry(
+        "synthetic fixed-url keyword, this test only",
+        download=DownloadSource(
+            source_url="https://example.org/one-item", recording_license="x", performer="x", manual=False
+        ),
+    )
+    monkeypatch.setitem(SPECIAL_GROUPS["master"].keywords, "_test_fixed_url", fixed_url)
+    sigs = fill_special_to_per_cell(3, 60, groups=["master"], keywords=["_test_fixed_url"])
+    assert len(sigs) == 1
+
+
+def test_fill_special_to_per_cell_does_not_cap_manual_download_keywords():
+    # goldberg and gymnopedies are both manual=True: more than one staged recording is
+    # a real possibility (a different performance, not a movement of the same one), so
+    # they fill like any other keyword rather than being capped at 1.
     sigs = fill_special_to_per_cell(3, 60, groups=["master"])
     report = special_coverage_report(_cells(sigs), groups=["master"])
     for keyword in MASTER_DOWNLOAD_KEYWORDS:
-        assert report["per_cell"][f"master:{keyword}"] == 1
+        assert report["per_cell"][f"master:{keyword}"] == 3
     for keyword in MASTER_PROMPT_KEYWORDS:
         assert report["per_cell"][f"master:{keyword}"] == 3
 
@@ -799,23 +819,44 @@ def test_master_download_keywords_produce_a_download_spec_with_no_prompt():
         assert spec["composer"]
 
 
-def test_master_gymnopedies_download_is_marked_manual():
-    # Musopen requires a logged-in account, so it can't be fetched with a plain GET —
-    # unlike goldberg, which archive.org serves unauthenticated.
-    entry = SPECIAL_GROUPS["master"].keywords["gymnopedies"]
-    assert entry.download.manual is True
-    assert SPECIAL_GROUPS["master"].keywords["goldberg"].download.manual is False
-
-
-def test_master_download_keywords_reject_a_second_variant():
-    # A fixed source recording has no second take to seed differently — a non-zero
-    # variant would just re-fetch the identical recording under a new track_id
-    # (this is exactly how a stray "..._seed<N>" duplicate of a download keyword
-    # used to get planned via --fill/--per-cell before this guard existed).
+def test_master_download_keywords_are_both_marked_manual():
+    # goldberg used to be manual=False (archive.org only), but what actually got
+    # staged in practice were short independent remixes/reinterpretations — the same
+    # "several genuine takes" situation gymnopedies was already built for — so both
+    # prefer whatever's staged by hand; only goldberg additionally has an archive.org
+    # fallback for variant 0 (bnb.master_sources.fetch_goldberg).
     for keyword in MASTER_DOWNLOAD_KEYWORDS:
-        build_keyword_signature("master", keyword, 60, variant=0)  # still fine
-        with pytest.raises(ValueError, match="fixed source recording"):
-            build_keyword_signature("master", keyword, 60, variant=1)
+        assert SPECIAL_GROUPS["master"].keywords[keyword].download.manual is True
+
+
+def test_fixed_url_download_keyword_rejects_a_second_variant(monkeypatch):
+    # A manual=False download keyword is a single fixed URL — no second take to seed
+    # differently — a non-zero variant would just re-fetch the identical recording
+    # under a new track_id (this is exactly how a stray "..._seed<N>" duplicate used
+    # to get planned via --fill/--per-cell before this guard existed). Exercised via a
+    # synthetic keyword since neither of master's own download keywords is
+    # manual=False any more.
+    fixed_url = KeywordEntry(
+        "synthetic fixed-url keyword, this test only",
+        download=DownloadSource(
+            source_url="https://example.org/one-item", recording_license="x", performer="x", manual=False
+        ),
+    )
+    monkeypatch.setitem(SPECIAL_GROUPS["master"].keywords, "_test_fixed_url", fixed_url)
+    build_keyword_signature("master", "_test_fixed_url", 60, variant=0)  # still fine
+    with pytest.raises(ValueError, match="single fixed-URL recording"):
+        build_keyword_signature("master", "_test_fixed_url", 60, variant=1)
+
+
+def test_manual_download_keywords_allow_further_variants():
+    # Both goldberg and gymnopedies are manual=True: further variants are legitimate
+    # independent recordings, not duplicates — build_keyword_signature must not reject
+    # them (a missing staged source for one is a fetch-time failure, not a plan-time one).
+    for keyword in MASTER_DOWNLOAD_KEYWORDS:
+        for variant in (0, 1, 2):
+            sig = build_keyword_signature("master", keyword, 60, variant=variant)
+            assert sig.variant == variant
+            assert sig.spec()["variant"] == variant
 
 
 def test_master_prompt_keywords_build_a_normal_generative_spec():

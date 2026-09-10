@@ -926,8 +926,12 @@ class DownloadSource:
 
     ``manual`` marks a source with no stable URL a script can fetch unattended (e.g. it
     sits behind a login) — the render step then expects the file staged by hand under
-    ``assets/manual_sources/<group>/<keyword>/`` (``bnb.master_sources.manual_source_dir``,
-    any filename) instead of downloading ``source_url`` itself.
+    ``assets/manual_sources/<group>/<keyword>/`` (``bnb.master_sources.manual_source_dir``)
+    instead of downloading ``source_url`` itself. It's also what lifts the one-track
+    cap (:func:`_keyword_capacity`): each independent recording staged there — one
+    audio file, or a subfolder of per-movement files for one recording — becomes its
+    own variant (``bnb.master_sources.staged_sources``), so ``manual=True`` is "more
+    than one genuine take is possible here" as much as it is "needs a login".
     """
 
     source_url: str
@@ -1329,19 +1333,29 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
         global_styles=("instrumental", "solo piano", "classical", "high production quality"),
         keywords={
             # -- Free-to-download: real recordings of public-domain compositions -------
+            # manual=True: prefer whatever's staged by hand (short remixes/alternate
+            # performances of individual variations are exactly the kind of thing that
+            # showed up in practice) over the one archive.org item, which is now only a
+            # variant-0 fallback for when nothing has been staged yet
+            # (master_sources.fetch_goldberg).
             "goldberg": KeywordEntry(
-                "J.S. Bach's Goldberg Variations, BWV 988 — the complete work (Aria, "
-                "30 variations, and the Aria da capo), performed on piano",
+                "J.S. Bach's Goldberg Variations, BWV 988 — a performance or "
+                "reinterpretation on piano",
                 goals=frozenset({"relax"}),
-                loopable=False,  # a 75-90 minute through-composed work, not a bed to loop
+                loopable=False,  # a real performance/recording, not a bed to loop
                 download=DownloadSource(
                     source_url="https://archive.org/download/The_Open_Goldberg_Variations-11823/",
-                    recording_license="CC0 1.0 (public domain dedication, no attribution required)",
-                    performer="Kimiko Ishizaka — the Open Goldberg Variations project",
-                    manual=False,  # archive.org: a plain, unauthenticated download
+                    recording_license=(
+                        "Manually-staged recordings take priority — verify each one's "
+                        "license individually; falls back to the CC0 1.0 Open Goldberg "
+                        "Variations recording (archive.org) for variant 0 only, when "
+                        "nothing has been staged"
+                    ),
+                    performer="see the staged recording, or Kimiko Ishizaka (Open Goldberg Variations) as the fallback",
+                    manual=True,
                 ),
                 composer="J.S. Bach (d. 1750)",
-                composition_status="public domain composition; CC0 recording",
+                composition_status="public domain composition; verify each staged recording's license before shipping",
             ),
             # Musopen states its hosted recordings as public domain, but requires a free
             # account to download — unlike Goldberg's archive.org source, this can't be
@@ -1558,6 +1572,11 @@ class KeywordSignature:
     download: DownloadSource | None = None
     composer: str | None = None
     composition_status: str | None = None
+    variant: int = 0
+    """Which take this is. Only load-bearing for a ``manual=True`` download keyword,
+    where it selects which staged candidate ``master_sources.fetch`` resolves
+    (``staged_sources(group, keyword)[variant]``) — everywhere else it's provenance
+    only, since a seed already determines a generative render or a fixed-URL fetch."""
 
     @property
     def track_id(self) -> str:
@@ -1584,6 +1603,7 @@ class KeywordSignature:
             "download": asdict(self.download) if self.download else None,
             "composer": self.composer,
             "composition_status": self.composition_status,
+            "variant": self.variant,
             "render": None,
         }
 
@@ -1616,12 +1636,23 @@ def build_keyword_signature(
     ignored (the source recording's own length is what it is, filled in from the fetched
     audio at render time — see ``master_sources.fetch``), and there is no prompt to build.
 
-    ``variant`` must be ``0`` for a download keyword. Unlike a generative cell, a fixed
-    source recording has no second take to seed differently — a non-zero variant would
-    fetch the exact same URL/staged file again under a different track_id, landing a
-    byte-identical duplicate in the catalog. :func:`_fill_cells` (the coverage guides'
-    shared loop) treats the resulting ``ValueError`` as "this cell is full" and moves on
-    to the next-least-covered one, rather than ever producing that duplicate.
+    ``variant`` must be ``0`` for a download keyword whose source is one fetchable URL
+    (``DownloadSource.manual=False``, e.g. ``goldberg`` on archive.org): unlike a
+    generative cell, a single URL has no second take to seed differently, and a
+    non-zero variant would just fetch the exact same thing again under a different
+    track_id, landing a byte-identical duplicate in the catalog — :func:`_fill_cells`
+    (the coverage guides' shared loop) treats the resulting ``ValueError`` as "this
+    cell is full" and moves on to the next-least-covered one.
+
+    A ``manual=True`` download keyword (e.g. ``gymnopedies``) has no such limit — its
+    source is whatever gets staged by hand under ``manual_source_dir(group, keyword)``
+    (``master_sources.staged_sources``), and more than one *independent* recording
+    there is exactly what a further variant is for (three different performances, not
+    three movements of one — a movement set goes in its own subfolder instead). This
+    stays capacity-checked either way: :func:`_keyword_capacity` reports ``inf`` for a
+    manual keyword rather than trying to count what's staged from here, since planning
+    is offline and doesn't touch the filesystem — a variant with nothing staged for it
+    yet simply fails clearly at fetch time instead of at plan time.
     """
     if group_name not in SPECIAL_GROUPS:
         raise ValueError(f"unknown special group {group_name!r}, expected one of {list(SPECIAL_GROUPS)}")
@@ -1631,11 +1662,11 @@ def build_keyword_signature(
             f"unknown keyword {keyword!r} for group {group_name!r}, expected one of {list(group.keywords)}"
         )
     entry = group.keywords[keyword]
-    if entry.download is not None and variant != 0:
+    if entry.download is not None and not entry.download.manual and variant != 0:
         raise ValueError(
-            f"{group_name}:{keyword} is a fixed source recording (KeywordEntry.download) — "
-            f"only variant 0 is meaningful; a further variant would just re-fetch the same "
-            f"recording under a new track_id"
+            f"{group_name}:{keyword} is a single fixed-URL recording (KeywordEntry.download, "
+            f"manual=False) — only variant 0 is meaningful; a further variant would just "
+            f"re-fetch the same recording under a new track_id"
         )
     instrumentation = (keyword,)
     seed = _seed((group_name, keyword), variant)
@@ -1655,6 +1686,7 @@ def build_keyword_signature(
             download=entry.download,
             composer=entry.composer,
             composition_status=entry.composition_status,
+            variant=variant,
         )
 
     composition_plan: dict[str, Any] = {
@@ -1683,6 +1715,7 @@ def build_keyword_signature(
         loopable=entry.loopable,
         composer=entry.composer,
         composition_status=entry.composition_status,
+        variant=variant,
     )
 
 
@@ -1953,15 +1986,24 @@ SpecialCell = Cell  # (group, keyword)
 def _keyword_capacity(cell: SpecialCell) -> float:
     """How many distinct renders one special cell can ever hold.
 
-    A download keyword (:class:`DownloadSource` — a fixed source recording) caps at 1:
-    :func:`build_keyword_signature` refuses a second variant, since it would just
-    re-fetch the same recording under a new track_id. Every other special keyword is
-    uncapped (``float("inf")``) — a prompted cell can take as many seeded variants as
-    asked for, same as the grid.
+    A download keyword with a single fetchable URL (:class:`DownloadSource`,
+    ``manual=False``, e.g. ``goldberg`` on archive.org) caps at 1:
+    :func:`build_keyword_signature` refuses a second variant there, since it would
+    just re-fetch the same recording under a new track_id. A ``manual=True`` download
+    keyword (e.g. ``gymnopedies``) is uncapped instead — its source isn't one URL but
+    whatever the person staging it drops in ``manual_source_dir`` (one candidate
+    recording per file or per-movement subfolder, ``master_sources.staged_sources``),
+    and planning doesn't reach the filesystem to count them (this module stays
+    offline/deterministic, per its own docstring) — so a plan can ask for as many
+    variants as it wants; each one's ``fetch`` just fails clearly until a matching
+    source is actually staged. Every other special keyword is uncapped the same way a
+    prompted cell always was — it can take as many seeded variants as asked for.
     """
     group_name, keyword = cell
     entry = SPECIAL_GROUPS[group_name].keywords[keyword]
-    return 1.0 if entry.download is not None else float("inf")
+    if entry.download is None or entry.download.manual:
+        return float("inf")
+    return 1.0
 
 
 def special_cells(
@@ -2050,10 +2092,14 @@ def fill_special_to_per_cell(
 ) -> list[KeywordSignature]:
     """Coverage guide: bring every keyword of the selected groups up to ``target`` tracks.
 
-    A download keyword tops out at its :func:`_keyword_capacity` (1) regardless of
-    ``target`` — the demand a bigger ``target`` would otherwise put on it is capped here
-    rather than left to spill over onto other keywords when :func:`_fill_cells` finds
-    it exhausted.
+    A fixed-URL download keyword (``manual=False``) tops out at its
+    :func:`_keyword_capacity` (1) regardless of ``target`` — the demand a bigger
+    ``target`` would otherwise put on it is capped here rather than left to spill over
+    onto other keywords when :func:`_fill_cells` finds it exhausted. A ``manual=True``
+    download keyword has no such cap (``_keyword_capacity`` reports ``inf``) — it can
+    be filled up to ``target`` the same as any prompted keyword; whether a given
+    variant actually has a source staged for it is a fetch-time question, not a
+    planning-time one.
     """
     cells = special_cells(groups, keywords)
     counts = Counter(cell for cell in existing_cells if cell in set(cells))

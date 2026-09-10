@@ -6,21 +6,27 @@ generative render path entirely — ``scripts/render_background.py`` calls
 the "prompt" half (spiegel, glass, clayderman) goes through the
 existing generative pipeline unchanged.
 
-Two different fetch mechanics, one per download keyword, because the two sources
-work differently:
+Both download keywords are ``manual=True`` — every candidate recording is whatever
+gets staged by hand under :func:`manual_source_dir`, resolved by index
+(:func:`staged_sources`, :func:`_fetch_manual_variant`): more than one staged
+recording means more than one playable variant, not one recording split into movements
+(a recording that legitimately arrives as several movement files gets its own
+subfolder instead — see :func:`staged_sources`). They differ in what happens on a
+miss:
 
-* ``goldberg`` is a public archive.org item — a plain, unauthenticated
-  download. Movements are cached under :data:`DOWNLOAD_CACHE_DIR` (source_url +
-  identifier) so a re-render (or a retry after a partial failure) doesn't re-pull
-  ~80 MB of MP3s it already has.
 * ``gymnopedies`` sits behind a Musopen login, so nothing here can fetch it
-  unattended (:attr:`DownloadSource.manual`). Instead it expects the file(s) staged
-  by hand under :func:`manual_source_dir`, and only assembles them.
+  unattended (:attr:`DownloadSource.manual`) — a variant with nothing staged simply
+  fails, with instructions.
+* ``goldberg`` additionally falls back, for variant 0 only, to downloading the
+  complete performance from its one public archive.org item (a plain, unauthenticated
+  download — movements cached under :data:`DOWNLOAD_CACHE_DIR` so a re-render doesn't
+  re-pull ~80 MB of MP3s it already has). Variant 1+ has no such fallback: there's
+  only the one archive.org item, so a second variant can only come from staging
+  another recording.
 
-Both return one continuous audio file (they're one-track-per-keyword, not
-one-track-per-movement — see the module's own design discussion), left for the
-caller to run through ``bnb.qc`` and hand to ``CategoryManager.attach_render`` exactly
-like a generative render's output.
+Every fetch here returns one continuous audio file (one per *variant*, not
+necessarily one per keyword), left for the caller to run through ``bnb.qc`` and hand
+to ``CategoryManager.attach_render`` exactly like a generative render's output.
 """
 
 from __future__ import annotations
@@ -43,27 +49,66 @@ like everything else in the asset repository (§ ``bnb.assets`` module docstring
 
 
 def manual_source_dir(group: str, keyword: str) -> Path:
-    """Where a download keyword's manually-staged file(s) belong: one directory per
+    """Where a download keyword's manually-staged candidates belong: one directory per
     (group, keyword) cell, same nesting as ``assets/specs/`` and ``assets/tracks/``
-    (``bnb.assets.cell_dir``) — a download keyword only ever has one track (§
-    ``build_keyword_signature``'s capacity guard), so the cell is the natural key, not
-    the seed, which the person staging the file has no reason to know or keep in sync."""
+    (``bnb.assets.cell_dir``) — the cell is the natural key, not a track_id/seed, which
+    the person staging a file has no reason to know or keep in sync."""
     return MANUAL_SOURCES_DIR / group / keyword
 
 
-def staged_files(group: str, keyword: str) -> list[Path]:
-    """Every audio file manually staged for one cell, sorted by filename — any name is
-    accepted (there's no track_id to match), so the filter is by extension
-    (``bnb.qc.AUDIO_SUFFIXES``) rather than name, or a stray README/.DS_Store dropped
-    in the same folder would be handed to :func:`_concat` as if it were a movement.
-    More than one file is concatenated in this sorted order (e.g. ``1.mp3``, ``2.mp3``,
-    ``3.mp3``)."""
+def staged_sources(group: str, keyword: str) -> list[Path]:
+    """Every manually-staged *candidate recording* for one cell, sorted by name.
+
+    Each entry is one independent take, indexed by a spec's ``variant`` (0 = the first
+    one here, 1 = the second, ...) — see :func:`fetch_gymnopedies`. An entry is either
+    a single audio file (used as-is) or a subfolder (its contents concatenated, for the
+    one case a recording legitimately arrives as several movement files rather than
+    one — see :func:`_resolve_source`). Three loose files staged side by side are
+    therefore three *different* recordings, not three movements of one; put movement
+    files in their own subfolder if that's what they are.
+
+    Filtered to known audio extensions (``bnb.qc.AUDIO_SUFFIXES``) plus any directory,
+    so a stray README/.DS_Store dropped in the same folder isn't picked up as a candidate.
+    """
     cell_dir = manual_source_dir(group, keyword)
     if not cell_dir.is_dir():
         return []
     return sorted(
-        p for p in cell_dir.iterdir() if p.is_file() and p.suffix.lower() in qc.AUDIO_SUFFIXES
+        p for p in cell_dir.iterdir()
+        if p.is_dir() or (p.is_file() and p.suffix.lower() in qc.AUDIO_SUFFIXES)
     )
+
+
+def _resolve_source(entry: Path) -> list[Path]:
+    """One staged candidate's underlying audio file(s), in the order :func:`_concat`
+    should join them: the file itself, or every audio file inside it (sorted) if it's
+    a per-movement subfolder."""
+    if entry.is_file():
+        return [entry]
+    return sorted(
+        p for p in entry.iterdir() if p.is_file() and p.suffix.lower() in qc.AUDIO_SUFFIXES
+    )
+
+
+def _fetch_manual_variant(spec: dict[str, Any], scratch_dir: Path) -> Path | None:
+    """Resolve ``spec``'s variant from what's manually staged for its cell, or
+    ``None`` if nothing is staged at that index yet — shared by every ``manual=True``
+    download keyword (:func:`fetch_gymnopedies`, :func:`fetch_goldberg`), which differ
+    only in what they do about a miss: gymnopedies has nothing else to try, goldberg
+    falls back to archive.org.
+    """
+    variant = spec.get("variant", 0)
+    sources = staged_sources(spec["group"], spec["keyword"])
+    if variant >= len(sources):
+        return None
+    files = _resolve_source(sources[variant])
+    if len(files) == 1:
+        dest = scratch_dir / f"{spec['track_id']}{files[0].suffix}"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(files[0], dest)
+        return dest
+    return _concat(files, scratch_dir / f"{spec['track_id']}.wav")
+
 
 DOWNLOAD_CACHE_DIR = ASSETS_DIR / "download_cache"
 """Raw per-movement downloads, kept across runs so replanning/re-rendering a keyword
@@ -126,9 +171,10 @@ def _archive_org_movement_files(identifier: str) -> list[str]:
     return names
 
 
-def fetch_goldberg(spec: dict[str, Any], scratch_dir: Path) -> Path:
+def _fetch_full_archive_org_recording(spec: dict[str, Any], scratch_dir: Path) -> Path:
     """Download every movement of the Open Goldberg Variations from archive.org and
-    concatenate them into one continuous recording of the complete work."""
+    concatenate them into one continuous recording of the complete work — the
+    variant-0 fallback :func:`fetch_goldberg` uses when nothing has been staged."""
     download = spec["download"]
     identifier = _archive_org_identifier(download["source_url"])
     filenames = _archive_org_movement_files(identifier)
@@ -144,30 +190,54 @@ def fetch_goldberg(spec: dict[str, Any], scratch_dir: Path) -> Path:
     return _concat(movement_paths, scratch_dir / f"{spec['track_id']}.wav")
 
 
+def fetch_goldberg(spec: dict[str, Any], scratch_dir: Path) -> Path:
+    """Prefer a manually-staged recording (any variant — short remixes and alternate
+    performances of individual variations are exactly what turned up staged in
+    practice), falling back to the complete archive.org performance only for variant 0
+    and only when nothing has been staged: there's just the one archive.org item, so
+    it can't answer for variant 1+ the way a further staged recording can.
+    """
+    resolved = _fetch_manual_variant(spec, scratch_dir)
+    if resolved is not None:
+        return resolved
+    variant = spec.get("variant", 0)
+    if variant != 0:
+        cell_dir = manual_source_dir(spec["group"], spec["keyword"])
+        sources = staged_sources(spec["group"], spec["keyword"])
+        raise RuntimeError(
+            f"no manually-staged source for {spec['group']}:{spec['keyword']} variant "
+            f"{variant} ({len(sources)} staged so far), and archive.org only has the "
+            f"one complete performance (that's variant 0's fallback, not variant "
+            f"{variant}'s). Stage another recording at {cell_dir}/"
+        )
+    return _fetch_full_archive_org_recording(spec, scratch_dir)
+
+
 def fetch_gymnopedies(spec: dict[str, Any], scratch_dir: Path) -> Path:
-    """Assemble the 3 Gymnopedies from a manually-staged Musopen download.
+    """Resolve one manually-staged recording of the 3 Gymnopedies.
 
     Musopen requires a logged-in account, so this can't be fetched with a plain HTTP
-    GET (see ``DownloadSource.manual``) — the caller has to place the file(s) at
-    ``manual_source_dir(spec["group"], spec["keyword"])`` first: any filename(s), one
-    combined file or one per movement (concatenated here in sorted filename order).
+    GET (see ``DownloadSource.manual``) — the caller has to stage it by hand under
+    ``manual_source_dir(spec["group"], spec["keyword"])`` first. ``spec["variant"]``
+    (:attr:`~bnb.background.KeywordSignature.variant`) picks which staged candidate
+    this spec resolves to (:func:`staged_sources`, via :func:`_fetch_manual_variant`) —
+    several independently-staged recordings are several variants of the keyword, not
+    movements of one, which is why this indexes rather than concatenates everything found.
     """
-    staged = staged_files(spec["group"], spec["keyword"])
-    if not staged:
-        cell_dir = manual_source_dir(spec["group"], spec["keyword"])
-        raise RuntimeError(
-            f"no manually-staged source for {spec['group']}:{spec['keyword']}. "
-            f"Download the 3 Gymnopedies from {spec['download']['source_url']} (a "
-            f"free Musopen account is required), then place the file(s) at "
-            f"{cell_dir}/ — any filename(s); one file per movement if there's more "
-            f"than one, concatenated in sorted filename order"
-        )
-    if len(staged) == 1:
-        dest = scratch_dir / f"{spec['track_id']}{staged[0].suffix}"
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(staged[0], dest)
-        return dest
-    return _concat(staged, scratch_dir / f"{spec['track_id']}.wav")
+    resolved = _fetch_manual_variant(spec, scratch_dir)
+    if resolved is not None:
+        return resolved
+    variant = spec.get("variant", 0)
+    cell_dir = manual_source_dir(spec["group"], spec["keyword"])
+    sources = staged_sources(spec["group"], spec["keyword"])
+    raise RuntimeError(
+        f"no manually-staged source for {spec['group']}:{spec['keyword']} variant "
+        f"{variant} ({len(sources)} staged so far). Download another recording of "
+        f"the 3 Gymnopedies from {spec['download']['source_url']} (a free Musopen "
+        f"account is required), then place it at {cell_dir}/ — a single file for "
+        f"one variant, or a subfolder of per-movement files for one variant "
+        f"assembled from several"
+    )
 
 
 DOWNLOADERS: dict[str, Callable[[dict[str, Any], Path], Path]] = {

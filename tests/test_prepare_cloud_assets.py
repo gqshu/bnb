@@ -217,6 +217,37 @@ def test_build_manifest_count_is_published_files_not_source_tracks():
     assert manifest["count"] == 3 == len(manifest["tracks"])
 
 
+# --- keyword_chunk_totals (--per-cell vs. published file count transparency) ----
+
+
+def test_keyword_chunk_totals_reports_source_and_published_counts():
+    entries = [
+        _entry(track_id="master_goldberg_seed1", keyword="goldberg", duration_s=500),
+        _entry(track_id="master_goldberg_seed2", keyword="goldberg", duration_s=500),
+    ]
+    totals = prep.keyword_chunk_totals(entries, chunk_s=240, bitrate_kbps=96, min_chunk_bytes=1 * 1024 * 1024)
+    assert totals[("master", "goldberg")] == (2, 6)  # 2 tracks x 3 chunks each
+
+
+def test_keyword_chunk_totals_excludes_grid_tracks():
+    grid_entry = {
+        "track_id": "drone_neutral_seed1",
+        "kind": "grid",
+        "group": None,
+        "keyword": None,
+        "duration_s": 60,
+        "loopable": True,
+    }
+    totals = prep.keyword_chunk_totals([grid_entry], chunk_s=240, bitrate_kbps=96, min_chunk_bytes=1024 * 1024)
+    assert totals == {}
+
+
+def test_keyword_chunk_totals_counts_loopable_tracks_as_one_part_each():
+    entries = [_entry(loopable=True, duration_s=10_000) for _ in range(3)]
+    totals = prep.keyword_chunk_totals(entries, chunk_s=240, bitrate_kbps=96, min_chunk_bytes=1024 * 1024)
+    assert totals[("master", "goldberg")] == (3, 3)
+
+
 # --- chunk_bounds --------------------------------------------------------------
 
 
