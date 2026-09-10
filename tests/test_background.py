@@ -856,16 +856,26 @@ def test_master_prompt_keywords_carry_style_only_provenance():
         assert entry.composer and "no" in entry.composition_status.lower()
 
 
-def test_master_glass_and_clayderman_relax_the_steadiness_bound_for_their_melody():
-    # Both ask for harmony that "shifts"/"resolves" every few bars in their description,
-    # which the default continuous-wash STEADINESS clause would forbid outright — same
+def test_master_prompt_keywords_all_relax_the_steadiness_bound_for_their_melody():
+    # All three ask for harmony that "shifts"/"resolves"/"moves through" chords in their
+    # description, which the default continuous-wash STEADINESS clause (or, before this
+    # revision, spiegel's own event-driven RESTRAINT clause) would forbid outright — same
     # fix as the grid's MELODIC_DEVELOPMENT cells (RELAX_FLOWING permits movement).
-    for keyword in ("glass", "clayderman"):
+    for keyword in MASTER_PROMPT_KEYWORDS:
         prompt = build_keyword_signature("master", keyword, 60).prompt
         assert "Full but unhurried" in prompt
         assert "nothing stepping forward out of it" not in prompt
+        assert "long stretches of near-stillness" not in prompt
 
 
-def test_master_spiegel_keeps_the_default_stillness_bound():
-    prompt = build_keyword_signature("master", "spiegel", 60).prompt
-    assert "long stretches of near-stillness" in prompt
+def test_master_prompt_keywords_ask_for_melody_and_harmonic_movement():
+    # docs/master_group_design.json's spiegel/glass templates were more static than the
+    # product wants; each description must actually name a melodic line and harmonic
+    # movement, not just avoid banning them.
+    melody_words = ("melod", "singable", "tune")
+    harmony_words = ("chord", "harmony")
+    for keyword in MASTER_PROMPT_KEYWORDS:
+        entry = SPECIAL_GROUPS["master"].keywords[keyword]
+        description = entry.description.lower()
+        assert any(w in description for w in melody_words), f"{keyword}: no melody language"
+        assert any(w in description for w in harmony_words), f"{keyword}: no harmony language"

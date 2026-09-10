@@ -1365,20 +1365,30 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
                 composition_status="public domain composition; recording license unverified, confirm before shipping",
             ),
             # -- Prompted: original pieces in the style of a (copyrighted) composer -----
+            # More melodic/harmonic than the first pass of all three: the first spiegel
+            # kept event_driven=True (the RESTRAINT bound — "long stretches of
+            # near-stillness", "no separate events and no layering"), which forbids a
+            # phrase from continuing in the same breath as asking for one, and glass
+            # said "no melody on top" outright — both fought the very thing being asked
+            # for here, the same self-contradiction the grid's MELODIC_DEVELOPMENT axis
+            # exists to avoid (§ TEXTURE_WHEN_MELODIC / density_clause). All three now
+            # take RELAX_FLOWING so the harmony actually has room to move.
             "spiegel": KeywordEntry(
-                "A deeply calm, meditative bed for solo piano and violin: sparse, "
-                "widely-spaced piano notes outline a simple major triad, rising and "
-                "falling like a mirror image, over a sustained low drone, with a single "
-                "long violin note floating above",
-                event_driven=True,  # -> the RESTRAINT bound: "vast space...between notes"
+                "A calm, meditative piece for solo piano and violin: a simple, gentle "
+                "melodic phrase on piano rises and falls like a mirror image, echoed "
+                "and answered a beat later, moving through a few warm consonant chords "
+                "over a sustained low drone, with a long violin line floating a slow "
+                "countermelody above",
+                flowing=RELAX_FLOWING,
                 composer="inspired by tintinnabuli-style sacred minimalism (no melody reproduced)",
                 composition_status="style only — not a reproduction of any copyrighted work",
             ),
             "glass": KeywordEntry(
                 "Hypnotic minimalist solo piano: continuous, evenly-flowing broken-chord "
-                "arpeggios in the left and right hand, slowly shifting harmony every few "
-                "bars, gently melancholic in a minor key, with no drums and no melody on "
-                "top — just the rippling arpeggio texture",
+                "arpeggios in the left hand, with a simple, singable melodic figure "
+                "emerging in the right hand and drifting slowly over them, the harmony "
+                "shifting warmly every few bars between a handful of consonant chords, "
+                "gently melancholic in a minor key",
                 # The harmony has to move every few bars, which the default STEADINESS
                 # bound (event_driven=False) forbids outright — same fix as the grid's
                 # MELODIC_DEVELOPMENT cells.
@@ -1388,9 +1398,9 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
             ),
             "clayderman": KeywordEntry(
                 "A warm, sentimental romantic piano piece in the easy-listening style: "
-                "expressive solo piano with gentle rubato and a flowing right-hand melody "
-                "over rolling left-hand accompaniment, backed by soft lush strings, "
-                "tender and nostalgic",
+                "a singable right-hand melody flows over rolling left-hand arpeggios, "
+                "with the chords shifting and resolving warmly every few bars, backed "
+                "by soft lush strings, tender and nostalgic",
                 flowing=RELAX_FLOWING,
                 loopable=False,  # rubato and a moving melody: trim to a phrase, don't loop
                 composer="inspired by romantic easy-listening piano repertoire (no tune reproduced)",
