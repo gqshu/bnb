@@ -139,10 +139,24 @@ def test_plan_special_coverage_avoids_used_track_ids():
 
 
 def test_fill_special_to_per_cell_reaches_target():
-    sigs = fill_special_to_per_cell(3, 60, existing_cells=[("natural_sounds", "rain")])
-    report = special_coverage_report([("natural_sounds", "rain")] + _cells(sigs))
+    sigs = fill_special_to_per_cell(
+        3, 60, existing_cells=[("natural_sounds", "rain")], groups=["natural_sounds"]
+    )
+    report = special_coverage_report([("natural_sounds", "rain")] + _cells(sigs), groups=["natural_sounds"])
     assert set(report["per_cell"].values()) == {3}
     assert report["per_group"]["natural_sounds"] == 3 * len(NATURAL)
+
+
+def test_fill_special_to_per_cell_caps_download_keywords_at_one():
+    # A fixed source recording (master's goldberg/gymnopedies) has no second take to
+    # seed differently — asking every keyword up to 3 tracks must still leave those two
+    # at 1, and must not spill their unmet demand onto the group's prompted keywords.
+    sigs = fill_special_to_per_cell(3, 60, groups=["master"])
+    report = special_coverage_report(_cells(sigs), groups=["master"])
+    for keyword in MASTER_DOWNLOAD_KEYWORDS:
+        assert report["per_cell"][f"master:{keyword}"] == 1
+    for keyword in MASTER_PROMPT_KEYWORDS:
+        assert report["per_cell"][f"master:{keyword}"] == 3
 
 
 def test_special_coverage_report_ignores_cells_outside_the_selection():
@@ -791,6 +805,17 @@ def test_master_gymnopedies_download_is_marked_manual():
     entry = SPECIAL_GROUPS["master"].keywords["gymnopedies"]
     assert entry.download.manual is True
     assert SPECIAL_GROUPS["master"].keywords["goldberg"].download.manual is False
+
+
+def test_master_download_keywords_reject_a_second_variant():
+    # A fixed source recording has no second take to seed differently — a non-zero
+    # variant would just re-fetch the identical recording under a new track_id
+    # (this is exactly how a stray "..._seed<N>" duplicate of a download keyword
+    # used to get planned via --fill/--per-cell before this guard existed).
+    for keyword in MASTER_DOWNLOAD_KEYWORDS:
+        build_keyword_signature("master", keyword, 60, variant=0)  # still fine
+        with pytest.raises(ValueError, match="fixed source recording"):
+            build_keyword_signature("master", keyword, 60, variant=1)
 
 
 def test_master_prompt_keywords_build_a_normal_generative_spec():

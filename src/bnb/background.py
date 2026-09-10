@@ -1597,6 +1597,13 @@ def build_keyword_signature(
     ``render_method="download"`` signature instead of a prompt one: ``duration_s`` is
     ignored (the source recording's own length is what it is, filled in from the fetched
     audio at render time — see ``master_sources.fetch``), and there is no prompt to build.
+
+    ``variant`` must be ``0`` for a download keyword. Unlike a generative cell, a fixed
+    source recording has no second take to seed differently — a non-zero variant would
+    fetch the exact same URL/staged file again under a different track_id, landing a
+    byte-identical duplicate in the catalog. :func:`_fill_cells` (the coverage guides'
+    shared loop) treats the resulting ``ValueError`` as "this cell is full" and moves on
+    to the next-least-covered one, rather than ever producing that duplicate.
     """
     if group_name not in SPECIAL_GROUPS:
         raise ValueError(f"unknown special group {group_name!r}, expected one of {list(SPECIAL_GROUPS)}")
@@ -1606,6 +1613,12 @@ def build_keyword_signature(
             f"unknown keyword {keyword!r} for group {group_name!r}, expected one of {list(group.keywords)}"
         )
     entry = group.keywords[keyword]
+    if entry.download is not None and variant != 0:
+        raise ValueError(
+            f"{group_name}:{keyword} is a fixed source recording (KeywordEntry.download) — "
+            f"only variant 0 is meaningful; a further variant would just re-fetch the same "
+            f"recording under a new track_id"
+        )
     instrumentation = (keyword,)
     seed = _seed((group_name, keyword), variant)
 
@@ -1802,21 +1815,38 @@ def _fill_cells(
     and in how a cell becomes a signature (``build(cell, variant)``). The variant
     advances until the track_id is free, so repeated picks of one cell are distinct
     renders rather than collisions with what's already planned.
+
+    A cell can also be capacity-limited rather than just already-covered: a special
+    keyword backed by a fixed source recording (``KeywordEntry.download``) only ever
+    has one real variant, and ``build_keyword_signature`` raises ``ValueError`` past it
+    rather than fetching the same recording again under a new track_id. That's read
+    here as "this cell is full" — the cell is dropped from contention and the guide
+    moves on to the next-least-covered one, instead of the whole fill crashing or (worse)
+    silently landing a duplicate.
     """
     picked: list[Any] = []
-    if not cells:
-        return picked
-    for _ in range(max(0, n)):
-        cell = min(cells, key=priority)
+    available = list(dict.fromkeys(cells))
+    remaining = max(0, n)
+    while remaining and available:
+        cell = min(available, key=priority)
         variant = 0
+        sig = None
         while True:
-            sig = build(cell, variant)
-            if sig.track_id not in used:
+            try:
+                candidate = build(cell, variant)
+            except ValueError:
+                available.remove(cell)
+                break
+            if candidate.track_id not in used:
+                sig = candidate
                 break
             variant += 1
+        if sig is None:
+            continue
         picked.append(sig)
         used.add(sig.track_id)
         counts[cell] += 1
+        remaining -= 1
     return picked
 
 
@@ -1900,6 +1930,20 @@ def fill_to_per_cell(
 # ``natural_sounds:rain`` targets are always variant 0.
 
 SpecialCell = Cell  # (group, keyword)
+
+
+def _keyword_capacity(cell: SpecialCell) -> float:
+    """How many distinct renders one special cell can ever hold.
+
+    A download keyword (:class:`DownloadSource` — a fixed source recording) caps at 1:
+    :func:`build_keyword_signature` refuses a second variant, since it would just
+    re-fetch the same recording under a new track_id. Every other special keyword is
+    uncapped (``float("inf")``) — a prompted cell can take as many seeded variants as
+    asked for, same as the grid.
+    """
+    group_name, keyword = cell
+    entry = SPECIAL_GROUPS[group_name].keywords[keyword]
+    return 1.0 if entry.download is not None else float("inf")
 
 
 def special_cells(
@@ -1986,10 +2030,17 @@ def fill_special_to_per_cell(
     groups: Sequence[str] | None = None,
     keywords: Sequence[str] | None = None,
 ) -> list[KeywordSignature]:
-    """Coverage guide: bring every keyword of the selected groups up to ``target`` tracks."""
+    """Coverage guide: bring every keyword of the selected groups up to ``target`` tracks.
+
+    A download keyword tops out at its :func:`_keyword_capacity` (1) regardless of
+    ``target`` — the demand a bigger ``target`` would otherwise put on it is capped here
+    rather than left to spill over onto other keywords when :func:`_fill_cells` finds
+    it exhausted.
+    """
     cells = special_cells(groups, keywords)
     counts = Counter(cell for cell in existing_cells if cell in set(cells))
-    needed = sum(max(0, target - counts[cell]) for cell in cells)
+    needed = sum(max(0, min(target, _keyword_capacity(cell)) - counts[cell]) for cell in cells)
+    needed = int(needed)
     return plan_special_coverage(
         needed,
         duration_s,
