@@ -12,7 +12,8 @@ backend at all:
       bg/
         manifest.json            the background catalogue    (see `build_manifest`)
         profiles.json            the mode-profile catalogue  (see `build_profiles`)
-        <track_id>.mp3           one file per rendered track
+        <track_id>.mp3           one file per rendered track that ships whole
+        <track_id>_partNN.mp3    one file per chunk, for a track that doesn't
         profile/<id>.jpg         one card background per profile that has art
 
 Upload ``bg/`` to the **root** of the WeChat cloud storage bucket (云开发控制台 → 存储)
@@ -26,6 +27,15 @@ The rendered masters are 60 s stereo 16-bit WAVs — about 10.6 MB each. That's 
 service that encodes on demand (``/background/{id}.mp3`` does exactly that, cached per
 track) but hopeless as something to upload by hand and pull down over mobile data, hence
 the transcode.
+
+The ``master`` group breaks that "60 s" assumption — a complete Goldberg Variations
+recording is well over an hour. Transcoded and shipped whole, that's tens of megabytes a
+mobile client would have to pull down before it could play a single note. So a track
+that isn't ``loopable`` (§ ``bnb.background.KeywordEntry.loopable``) and runs longer than
+``--chunk-minutes`` is split into that many roughly-equal pieces instead of one giant
+file (:func:`chunk_bounds`, :func:`transcode_track`), each capped at ``--max-chunk-mb`` —
+the thing actually being budgeted for is a single mobile download staying reasonable, not
+a fixed runtime.
 
 **Transcoding is not the whole audio pass.** The client loops each MP3 forever
 (``audio.ts``: ``src.loop = true``) with nothing crossfading the wrap, so a master that
@@ -69,6 +79,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import shutil
 import sys
 import time
@@ -99,6 +110,18 @@ DEFAULT_QUALITY = 2
 the request path; this is a batch job run once per library, so it buys the better psycho-
 acoustic search for nothing that matters. Same bitrate, same file size, fewer artifacts
 on the hiss-like beds (rain, stream, noise_texture) where 96 kbps is worked hardest."""
+
+DEFAULT_CHUNK_MINUTES = 4.0
+"""Target length of one piece of a long, non-loopable track (§ module docstring). At
+DEFAULT_BITRATE_KBPS a 4-minute chunk is ~2.9 MB — comfortably inside MAX_CHUNK_MB even
+at a much higher bitrate, so this is picked for a reasonable number of files per
+recording (~20 for a full Goldberg Variations) rather than to hug the size cap."""
+
+MAX_CHUNK_MB = 10.0
+"""Hard ceiling on one chunk's encoded size — what "reasonable to download on mobile
+data" actually means here. transcode_track refuses to write a chunk over this rather
+than silently shipping it; at any sane --chunk-minutes/--bitrate combination it should
+never fire, so if it does, the flags are the thing to fix, not this constant."""
 
 # Everything the app reads lives under one directory in the bucket, so the output tree is
 # a literal mirror of what gets uploaded: drop `bg/` at the bucket root and you're done.
@@ -141,39 +164,79 @@ def resolve_goals(entry: dict[str, Any]) -> list[str]:
 
 
 
-def manifest_entry(entry: dict[str, Any]) -> dict[str, Any]:
-    """One catalog entry reduced to what the client actually selects on."""
-    track_id = entry["track_id"]
-    return {
-        "id": track_id,
-        "file": f"{AUDIO_SUBDIR}/{track_id}.mp3",
-        "name": _bg_display_name(entry),
-        "goals": resolve_goals(entry),
-        # Both axes, in the taxonomy's own vocabulary — the exact strings a profile's
-        # ``spec.soundscape`` keywords are built from (§ :func:`bnb.background.soundscape_tags`).
-        "tags": soundscape_tags(entry),
-        # Every prior track loops forever client-side (`audio.ts`: `src.loop = true`).
-        # The `master` group's real recordings don't (§ `transcode`'s `loopable` note) —
-        # carried through so a future client can stop looping them instead of repeating
-        # a finished performance. Absent/true for every track published before this field.
-        "loopable": entry.get("loopable", True),
-    }
+def chunk_count(duration_s: float | None, chunk_s: float) -> int:
+    """How many pieces a track's cloud copy splits into: 1 (shipped whole) unless its
+    duration is known and exceeds one chunk.
+
+    Callers only ask this for a non-``loopable`` track (a loop must stay one file — a
+    cut chunk boundary is a real discontinuity, not something the loop crossfade
+    smooths over) — see :func:`manifest_entries_for` and ``main``'s per-track loop,
+    the two places that decide "chunk or not" and must agree.
+    """
+    if not duration_s or duration_s <= chunk_s:
+        return 1
+    return math.ceil(duration_s / chunk_s)
 
 
-def build_manifest(entries: list[dict[str, Any]], bitrate_kbps: int) -> dict[str, Any]:
+def chunk_ids(track_id: str, n_parts: int) -> list[str]:
+    """The published id(s) for one track: itself if it ships whole (``n_parts <= 1``),
+    else ``<track_id>_partNN`` — zero-padded to every id's width, so a plain filename
+    sort still gives playback order."""
+    if n_parts <= 1:
+        return [track_id]
+    width = len(str(n_parts))
+    return [f"{track_id}_part{i:0{width}d}" for i in range(1, n_parts + 1)]
+
+
+def manifest_entries_for(entry: dict[str, Any], chunk_s: float) -> list[dict[str, Any]]:
+    """One catalog entry reduced to what the client actually selects on — one row, or
+    (for a long non-loopable track) one row per chunk, all sharing the source track's
+    goals/tags/loopable so a soundscape/goal filter still finds every piece of it.
+    """
+    loopable = entry.get("loopable", True)
+    n_parts = chunk_count(entry.get("duration_s"), chunk_s) if not loopable else 1
+    ids = chunk_ids(entry["track_id"], n_parts)
+    name = _bg_display_name(entry)
+    goals = resolve_goals(entry)
+    tags = soundscape_tags(entry)
+    return [
+        {
+            "id": chunk_id,
+            "file": f"{AUDIO_SUBDIR}/{chunk_id}.mp3",
+            "name": f"{name} · {i}/{n_parts}" if n_parts > 1 else name,
+            "goals": goals,
+            # Both axes, in the taxonomy's own vocabulary — the exact strings a profile's
+            # ``spec.soundscape`` keywords are built from (§ :func:`bnb.background.soundscape_tags`).
+            "tags": tags,
+            # Every prior track loops forever client-side (`audio.ts`: `src.loop = true`).
+            # The `master` group's real recordings don't (§ `transcode_track`'s `loopable`
+            # note) — carried through so a future client can stop looping them instead of
+            # repeating a finished performance, or a chunk of one. Absent/true for every
+            # track published before this field.
+            "loopable": loopable,
+        }
+        for i, chunk_id in enumerate(ids, 1)
+    ]
+
+
+def build_manifest(entries: list[dict[str, Any]], bitrate_kbps: int, chunk_s: float) -> dict[str, Any]:
     """The client-facing catalogue: presentation and selection keys only.
 
     Everything the backend keeps for its own purposes — prompts, seeds, requested and
     measured features, provider, spec paths — stays out. The client selects on ``goals``
     and ``tags``, displays ``name``, and fetches ``file``; shipping the rest would just be
     a second copy of the catalog to keep in sync.
+
+    A chunked track contributes several rows (:func:`manifest_entries_for`), so
+    ``count`` is published files, not source tracks — what actually sits in the bucket.
     """
+    tracks = [row for entry in entries for row in manifest_entries_for(entry, chunk_s)]
     return {
         "version": MANIFEST_VERSION,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "bitrate_kbps": bitrate_kbps,
-        "count": len(entries),
-        "tracks": [manifest_entry(e) for e in entries],
+        "count": len(tracks),
+        "tracks": tracks,
     }
 
 
@@ -252,17 +315,83 @@ def build_profiles(out: Path) -> tuple[list[dict[str, Any]], list[str]]:
     return profiles, missing
 
 
-def transcode(src: Path, dst: Path, args: argparse.Namespace, *, loopable: bool = True) -> tuple[int, MasterReport]:
-    """Master one rendered WAV for looping and encode it. Returns ``(bytes, report)``.
+def _quietest_offset(mono: np.ndarray, frame: int) -> int:
+    """The start offset of the quietest ``frame``-sample window in ``mono``."""
+    if len(mono) < frame:
+        return 0
+    step = max(1, frame // 4)
+    best_i, best_rms = 0, float("inf")
+    for i in range(0, len(mono) - frame + 1, step):
+        rms = float(np.sqrt(np.mean(mono[i : i + frame] ** 2)))
+        if rms < best_rms:
+            best_rms, best_i = rms, i
+    return best_i
+
+
+CUT_SEARCH_S = 2.0
+"""How far either side of an even division a chunk boundary may move, hunting for the
+quietest moment — long enough to usually land in a real gap between phrases/movements
+of a solo piano recording, short enough that a chunk's length still tracks
+``--chunk-minutes`` closely."""
+
+CUT_FRAME_S = 0.05  # same analysis window bnb.qc uses for its own RMS measurements
+
+
+def chunk_bounds(n_samples: int, sample_rate: int, mono: np.ndarray, n_parts: int) -> list[tuple[int, int]]:
+    """``n_parts`` contiguous ``(start, end)`` sample ranges covering ``mono`` end to end.
+
+    An even division would as often as not land mid-note; each interior boundary
+    instead snaps to the quietest moment within :data:`CUT_SEARCH_S` of it
+    (:func:`_quietest_offset`) — the same reasoning as ``bnb.mastering``'s declick pass
+    (a defect is cheap to avoid at the moment it's created, expensive to notice by ear
+    across a growing library), just at a chunk boundary instead of an impulse click.
+    """
+    if n_parts <= 1:
+        return [(0, n_samples)]
+    search = int(CUT_SEARCH_S * sample_rate)
+    frame = max(1, int(CUT_FRAME_S * sample_rate))
+    bounds: list[tuple[int, int]] = []
+    start = 0
+    for i in range(1, n_parts):
+        target = round(n_samples * i / n_parts)
+        lo, hi = max(0, target - search), min(n_samples, target + search)
+        cut = lo + _quietest_offset(mono[lo:hi], frame)
+        cut = max(start + 1, min(cut, n_samples - 1))  # never empty, never past the end
+        bounds.append((start, cut))
+        start = cut
+    bounds.append((start, n_samples))
+    return bounds
+
+
+def transcode_track(
+    src: Path,
+    audio_dir: Path,
+    chunk_ids_: list[str],
+    args: argparse.Namespace,
+    *,
+    loopable: bool,
+    max_chunk_bytes: float,
+) -> tuple[list[int], MasterReport]:
+    """Master one rendered WAV once, then split and encode it into ``len(chunk_ids_)``
+    pieces at ``audio_dir/<id>.mp3``. Returns each chunk's encoded size, in the same
+    order as ``chunk_ids_``, and the single :class:`MasterReport` for the pass over the
+    whole file (declick/trim happen once, before any split — a chunk boundary is not a
+    defect the way a click or a bad loop seam is, so there's nothing per-chunk to report).
 
     Mono sources are widened to stereo rather than encoded as mono, so every file in the
     bucket has the same channel count and the client never has to special-case one.
 
     ``loopable=False`` (the ``master`` group's real recordings, e.g. the Goldberg
     Variations — see ``bnb.background.KeywordEntry.loopable``) skips the crossfade
-    loop-seam step: folding a real performance's tail back over its head to hide a seam
-    that will never actually repeat would just mangle its intentional ending. Declicking
-    still runs — a true sample-scale click is a defect either way.
+    loop-seam step regardless of chunk count: folding a real performance's tail back
+    over its head to hide a seam that will never actually repeat would just mangle its
+    intentional ending, and a split chunk is a segment of that performance, not a loop
+    candidate either way. Declicking still runs — a true sample-scale click is a defect
+    either way.
+
+    Raises ``ValueError`` if any chunk would exceed ``max_chunk_bytes`` — the "reasonable
+    to download on mobile data" requirement is enforced here, not left as a hope that
+    ``--chunk-minutes``/``--bitrate`` were chosen well.
     """
     data, sample_rate = sf.read(str(src), dtype="float32", always_2d=True)
     if data.shape[1] == 1:
@@ -276,15 +405,27 @@ def transcode(src: Path, dst: Path, args: argparse.Namespace, *, loopable: bool 
         click_z=args.click_sensitivity,
         peak_dbfs=args.peak_dbfs,
     )
-    encoder = lameenc.Encoder()
-    encoder.set_bit_rate(args.bitrate)
-    encoder.set_in_sample_rate(sample_rate)
-    encoder.set_channels(2)
-    encoder.set_quality(args.quality)
-    mp3 = bytes(encoder.encode(to_int16_bytes(data))) + bytes(encoder.flush())
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_bytes(mp3)
-    return len(mp3), report
+
+    mono = data.mean(axis=1)
+    bounds = chunk_bounds(len(data), sample_rate, mono, len(chunk_ids_))
+
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    sizes: list[int] = []
+    for chunk_id, (start, end) in zip(chunk_ids_, bounds):
+        encoder = lameenc.Encoder()
+        encoder.set_bit_rate(args.bitrate)
+        encoder.set_in_sample_rate(sample_rate)
+        encoder.set_channels(2)
+        encoder.set_quality(args.quality)
+        mp3 = bytes(encoder.encode(to_int16_bytes(data[start:end]))) + bytes(encoder.flush())
+        if len(mp3) > max_chunk_bytes:
+            raise ValueError(
+                f"{chunk_id}: {human(len(mp3))} exceeds the {human(max_chunk_bytes)} cap "
+                f"(--max-chunk-mb) — pass a shorter --chunk-minutes or a lower --bitrate"
+            )
+        (audio_dir / f"{chunk_id}.mp3").write_bytes(mp3)
+        sizes.append(len(mp3))
+    return sizes, report
 
 
 def stray_mp3s(out: Path, published: set[str]) -> list[Path]:
@@ -317,6 +458,20 @@ def main() -> int:
     parser.add_argument("--bitrate", type=int, default=DEFAULT_BITRATE_KBPS, help="MP3 bitrate in kbps")
     parser.add_argument("--quality", type=int, default=DEFAULT_QUALITY, help="lameenc effort, 0=best … 9=fastest")
     parser.add_argument("--limit", type=int, default=None, help="only process the first N tracks (for a trial run)")
+    parser.add_argument(
+        "--chunk-minutes",
+        type=float,
+        default=DEFAULT_CHUNK_MINUTES,
+        help=f"target length of one piece of a long, non-loopable track (default: "
+        f"{DEFAULT_CHUNK_MINUTES:g}); loopable tracks are never split",
+    )
+    parser.add_argument(
+        "--max-chunk-mb",
+        type=float,
+        default=MAX_CHUNK_MB,
+        help=f"refuse to write a chunk larger than this (default: {MAX_CHUNK_MB:g}) — "
+        f"lower --chunk-minutes or --bitrate if it's hit",
+    )
     parser.add_argument(
         "--force",
         action="store_true",
@@ -394,12 +549,17 @@ def main() -> int:
     total_bytes = 0
     reports: dict[str, dict[str, Any]] = {}
 
+    chunk_s = args.chunk_minutes * 60
+    max_chunk_bytes = args.max_chunk_mb * 1024 * 1024
+
     if not args.catalog_only:
         for i, entry in enumerate(entries, 1):
             track_id = entry["track_id"]
-            dst = out / AUDIO_SUBDIR / f"{track_id}.mp3"
-            if dst.exists() and not args.force:
-                total_bytes += dst.stat().st_size
+            loopable = entry.get("loopable", True)
+            n_parts = chunk_count(entry.get("duration_s"), chunk_s) if not loopable else 1
+            dsts = [out / AUDIO_SUBDIR / f"{cid}.mp3" for cid in chunk_ids(track_id, n_parts)]
+            if not args.force and all(d.exists() for d in dsts):
+                total_bytes += sum(d.stat().st_size for d in dsts)
                 skipped += 1
                 continue
             src = assets.find_track(track_id)
@@ -409,18 +569,30 @@ def main() -> int:
                 # other 116 transcodes.
                 missing.append(track_id)
                 continue
-            size, report = transcode(src, dst, args, loopable=entry.get("loopable", True))
+            try:
+                sizes, report = transcode_track(
+                    src,
+                    out / AUDIO_SUBDIR,
+                    chunk_ids(track_id, n_parts),
+                    args,
+                    loopable=loopable,
+                    max_chunk_bytes=max_chunk_bytes,
+                )
+            except ValueError as exc:
+                print(f"\nchunking error: {exc}", file=sys.stderr)
+                return 1
             reports[track_id] = report.as_dict()
-            total_bytes += size
+            total_bytes += sum(sizes)
             written += 1
+            parts_note = f", {n_parts} parts" if n_parts > 1 else ""
             notes = f"  ({', '.join(report.notes)})" if report.notes else ""
-            print(f"[{i}/{len(entries)}] {track_id}  {human(size)}{notes}")
+            print(f"[{i}/{len(entries)}] {track_id}  {human(sum(sizes))}{parts_note}{notes}")
 
     # The manifest lists what's actually in the bucket, so a track whose master was
     # missing is left out of it too — otherwise the client would pick an id it can't
     # download and fail at play time instead of never offering it.
     publishable = [e for e in entries if e["track_id"] not in set(missing)]
-    manifest = build_manifest(publishable, args.bitrate)
+    manifest = build_manifest(publishable, args.bitrate, chunk_s)
     (out / MANIFEST_NAME).write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
 
     # Profiles are validated on read, so a bad hand-edit to assets/profiles.json aborts
@@ -456,7 +628,9 @@ def main() -> int:
             )
         )
 
-    strays = stray_mp3s(out, {e["track_id"] for e in publishable})
+    # The published id set, not just track_ids: a chunked track's files are named
+    # <track_id>_partNN, and stray_mp3s would otherwise call every one of them stale.
+    strays = stray_mp3s(out, {row["id"] for row in manifest["tracks"]})
     if strays and args.prune:
         for path in strays:
             path.unlink()
