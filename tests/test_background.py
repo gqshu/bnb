@@ -92,6 +92,7 @@ def test_unknown_axis_names_rejected():
 NATURAL = list(SPECIAL_GROUPS["natural_sounds"].keywords)
 ENERGIZER = list(SPECIAL_GROUPS["energizer"].keywords)
 UNWIND = list(SPECIAL_GROUPS["unwind"].keywords)
+MASTER = list(SPECIAL_GROUPS["master"].keywords)
 
 
 def _cells(sigs):
@@ -102,8 +103,12 @@ def test_special_cells_enumerates_every_keyword():
     assert special_cells(["natural_sounds"]) == [("natural_sounds", k) for k in NATURAL]
     assert special_cells(["energizer"]) == [("energizer", k) for k in ENERGIZER]
     assert special_cells(["unwind"]) == [("unwind", k) for k in UNWIND]
+    assert special_cells(["master"]) == [("master", k) for k in MASTER]
     assert special_cells() == (
-        special_cells(["natural_sounds"]) + special_cells(["energizer"]) + special_cells(["unwind"])
+        special_cells(["natural_sounds"])
+        + special_cells(["energizer"])
+        + special_cells(["unwind"])
+        + special_cells(["master"])
     )
 
 
@@ -218,7 +223,11 @@ def test_every_special_group_keyword_builds_without_error():
     for group_name, group in SPECIAL_GROUPS.items():
         for keyword in group.keywords:
             sig = build_keyword_signature(group_name, keyword, 30)
-            assert sig.prompt and sig.negative_prompt
+            if sig.render_method == "download":
+                assert sig.download is not None
+                assert sig.prompt is None and sig.negative_prompt is None
+            else:
+                assert sig.prompt and sig.negative_prompt
 
 
 # --- provider prompt adaptation ----------------------------------------------
@@ -747,3 +756,91 @@ def test_lofi_does_not_ask_for_the_noise_its_negative_prompt_bans():
     for substrate in ("drone", "melodic_instrument"):
         assert substrate in lofi.overrides
         assert "chord" in lofi.overrides[substrate].body.lower()
+
+
+# --- master group (docs/master_group_design.json) ----------------------------
+
+MASTER_DOWNLOAD_KEYWORDS = ("goldberg", "gymnopedies")
+MASTER_PROMPT_KEYWORDS = ("spiegel", "glass", "clayderman")
+
+
+def test_master_group_has_five_keywords_split_download_and_prompt():
+    assert set(MASTER) == set(MASTER_DOWNLOAD_KEYWORDS) | set(MASTER_PROMPT_KEYWORDS)
+    assert len(MASTER) == 5
+
+
+def test_master_download_keywords_produce_a_download_spec_with_no_prompt():
+    for keyword in MASTER_DOWNLOAD_KEYWORDS:
+        spec = build_keyword_signature("master", keyword, 60).spec()
+        assert spec["kind"] == "special"
+        assert spec["group"] == "master" and spec["keyword"] == keyword
+        assert spec["render_method"] == "download"
+        assert spec["prompt"] is None
+        assert spec["negative_prompt"] is None
+        assert spec["composition_plan"] is None
+        assert spec["duration_s"] is None
+        assert spec["loopable"] is False  # a real, finite recording — not a bed to loop
+        assert spec["download"]["source_url"]
+        assert spec["download"]["recording_license"]
+        assert spec["composer"]
+
+
+def test_master_gymnopedies_download_is_marked_manual():
+    # Musopen requires a logged-in account, so it can't be fetched with a plain GET —
+    # unlike goldberg, which archive.org serves unauthenticated.
+    entry = SPECIAL_GROUPS["master"].keywords["gymnopedies"]
+    assert entry.download.manual is True
+    assert SPECIAL_GROUPS["master"].keywords["goldberg"].download.manual is False
+
+
+def test_master_prompt_keywords_build_a_normal_generative_spec():
+    for keyword in MASTER_PROMPT_KEYWORDS:
+        sig = build_keyword_signature("master", keyword, 60)
+        spec = sig.spec()
+        assert spec["render_method"] == "prompt"
+        assert spec["download"] is None
+        assert spec["prompt"] and spec["negative_prompt"]
+        assert spec["composition_plan"] is not None
+        assert spec["duration_s"] == 60
+
+
+def test_master_clayderman_is_not_loopable_but_the_others_are():
+    # docs/master_group_design.json: clayderman params say "trim to a clean
+    # phrase; fade rather than hard-loop" — the one prompt keyword that isn't a loop.
+    assert build_keyword_signature("master", "clayderman", 60).spec()["loopable"] is False
+    for keyword in ("spiegel", "glass"):
+        assert build_keyword_signature("master", keyword, 60).spec()["loopable"] is True
+
+
+def test_master_prompts_never_name_the_real_composer_or_piece():
+    # The guardrail docs/master_group_design.json asks for: an "avoid" of any specific
+    # copyrighted work applies here the same way buddhist_meditative avoids real mantra
+    # text — composer/piece identity lives only in the spec's provenance fields
+    # (composer/composition_status), never in the text actually sent to a generative model.
+    banned = ("pärt", "arvo", "spiegel im spiegel", "philip glass", "richard clayderman",
+              "ballade pour adeline", "mariage d'amour")
+    for keyword in MASTER_PROMPT_KEYWORDS:
+        prompt = build_keyword_signature("master", keyword, 60).prompt.lower()
+        for phrase in banned:
+            assert phrase not in prompt, f"{keyword}: prompt leaks {phrase!r}"
+
+
+def test_master_prompt_keywords_carry_style_only_provenance():
+    for keyword in MASTER_PROMPT_KEYWORDS:
+        entry = SPECIAL_GROUPS["master"].keywords[keyword]
+        assert entry.composer and "no" in entry.composition_status.lower()
+
+
+def test_master_glass_and_clayderman_relax_the_steadiness_bound_for_their_melody():
+    # Both ask for harmony that "shifts"/"resolves" every few bars in their description,
+    # which the default continuous-wash STEADINESS clause would forbid outright — same
+    # fix as the grid's MELODIC_DEVELOPMENT cells (RELAX_FLOWING permits movement).
+    for keyword in ("glass", "clayderman"):
+        prompt = build_keyword_signature("master", keyword, 60).prompt
+        assert "Full but unhurried" in prompt
+        assert "nothing stepping forward out of it" not in prompt
+
+
+def test_master_spiegel_keeps_the_default_stillness_bound():
+    prompt = build_keyword_signature("master", "spiegel", 60).prompt
+    assert "long stretches of near-stillness" in prompt

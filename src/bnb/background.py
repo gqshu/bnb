@@ -28,7 +28,7 @@ from __future__ import annotations
 import hashlib
 from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
 # Applies to every down-regulation track (§4). Kept as prose (prompt) and as
@@ -916,6 +916,26 @@ def composition_plan_for_model(spec: dict[str, Any], model_id: str) -> dict[str,
 
 
 @dataclass(frozen=True)
+class DownloadSource:
+    """A pre-existing recording to fetch rather than generate.
+
+    A :class:`KeywordEntry` with ``download`` set skips prompting entirely
+    (:func:`build_keyword_signature`) — the render step fetches audio instead of calling a
+    generative provider (``scripts/render_background.py`` routes on the spec's
+    ``render_method``, ``bnb.master_sources`` does the actual fetch).
+
+    ``manual`` marks a source with no stable URL a script can fetch unattended (e.g. it
+    sits behind a login) — the render step then expects the file staged by hand under
+    ``assets/manual_sources/<track_id>.*`` instead of downloading ``source_url`` itself.
+    """
+
+    source_url: str
+    recording_license: str
+    performer: str
+    manual: bool = False
+
+
+@dataclass(frozen=True)
 class KeywordEntry:
     """One keyword within a special group.
 
@@ -940,6 +960,17 @@ class KeywordEntry:
     needing the opposite — movement, and tonal content the shell's "no music, no
     instruments" tail would otherwise argue away. Overriding one keyword beats either
     loosening the shell for all of them or inventing a group for one member.
+
+    ``loopable`` records whether the *rendered* audio is meant to repeat forever, same
+    meaning as the grid's (currently always-true) ``Signature.spec()["loopable"]``, but
+    here it can vary per keyword: a 60s generated bed loops, a real finite recording or a
+    piece trimmed to "a clean phrase, fade rather than hard-loop" does not.
+
+    ``download``, ``composer`` and ``composition_status`` are provenance, not prompt
+    content — worth recording on the spec either way (what a track *is*, and why its
+    license is what it is), but never fed into the actual generation prompt: naming a
+    real composer or title there is exactly the copying risk a style-only prompt (see
+    the ``master`` group) is written to avoid.
     """
 
     description: str
@@ -947,6 +978,10 @@ class KeywordEntry:
     goals: frozenset[str] = field(default_factory=lambda: frozenset({"relax", "focus"}))
     flowing: str | None = None
     body: str | None = None
+    loopable: bool = True
+    download: DownloadSource | None = None
+    composer: str | None = None
+    composition_status: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1270,6 +1305,98 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
             ),
         },
     ),
+    # docs/master_group_design.json: tracks inspired by public-domain masterpieces. Two
+    # keywords are real recordings (``KeywordEntry.download`` set — fetched, not
+    # generated) and three are original compositions in the *style* of a (copyrighted)
+    # composer, generated like any other special cell. The distinction lives entirely on
+    # the keyword, which is why ``build_keyword_signature`` branches on ``entry.download``
+    # rather than this needing a separate group.
+    #
+    # The shared shell carries the one guardrail that matters for the generated half:
+    # never quote or reproduce an existing melody. It says nothing else in common —
+    # a mirror-calm drone, a minimalist arpeggio and a romantic ballad don't share a
+    # mood — so unlike every other group here, ``flowing``/``development`` are left at
+    # their defaults and each keyword's own ``description`` carries its full character
+    # (same override-per-keyword pattern ``natural_sounds``' ``universe`` already uses).
+    "master": SpecialGroup(
+        name="master",
+        body=(
+            "An original instrumental composition — inspired only by a tradition's mood "
+            "and technique, never quoting or reproducing any specific existing melody. "
+            "Warm and intimate, cleanly recorded with a soft natural room ambience."
+        ),
+        global_styles=("instrumental", "solo piano", "classical", "high production quality"),
+        keywords={
+            # -- Free-to-download: real recordings of public-domain compositions -------
+            "goldberg": KeywordEntry(
+                "J.S. Bach's Goldberg Variations, BWV 988 — the complete work (Aria, "
+                "30 variations, and the Aria da capo), performed on piano",
+                goals=frozenset({"relax"}),
+                loopable=False,  # a 75-90 minute through-composed work, not a bed to loop
+                download=DownloadSource(
+                    source_url="https://archive.org/download/The_Open_Goldberg_Variations-11823/",
+                    recording_license="CC0 1.0 (public domain dedication, no attribution required)",
+                    performer="Kimiko Ishizaka — the Open Goldberg Variations project",
+                    manual=False,  # archive.org: a plain, unauthenticated download
+                ),
+                composer="J.S. Bach (d. 1750)",
+                composition_status="public domain composition; CC0 recording",
+            ),
+            # Musopen states its hosted recordings as public domain, but requires a free
+            # account to download — unlike Goldberg's archive.org source, this can't be
+            # fetched with a plain HTTP GET (see DownloadSource.manual and
+            # bnb.master_sources.fetch_gymnopedies).
+            "gymnopedies": KeywordEntry(
+                "Erik Satie's 3 Gymnopedies — the complete set of three slow, wistful "
+                "piano waltzes, performed on piano",
+                goals=frozenset({"relax"}),
+                loopable=False,
+                download=DownloadSource(
+                    source_url="https://musopen.org/music/8010-3-gymnopedies/",
+                    recording_license=(
+                        "Musopen-hosted recording, treated by Musopen as public domain — "
+                        "verify the specific recording before shipping (see design doc)"
+                    ),
+                    performer="see the Musopen listing at download time",
+                    manual=True,  # requires a logged-in Musopen account
+                ),
+                composer="Erik Satie (d. 1925)",
+                composition_status="public domain composition; recording license unverified, confirm before shipping",
+            ),
+            # -- Prompted: original pieces in the style of a (copyrighted) composer -----
+            "spiegel": KeywordEntry(
+                "A deeply calm, meditative bed for solo piano and violin: sparse, "
+                "widely-spaced piano notes outline a simple major triad, rising and "
+                "falling like a mirror image, over a sustained low drone, with a single "
+                "long violin note floating above",
+                event_driven=True,  # -> the RESTRAINT bound: "vast space...between notes"
+                composer="inspired by tintinnabuli-style sacred minimalism (no melody reproduced)",
+                composition_status="style only — not a reproduction of any copyrighted work",
+            ),
+            "glass": KeywordEntry(
+                "Hypnotic minimalist solo piano: continuous, evenly-flowing broken-chord "
+                "arpeggios in the left and right hand, slowly shifting harmony every few "
+                "bars, gently melancholic in a minor key, with no drums and no melody on "
+                "top — just the rippling arpeggio texture",
+                # The harmony has to move every few bars, which the default STEADINESS
+                # bound (event_driven=False) forbids outright — same fix as the grid's
+                # MELODIC_DEVELOPMENT cells.
+                flowing=RELAX_FLOWING,
+                composer="inspired by minimalist repeating-arpeggio piano (no composition reproduced)",
+                composition_status="style only — not a reproduction of any copyrighted work",
+            ),
+            "clayderman": KeywordEntry(
+                "A warm, sentimental romantic piano piece in the easy-listening style: "
+                "expressive solo piano with gentle rubato and a flowing right-hand melody "
+                "over rolling left-hand accompaniment, backed by soft lush strings, "
+                "tender and nostalgic",
+                flowing=RELAX_FLOWING,
+                loopable=False,  # rubato and a moving melody: trim to a phrase, don't loop
+                composer="inspired by romantic easy-listening piano repertoire (no tune reproduced)",
+                composition_status="style only — not a reproduction of any copyrighted work",
+            ),
+        },
+    ),
 }
 
 
@@ -1392,16 +1519,27 @@ class KeywordSignature:
 
     Mirrors :class:`Signature`'s ``track_id``/``spec()`` surface so storage and
     rendering can treat grid and special signatures identically.
+
+    ``render_method`` says which render path ``scripts/render_background.py`` takes:
+    ``"prompt"`` (the default — call a generative provider, same as every other special
+    cell) or ``"download"`` (fetch existing audio per ``download``; see
+    :class:`DownloadSource`). A download cell carries no prompt/negative_prompt/
+    composition_plan — there is nothing to generate — so those are ``None``.
     """
 
     group: SpecialGroup
     keyword: str
-    duration_s: int
+    duration_s: int | None
     seed: int
-    prompt: str
-    negative_prompt: str
+    prompt: str | None
+    negative_prompt: str | None
     instrumentation: tuple[str, ...]
-    composition_plan: dict[str, Any]
+    composition_plan: dict[str, Any] | None
+    loopable: bool = True
+    render_method: str = "prompt"
+    download: DownloadSource | None = None
+    composer: str | None = None
+    composition_status: str | None = None
 
     @property
     def track_id(self) -> str:
@@ -1418,12 +1556,16 @@ class KeywordSignature:
             "requested_features": None,
             "measured_features": None,
             "instrumentation": list(self.instrumentation),
+            "render_method": self.render_method,
             "prompt": self.prompt,
             "negative_prompt": self.negative_prompt,
             "composition_plan": self.composition_plan,
             "seed": self.seed,
             "duration_s": self.duration_s,
-            "loopable": True,
+            "loopable": self.loopable,
+            "download": asdict(self.download) if self.download else None,
+            "composer": self.composer,
+            "composition_status": self.composition_status,
             "render": None,
         }
 
@@ -1449,7 +1591,13 @@ def _keyword_prompt(group: SpecialGroup, entry: KeywordEntry) -> str:
 def build_keyword_signature(
     group_name: str, keyword: str, duration_s: int, variant: int = 0
 ) -> KeywordSignature:
-    """Resolve a (group, keyword) pair into a full render spec, grid-signature style."""
+    """Resolve a (group, keyword) pair into a full render spec, grid-signature style.
+
+    A keyword whose entry sets ``download`` (:class:`DownloadSource`) resolves to a
+    ``render_method="download"`` signature instead of a prompt one: ``duration_s`` is
+    ignored (the source recording's own length is what it is, filled in from the fetched
+    audio at render time — see ``master_sources.fetch``), and there is no prompt to build.
+    """
     if group_name not in SPECIAL_GROUPS:
         raise ValueError(f"unknown special group {group_name!r}, expected one of {list(SPECIAL_GROUPS)}")
     group = SPECIAL_GROUPS[group_name]
@@ -1459,6 +1607,24 @@ def build_keyword_signature(
         )
     entry = group.keywords[keyword]
     instrumentation = (keyword,)
+    seed = _seed((group_name, keyword), variant)
+
+    if entry.download is not None:
+        return KeywordSignature(
+            group=group,
+            keyword=keyword,
+            duration_s=None,
+            seed=seed,
+            prompt=None,
+            negative_prompt=None,
+            instrumentation=instrumentation,
+            composition_plan=None,
+            loopable=entry.loopable,
+            render_method="download",
+            download=entry.download,
+            composer=entry.composer,
+            composition_status=entry.composition_status,
+        )
 
     composition_plan: dict[str, Any] = {
         "positive_global_styles": _dedupe(group.global_styles + (keyword,)),
@@ -1478,11 +1644,14 @@ def build_keyword_signature(
         group=group,
         keyword=keyword,
         duration_s=duration_s,
-        seed=_seed((group_name, keyword), variant),
+        seed=seed,
         prompt=_keyword_prompt(group, entry),
         negative_prompt=group.negative_prompt,
         instrumentation=instrumentation,
         composition_plan=composition_plan,
+        loopable=entry.loopable,
+        composer=entry.composer,
+        composition_status=entry.composition_status,
     )
 
 

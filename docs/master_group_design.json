@@ -1,0 +1,143 @@
+{
+  "free_recordings": {
+    "goldberg_variations": {
+      "piece": "Goldberg Variations, BWV 988 (complete, Aria + 30 variations)",
+      "composer": "J.S. Bach",
+      "composition_status": "public domain (Bach d. 1750)",
+      "performer": "Kimiko Ishizaka — the 'Open Goldberg Variations' project",
+      "recording_license": "CC0 1.0 (public domain dedication) — use/edit/sell, no attribution required",
+      "formats": [
+        "MP3 (VBR)",
+        "OGG Vorbis",
+        "WAV (Bandcamp)"
+      ],
+      "primary_url": "https://opengoldbergvariations.org/listen/",
+      "direct_download": "https://archive.org/download/The_Open_Goldberg_Variations-11823/",
+      "notes": "Cleanest license of the whole list. Archive.org identifier: The_Open_Goldberg_Variations-11823 (32 tracks, MP3+OGG, torrent). Also on Bandcamp (MP3/WAV) and Free Music Archive. Score is CC0 too."
+    },
+    "gymnopedies": {
+      "piece": "3 Gymnopedies (No. 1 Lent et douloureux, No. 2 Lent et triste, No. 3 Lent et grave)",
+      "composer": "Erik Satie",
+      "composition_status": "public domain (Satie d. 1925)",
+      "performer": "see notes — pick a clearly-licensed recording, or generate your own",
+      "recording_license": "VARIES — verify per track (see notes)",
+      "formats": [
+        "MP3",
+        "OGG"
+      ],
+      "primary_url": "https://musopen.org/music/8010-3-gymnopedies/",
+      "direct_download": "https://archive.org/download/Satie_Gymnopedies/",
+      "notes": "IMPORTANT: the *composition* is fully public domain, but recording licenses differ. Musopen hosts recordings it treats as public domain (free account required to download) — verify the individual track. Community archive.org uploads (e.g. identifier 'Satie_Gymnopedies', all three movements; or 'SatiesThreeGymnopedies' by S. Robert Powell) do NOT state a recording license explicitly, so treat them as prototype-only unless you confirm status. CLEANEST PATH for production: because the composition is PD, just generate your own Satie performance (see INSTYLE_PROMPTS['satie_optional']) — zero recording-rights risk, and you get tempo/key control."
+    }
+  },
+  "ambience_sources": {
+    "rain_and_nature": {
+      "url": "https://freesound.org/",
+      "license": "filter to CC0 for no-attribution commercial use (CC-BY also available)",
+      "notes": "Rebuild the 'with rain' version yourself: PD Gymnopedie bed + CC0 rain layer = you own the whole mix and its license end to end."
+    }
+  },
+  "instyle_prompts": {
+    "spiegel_style": {
+      "piece": "Mirror-calm piano & violin bed (Spiegel-im-Spiegel style)",
+      "inspiration": "Arvo Part, 'Spiegel im Spiegel' (1978) — DO NOT reproduce the theme",
+      "composition_status": "COPYRIGHT (Part b. 1935) — style only",
+      "ace_step_tags": "ambient classical, solo piano and violin, tintinnabuli, sparse, sustained, meditative, F major, very slow, 52 BPM",
+      "ace_step_lyrics": "[instrumental]",
+      "stable_audio_prompt": "A deeply calm, meditative piece for solo piano and violin. Sparse, widely-spaced piano notes outlining a simple major triad, rising and falling like a mirror image, over a sustained low drone. A single long violin note floats above. Vast space and silence between notes, no percussion, no rhythm section, F major, extremely slow and still. 60 seconds, seamless, ambient.",
+      "variations": [
+        "solo piano only, no violin, sustained bell-like single notes, glacial, F major, 48 BPM",
+        "piano and cello, low register, sacred minimalism, endless sustain, reverberant church space"
+      ],
+      "avoid": "Do not request the specific 3-note rising/falling motif by name or the title; keep the triad generic. Audition for accidental quotation of the real figure.",
+      "params": {
+        "duration_s": 60,
+        "loopable": true,
+        "key": "F major",
+        "bpm": 52,
+        "steps": 60,
+        "cfg": 4.0,
+        "seeds_to_try": 6,
+        "post": "reverb tail + crossfade loop to session length"
+      },
+      "am_fit": "EXCELLENT AM carrier: sustained tones and long silences take an imposed amplitude-gate cleanly. Also ideal as a soundscape over a pure-sine binaural bed."
+    },
+    "glass_style": {
+      "piece": "Minimalist arpeggio piano bed (Glass style)",
+      "inspiration": "Philip Glass, e.g. 'Metamorphosis'/'Mad Rush' — DO NOT reproduce any actual etude",
+      "composition_status": "COPYRIGHT (Glass b. 1937) — style only",
+      "ace_step_tags": "minimalist piano, repeating broken-chord arpeggios, hypnotic, gentle harmonic shifts, melancholic, minor key, 76 BPM",
+      "ace_step_lyrics": "[instrumental]",
+      "stable_audio_prompt": "Hypnotic minimalist solo piano. Continuous, evenly-flowing broken-chord arpeggios in the left and right hand, slowly shifting harmony every few bars, gently melancholic, in a minor key. Steady and trance-like with no drums and no melody on top — just the rippling arpeggio texture. Contemplative, cyclical, 60 seconds, loopable.",
+      "variations": [
+        "add soft sustained synth pad under the piano arpeggios, warm, ambient minimalism",
+        "faster rippling arpeggios, brighter major-key sections, urgent but calm, 96 BPM"
+      ],
+      "avoid": "Keep the arpeggio pattern and chord progression generic-minimalist; do not prompt a specific Glass work or its signature figure. Audition outputs.",
+      "params": {
+        "duration_s": 60,
+        "loopable": true,
+        "key": "A minor (try C minor)",
+        "bpm": 76,
+        "steps": 60,
+        "cfg": 4.5,
+        "seeds_to_try": 6,
+        "post": "bar-aligned loop; watch for phrase seams"
+      },
+      "am_fit": "MUDDIER as an AM carrier — the steady arpeggios already carry a strong rhythmic envelope that fights an imposed gate. Best used as a soundscape layered over a binaural beat."
+    },
+    "clayderman_style": {
+      "piece": "Romantic easy-listening piano bed (Clayderman style)",
+      "inspiration": "Richard Clayderman repertoire (comp. Paul de Senneville) — e.g. 'Ballade pour Adeline', 'Mariage d'amour'. DO NOT reproduce these tunes.",
+      "composition_status": "COPYRIGHT (de Senneville b. 1933) — style only",
+      "ace_step_tags": "romantic solo piano, easy listening, lush, sentimental, gentle rubato, soft strings, major key, 72 BPM",
+      "ace_step_lyrics": "[instrumental]",
+      "stable_audio_prompt": "A warm, sentimental romantic piano piece in the easy-listening style. Expressive solo piano with gentle rubato and a flowing right-hand melody over rolling left-hand accompaniment, backed by soft lush strings. Tender, nostalgic, major key, cinematic and sweet. No drums. 60 seconds, smooth.",
+      "variations": [
+        "solo piano only, no strings, intimate, close-mic'd, gentle, major key, 68 BPM",
+        "piano with soft pad and light harp, dreamy, romantic, slow ballad feel"
+      ],
+      "avoid": "Prompt for the romantic-piano *mood* only. Do NOT request 'Ballade pour Adeline' / 'Mariage d'amour' or their melodies — both are in copyright. Because Clayderman's sound is so melody-driven, audition especially carefully.",
+      "params": {
+        "duration_s": 60,
+        "loopable": false,
+        "key": "D major (try G major)",
+        "bpm": 72,
+        "steps": 60,
+        "cfg": 4.5,
+        "seeds_to_try": 8,
+        "post": "trim to a clean phrase; fade rather than hard-loop"
+      },
+      "am_fit": "MUDDIER as an AM carrier — rubato and a moving melody give an irregular envelope that blurs the gate. Use as a soundscape over a binaural bed."
+    },
+    "satie_optional": {
+      "piece": "Gymnopedie-style slow piano waltz (PD composition — generate freely)",
+      "inspiration": "Erik Satie Gymnopedies — composition is PUBLIC DOMAIN, no restriction",
+      "composition_status": "PUBLIC DOMAIN (Satie d. 1925) — you may even reproduce the tune",
+      "ace_step_tags": "solo piano, slow waltz, 3/4 time, gentle suspended chords, melancholic, tender, sparse, 60 BPM",
+      "ace_step_lyrics": "[instrumental]",
+      "stable_audio_prompt": "A slow, gentle solo piano waltz in 3/4 time. Simple wistful melody over soft suspended chords, unhurried and melancholic but sweet, lots of space, no drums. Reflective and calm, 60 seconds, loopable.",
+      "variations": [
+        "add faint room reverb, intimate upright piano, nostalgic",
+        "piano with a very soft string pad underneath, ambient, dreamy 3/4"
+      ],
+      "avoid": "None required for copyright (PD). Still audition for musical quality.",
+      "params": {
+        "duration_s": 60,
+        "loopable": true,
+        "key": "D major / B minor feel",
+        "bpm": 60,
+        "steps": 60,
+        "cfg": 4.0,
+        "seeds_to_try": 4,
+        "post": "reverb + loop"
+      },
+      "am_fit": "GOOD AM carrier: slow, sparse, held chords take an imposed gate gracefully. Also fine as a soundscape over a binaural bed."
+    }
+  },
+  "model_licenses": {
+    "ace-step": "Apache-2.0 — model and output free for commercial use (PRIMARY choice)",
+    "stable-audio-open": "Stability AI Community License — commercial OK under a revenue threshold; check the clause as you scale (best texture)",
+    "musicgen": "CC-BY-NC-4.0 — NON-COMMERCIAL only. Prototype/ideation only, do NOT ship."
+  }
+}

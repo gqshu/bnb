@@ -66,7 +66,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, NamedTuple
 
-from bnb import assets, qc, stable_audio
+import httpx
+
+from bnb import assets, master_sources, qc, stable_audio
 from bnb.background import composition_plan_for_model, prompt_for_provider, retry_seed
 from bnb.catalog import CategoryManager
 
@@ -211,13 +213,33 @@ def engine_for(spec: dict[str, Any], args: argparse.Namespace) -> Engine:
     return Engine(args.sa3_model, args.sa3_backend)
 
 
+def is_download(spec: dict[str, Any]) -> bool:
+    """Whether ``spec`` is fetched rather than generated (``master`` group's
+    goldberg/gymnopedies — see ``bnb.background.DownloadSource``)."""
+    return spec.get("render_method") == "download"
+
+
+def partition_by_render_method(
+    track_ids: list[str], manager: CategoryManager
+) -> tuple[list[str], list[str]]:
+    """Split a batch into ``(download, generate)`` track_ids, order preserved within
+    each. Download specs never go through the provider/engine machinery below."""
+    download: list[str] = []
+    generate: list[str] = []
+    for track_id in track_ids:
+        spec = assets.load_spec(track_id, root=manager.root)
+        (download if is_download(spec) else generate).append(track_id)
+    return download, generate
+
+
 def group_by_engine(
     track_ids: list[str], args: argparse.Namespace, manager: CategoryManager
 ) -> dict[Engine, list[str]]:
     """Partition the batch by the checkpoint each spec needs, order preserved.
 
     One entry becomes one model load; ElevenLabs has no checkpoint to choose, so it
-    stays a single group.
+    stays a single group. ``track_ids`` is assumed already filtered to generative specs
+    (:func:`partition_by_render_method`) — a download spec has no engine to route to.
     """
     groups: dict[Engine, list[str]] = {}
     for track_id in track_ids:
@@ -310,6 +332,34 @@ def render_checked(
         tail = f"retrying with a new seed ({remaining} left)" if remaining else "giving up"
         print(f"  qc fail      attempt {attempt + 1}/{attempts}: {reasons} — {tail}")
 
+    return None, record
+
+
+def fetch_checked(spec: dict[str, Any], *, check: bool) -> tuple[Path | None, dict[str, Any]]:
+    """Fetch a download-kind spec's audio and measure it once.
+
+    Unlike :func:`render_checked` there is nothing to retry with a fresh seed — a
+    download either produces the source recording or it doesn't, so one failed attempt
+    (a fetch error or a QC failure) is reported and left unrendered rather than retried.
+
+    ``bnb.qc.check_track`` runs regardless of ``check`` (unlike the generative path):
+    its ``metrics.duration_s`` is the *only* place a download spec's real length comes
+    from — there is no seed/duration_s to plan it from up front, the source recording's
+    length is whatever it is (see ``build_keyword_signature``). ``check`` only decides
+    whether a bad verdict blocks the track; ``--no-qc`` still needs the measurement.
+    """
+    path = master_sources.fetch(spec, Path(tempfile.mkdtemp()))
+    report = qc.check_track(path)
+    record = {
+        "attempts": 1,
+        "seed": None,
+        "verdict": report.verdict if check else "unchecked",
+        "warnings": report.warnings,
+        "metrics": report.metrics,
+    }
+    if not check or report.ok:
+        return path, record
+    path.unlink(missing_ok=True)
     return None, record
 
 
@@ -517,14 +567,50 @@ def select_todo(
     return todo, orphaned
 
 
+def render_downloads(
+    download_todo: list[str], manager: CategoryManager, args: argparse.Namespace
+) -> tuple[int, int]:
+    """Fetch every download-kind spec in the batch (``master``'s goldberg/
+    gymnopedies). Returns ``(rendered, failed)``, same accounting as the generative loop."""
+    rendered = failed = 0
+    for track_id in download_todo:
+        spec = assets.load_spec(track_id, root=manager.root)
+        try:
+            tmp_path, quality = fetch_checked(spec, check=not args.no_qc)
+        except (RuntimeError, httpx.HTTPError) as exc:
+            failed += 1
+            print(f"failed fetch   {track_id}  ({describe(spec)}) — {exc}")
+            continue
+        if tmp_path is None:
+            failed += 1
+            print(f"failed qc      {track_id}  ({describe(spec)}) — not added to the library")
+            continue
+
+        # Only known after the fetch (see build_keyword_signature's duration_s=None note) —
+        # attach_render below persists the whole spec dict, so setting it here is what
+        # makes it stick.
+        spec["duration_s"] = quality["metrics"]["duration_s"]
+
+        audio_path = manager.attach_render(
+            spec,
+            tmp_path,
+            provider="download",
+            model_version=spec["download"]["performer"],
+            license=spec["download"]["recording_license"],
+            generated_at=datetime.now(timezone.utc).isoformat(),
+            output_format="wav",
+            seed=None,
+            qc=quality,
+            rebuild=False,
+        )
+        rendered += 1
+        print(f"downloaded     {track_id}  -> {audio_path.relative_to(manager.root)}")
+    return rendered, failed
+
+
 def main() -> None:
     args = parse_args()
     license = LICENSES[args.provider]
-    # The credential check needs nothing from the catalog, so it runs before the scan: a
-    # bad key then fails in about a second, instead of underneath a screenful of skip
-    # lines. SA3's engine preflight genuinely does depend on what is in the batch (special
-    # cells route to a different checkpoint), so that half stays below, after grouping.
-    readiness = check_elevenlabs_credential(args.model_id) if args.provider == "elevenlabs" else None
     manager = CategoryManager()
 
     targets = target_ids(args, manager)
@@ -532,20 +618,38 @@ def main() -> None:
     skipped = len(targets) - len(todo)
     repair = f", {orphaned} missing audio" if orphaned else ""
 
-    # Preflight against the engines this batch actually needs — which depends on what
-    # is in it, since special cells route to a different checkpoint than the grid.
-    groups = group_by_engine(todo, args, manager)
-    check_engines_can_render(args, groups, manager)
-    if readiness is None:
-        readiness = check_provider_ready(args, groups)
-    print(f"provider       {readiness}")
-    print(f"quality gate   {'off' if args.no_qc else f'bnb.qc, up to {args.max_retry} re-render(s)'}\n")
+    # Download-kind specs (master:goldberg, master:gymnopedies) never touch a
+    # generative provider, so they're split out before any provider preflight — a batch
+    # made up only of them needs no SA3/ElevenLabs setup at all.
+    download_todo, generate_todo = partition_by_render_method(todo, manager)
+
+    # The credential check needs nothing from the catalog, so it runs before the scan: a
+    # bad key then fails in about a second, instead of underneath a screenful of skip
+    # lines. SA3's engine preflight genuinely does depend on what is in the batch (special
+    # cells route to a different checkpoint), so that half stays below, after grouping.
+    readiness = None
+    groups: dict[Engine, list[str]] = {}
+    if generate_todo:
+        readiness = check_elevenlabs_credential(args.model_id) if args.provider == "elevenlabs" else None
+        # Preflight against the engines this batch actually needs — which depends on
+        # what is in it, since special cells route to a different checkpoint than the grid.
+        groups = group_by_engine(generate_todo, args, manager)
+        check_engines_can_render(args, groups, manager)
+        if readiness is None:
+            readiness = check_provider_ready(args, groups)
+        print(f"provider       {readiness}")
+        print(f"quality gate   {'off' if args.no_qc else f'bnb.qc, up to {args.max_retry} re-render(s)'}\n")
+    elif download_todo:
+        print("provider       (none needed — every target is a download-kind spec)\n")
 
     if args.dry_run:
         for engine, track_ids in groups.items():
             for track_id in track_ids:
                 spec = assets.load_spec(track_id, root=manager.root)
                 print(f"planned        {track_id}  ({describe(spec)}, {engine})")
+        for track_id in download_todo:
+            spec = assets.load_spec(track_id, root=manager.root)
+            print(f"planned        {track_id}  ({describe(spec)}, download)")
         catalog = manager.rebuild()
         print(
             f"\ndry run: {len(todo)} would render{repair}, {skipped} skipped; "
@@ -582,6 +686,10 @@ def main() -> None:
                 rendered += 1
                 note = summarize_quality(quality)
                 print(f"rendered       {track_id}  -> {audio_path.relative_to(manager.root)}{note}")
+
+    download_rendered, download_failed = render_downloads(download_todo, manager, args)
+    rendered += download_rendered
+    failed += download_failed
 
     catalog = manager.rebuild()
     print(

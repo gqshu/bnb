@@ -609,6 +609,12 @@ _BG_NAMES = {
     "temple": "梵乐",
     "lounge": "爵士",
     "piano": "钢琴",
+    # master
+    "goldberg": "哥德堡变奏曲",
+    "gymnopedies": "吉姆诺佩蒂",
+    "spiegel": "镜像",
+    "glass": "极简钢琴",
+    "clayderman": "浪漫钢琴",
 }
 
 # Per-group fallback for a keyword with no curated name yet. The old single fallback was
@@ -617,6 +623,7 @@ _BG_NAMES = {
 _GROUP_NAMES = {
     "natural_sounds": "自然音",
     "energizer": "活力",
+    "master": "大师精选",
     "unwind": "舒缓",
 }
 _STYLE_NAMES = {

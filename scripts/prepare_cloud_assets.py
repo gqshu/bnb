@@ -152,6 +152,11 @@ def manifest_entry(entry: dict[str, Any]) -> dict[str, Any]:
         # Both axes, in the taxonomy's own vocabulary — the exact strings a profile's
         # ``spec.soundscape`` keywords are built from (§ :func:`bnb.background.soundscape_tags`).
         "tags": soundscape_tags(entry),
+        # Every prior track loops forever client-side (`audio.ts`: `src.loop = true`).
+        # The `master` group's real recordings don't (§ `transcode`'s `loopable` note) —
+        # carried through so a future client can stop looping them instead of repeating
+        # a finished performance. Absent/true for every track published before this field.
+        "loopable": entry.get("loopable", True),
     }
 
 
@@ -247,11 +252,17 @@ def build_profiles(out: Path) -> tuple[list[dict[str, Any]], list[str]]:
     return profiles, missing
 
 
-def transcode(src: Path, dst: Path, args: argparse.Namespace) -> tuple[int, MasterReport]:
+def transcode(src: Path, dst: Path, args: argparse.Namespace, *, loopable: bool = True) -> tuple[int, MasterReport]:
     """Master one rendered WAV for looping and encode it. Returns ``(bytes, report)``.
 
     Mono sources are widened to stereo rather than encoded as mono, so every file in the
     bucket has the same channel count and the client never has to special-case one.
+
+    ``loopable=False`` (the ``master`` group's real recordings, e.g. the Goldberg
+    Variations — see ``bnb.background.KeywordEntry.loopable``) skips the crossfade
+    loop-seam step: folding a real performance's tail back over its head to hide a seam
+    that will never actually repeat would just mangle its intentional ending. Declicking
+    still runs — a true sample-scale click is a defect either way.
     """
     data, sample_rate = sf.read(str(src), dtype="float32", always_2d=True)
     if data.shape[1] == 1:
@@ -260,7 +271,7 @@ def transcode(src: Path, dst: Path, args: argparse.Namespace) -> tuple[int, Mast
         data,
         sample_rate,
         declick=not args.no_declick,
-        loop=not args.no_loop_prep,
+        loop=not args.no_loop_prep and loopable,
         crossfade_s=args.crossfade,
         click_z=args.click_sensitivity,
         peak_dbfs=args.peak_dbfs,
@@ -398,7 +409,7 @@ def main() -> int:
                 # other 116 transcodes.
                 missing.append(track_id)
                 continue
-            size, report = transcode(src, dst, args)
+            size, report = transcode(src, dst, args, loopable=entry.get("loopable", True))
             reports[track_id] = report.as_dict()
             total_bytes += size
             written += 1

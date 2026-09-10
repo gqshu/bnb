@@ -295,7 +295,8 @@ def _summary(spec: dict[str, Any]) -> str:
     """A one-line human-readable descriptor for the catalog."""
     instruments = ", ".join(spec.get("instrumentation", [])) or "—"
     if spec.get("kind", "grid") == "special":
-        return f"{spec['group']} × {spec['keyword']} — {instruments}"
+        composer = f" ({spec['composer']})" if spec.get("composer") else ""
+        return f"{spec['group']} × {spec['keyword']} — {instruments}{composer}"
     rf = spec.get("requested_features") or {}
     bits = [b for b in (rf.get("energy"), rf.get("register"), rf.get("texture_density")) if b]
     return f"{spec['style']} × {spec['substrate']} — {instruments}; {', '.join(bits)}"
@@ -323,6 +324,9 @@ def _entry(
         "keyword": spec.get("keyword"),
         "seed": spec.get("seed"),
         "duration_s": spec.get("duration_s"),
+        "loopable": spec.get("loopable", True),
+        "render_method": spec.get("render_method", "prompt"),
+        "composer": spec.get("composer"),
         "instrumentation": spec.get("instrumentation", []),
         "tags": sorted(spec.get("tags") or []),
         "requested_features": spec.get("requested_features"),
