@@ -20,6 +20,32 @@ def _write_wav(path, seconds=0.1, sample_rate=8000, value=1.0, channels=2):
     return path
 
 
+# --- manual_source_dir / staged_files -------------------------------------------
+
+
+def test_manual_source_dir_nests_by_group_then_keyword(tmp_path, monkeypatch):
+    monkeypatch.setattr(master_sources, "MANUAL_SOURCES_DIR", tmp_path)
+    assert master_sources.manual_source_dir("master", "gymnopedies") == tmp_path / "master" / "gymnopedies"
+
+
+def test_staged_files_returns_empty_for_a_cell_with_nothing_staged(tmp_path, monkeypatch):
+    monkeypatch.setattr(master_sources, "MANUAL_SOURCES_DIR", tmp_path)
+    assert master_sources.staged_files("master", "gymnopedies") == []
+
+
+def test_staged_files_accepts_any_filename_but_only_audio_extensions(tmp_path, monkeypatch):
+    monkeypatch.setattr(master_sources, "MANUAL_SOURCES_DIR", tmp_path)
+    cell_dir = tmp_path / "master" / "gymnopedies"
+    _write_wav(cell_dir / "z_movement.wav")
+    _write_wav(cell_dir / "a_movement.wav")
+    # A stray non-audio file in the same folder must not be handed to _concat as if
+    # it were a movement — it would crash trying to decode it.
+    (cell_dir / "READ ME.txt").write_text("not audio, but still a file")
+
+    found = master_sources.staged_files("master", "gymnopedies")
+    assert [p.name for p in found] == ["a_movement.wav", "z_movement.wav"]
+
+
 # --- _concat -------------------------------------------------------------------
 
 
@@ -47,6 +73,7 @@ def test_concat_rejects_mismatched_sample_rate(tmp_path):
 
 SPEC = {
     "track_id": "master_gymnopedies_seed1",
+    "group": "master",
     "keyword": "gymnopedies",
     "download": {"source_url": "https://musopen.org/music/8010-3-gymnopedies/"},
 }
@@ -61,7 +88,8 @@ def test_fetch_gymnopedies_missing_source_raises_with_instructions(tmp_path, mon
 def test_fetch_gymnopedies_single_staged_file_is_copied_not_moved(tmp_path, monkeypatch):
     manual = tmp_path / "manual_sources"
     monkeypatch.setattr(master_sources, "MANUAL_SOURCES_DIR", manual)
-    staged = _write_wav(manual / f"{SPEC['track_id']}.wav", value=0.5)
+    # Any filename, dropped straight in the cell directory — no need to know the seed.
+    staged = _write_wav(manual / "master" / "gymnopedies" / "complete.wav", value=0.5)
 
     out = master_sources.fetch_gymnopedies(SPEC, tmp_path / "scratch")
 
@@ -74,9 +102,10 @@ def test_fetch_gymnopedies_single_staged_file_is_copied_not_moved(tmp_path, monk
 def test_fetch_gymnopedies_multiple_staged_files_concatenate_in_filename_order(tmp_path, monkeypatch):
     manual = tmp_path / "manual_sources"
     monkeypatch.setattr(master_sources, "MANUAL_SOURCES_DIR", manual)
-    _write_wav(manual / f"{SPEC['track_id']}_1.wav", value=0.1)
-    _write_wav(manual / f"{SPEC['track_id']}_2.wav", value=0.2)
-    _write_wav(manual / f"{SPEC['track_id']}_3.wav", value=0.3)
+    cell_dir = manual / "master" / "gymnopedies"
+    _write_wav(cell_dir / "1.wav", value=0.1)
+    _write_wav(cell_dir / "2.wav", value=0.2)
+    _write_wav(cell_dir / "3.wav", value=0.3)
 
     out = master_sources.fetch_gymnopedies(SPEC, tmp_path / "scratch")
     data, _ = sf.read(str(out), dtype="float32", always_2d=True)

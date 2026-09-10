@@ -15,7 +15,7 @@ work differently:
   ~80 MB of MP3s it already has.
 * ``gymnopedies`` sits behind a Musopen login, so nothing here can fetch it
   unattended (:attr:`DownloadSource.manual`). Instead it expects the file(s) staged
-  by hand under :data:`MANUAL_SOURCES_DIR`, and only assembles them.
+  by hand under :func:`manual_source_dir`, and only assembles them.
 
 Both return one continuous audio file (they're one-track-per-keyword, not
 one-track-per-movement — see the module's own design discussion), left for the
@@ -33,12 +33,37 @@ import httpx
 import numpy as np
 import soundfile as sf
 
+from bnb import qc
 from bnb.assets import ASSETS_DIR
 
 MANUAL_SOURCES_DIR = ASSETS_DIR / "manual_sources"
 """Where a source that needs a logged-in download (:attr:`DownloadSource.manual`) is
 staged by hand before a render can pick it up. Under ``assets/``, so it's git-ignored
 like everything else in the asset repository (§ ``bnb.assets`` module docstring)."""
+
+
+def manual_source_dir(group: str, keyword: str) -> Path:
+    """Where a download keyword's manually-staged file(s) belong: one directory per
+    (group, keyword) cell, same nesting as ``assets/specs/`` and ``assets/tracks/``
+    (``bnb.assets.cell_dir``) — a download keyword only ever has one track (§
+    ``build_keyword_signature``'s capacity guard), so the cell is the natural key, not
+    the seed, which the person staging the file has no reason to know or keep in sync."""
+    return MANUAL_SOURCES_DIR / group / keyword
+
+
+def staged_files(group: str, keyword: str) -> list[Path]:
+    """Every audio file manually staged for one cell, sorted by filename — any name is
+    accepted (there's no track_id to match), so the filter is by extension
+    (``bnb.qc.AUDIO_SUFFIXES``) rather than name, or a stray README/.DS_Store dropped
+    in the same folder would be handed to :func:`_concat` as if it were a movement.
+    More than one file is concatenated in this sorted order (e.g. ``1.mp3``, ``2.mp3``,
+    ``3.mp3``)."""
+    cell_dir = manual_source_dir(group, keyword)
+    if not cell_dir.is_dir():
+        return []
+    return sorted(
+        p for p in cell_dir.iterdir() if p.is_file() and p.suffix.lower() in qc.AUDIO_SUFFIXES
+    )
 
 DOWNLOAD_CACHE_DIR = ASSETS_DIR / "download_cache"
 """Raw per-movement downloads, kept across runs so replanning/re-rendering a keyword
@@ -124,20 +149,18 @@ def fetch_gymnopedies(spec: dict[str, Any], scratch_dir: Path) -> Path:
 
     Musopen requires a logged-in account, so this can't be fetched with a plain HTTP
     GET (see ``DownloadSource.manual``) — the caller has to place the file(s) at
-    ``MANUAL_SOURCES_DIR / "<track_id>*"`` first: either one combined file, or one per
-    movement (concatenated here in filename order).
+    ``manual_source_dir(spec["group"], spec["keyword"])`` first: any filename(s), one
+    combined file or one per movement (concatenated here in sorted filename order).
     """
-    staged = sorted(
-        p for p in MANUAL_SOURCES_DIR.glob(f"{spec['track_id']}*") if p.is_file()
-    )
+    staged = staged_files(spec["group"], spec["keyword"])
     if not staged:
+        cell_dir = manual_source_dir(spec["group"], spec["keyword"])
         raise RuntimeError(
-            f"no manually-staged source for {spec['track_id']!r}. Download the 3 "
-            f"Gymnopedies from {spec['download']['source_url']} (a free Musopen "
-            f"account is required), then place the file at "
-            f"{MANUAL_SOURCES_DIR / spec['track_id']}.<ext> — or one file per "
-            f"movement (e.g. '..._1.mp3', '..._2.mp3', '..._3.mp3'), concatenated in "
-            f"filename order"
+            f"no manually-staged source for {spec['group']}:{spec['keyword']}. "
+            f"Download the 3 Gymnopedies from {spec['download']['source_url']} (a "
+            f"free Musopen account is required), then place the file(s) at "
+            f"{cell_dir}/ — any filename(s); one file per movement if there's more "
+            f"than one, concatenated in sorted filename order"
         )
     if len(staged) == 1:
         dest = scratch_dir / f"{spec['track_id']}{staged[0].suffix}"

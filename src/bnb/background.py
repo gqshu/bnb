@@ -926,7 +926,8 @@ class DownloadSource:
 
     ``manual`` marks a source with no stable URL a script can fetch unattended (e.g. it
     sits behind a login) — the render step then expects the file staged by hand under
-    ``assets/manual_sources/<track_id>.*`` instead of downloading ``source_url`` itself.
+    ``assets/manual_sources/<group>/<keyword>/`` (``bnb.master_sources.manual_source_dir``,
+    any filename) instead of downloading ``source_url`` itself.
     """
 
     source_url: str
