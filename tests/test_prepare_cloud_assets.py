@@ -132,6 +132,31 @@ def test_chunk_count_splits_a_long_track_evenly():
     assert prep.chunk_count(79 * 60, 240) == 20
 
 
+def test_chunk_count_respects_the_min_chunk_size_floor():
+    # At 96 kbps, 240s (the default --chunk-minutes) chunks are ~2.9 MB each — nowhere
+    # near the 1 MB default floor, so a duration that would naturally split several ways
+    # still does, unconstrained.
+    assert (
+        prep.chunk_count(80 * 60, 240, bitrate_kbps=96, min_chunk_bytes=1 * 1024 * 1024) == 20
+    )
+
+
+def test_chunk_count_shrinks_part_count_rather_than_produce_tiny_files():
+    # A small --chunk-minutes (60s) at 96 kbps would naturally want 10 one-minute
+    # parts (~0.7 MB each) — under a 1 MB floor. The count must shrink until each
+    # part's average size clears the floor, not silently ship undersized files.
+    n = prep.chunk_count(600, 60, bitrate_kbps=96, min_chunk_bytes=1 * 1024 * 1024)
+    assert n < 10
+    bytes_per_s = 96 * 1000 / 8
+    assert (600 / n) * bytes_per_s >= 1 * 1024 * 1024
+
+
+def test_chunk_count_floor_never_goes_below_one_part():
+    # An extreme floor (larger than the whole track) must still ship the track — as
+    # a single unchunked file — rather than producing zero parts.
+    assert prep.chunk_count(600, 60, bitrate_kbps=96, min_chunk_bytes=1000 * 1024 * 1024) == 1
+
+
 def test_chunk_ids_ships_a_single_part_under_the_bare_track_id():
     assert prep.chunk_ids("master_goldberg_seed1", 1) == ["master_goldberg_seed1"]
 

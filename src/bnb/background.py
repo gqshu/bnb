@@ -1373,12 +1373,19 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
             # for here, the same self-contradiction the grid's MELODIC_DEVELOPMENT axis
             # exists to avoid (§ TEXTURE_WHEN_MELODIC / density_clause). All three now
             # take RELAX_FLOWING so the harmony actually has room to move.
+            # v2: the first pass ("a simple, gentle melodic phrase... a long violin note
+            # floating above") still rendered too sparse in practice — "simple", "gentle"
+            # and a single held violin note all bias toward stillness even under
+            # RELAX_FLOWING. This keeps the mirror device but adds a real second layer
+            # (a continuous pad) and an active, continuously moving violin part, and
+            # says busy/full outright rather than hoping the extra layer implies it.
             "spiegel": KeywordEntry(
-                "A calm, meditative piece for solo piano and violin: a simple, gentle "
-                "melodic phrase on piano rises and falls like a mirror image, echoed "
-                "and answered a beat later, moving through a few warm consonant chords "
-                "over a sustained low drone, with a long violin line floating a slow "
-                "countermelody above",
+                "A rich, warmly layered piece for piano and violin: a clear, flowing "
+                "melodic phrase on piano moves steadily through a full sequence of warm "
+                "chords, immediately echoed a beat behind by a second phrase like a "
+                "mirror image, with a continuous sustained pad underneath and a violin "
+                "weaving its own active countermelody throughout — busy and full from "
+                "the first note to the last, with almost no silence between phrases",
                 flowing=RELAX_FLOWING,
                 composer="inspired by tintinnabuli-style sacred minimalism (no melody reproduced)",
                 composition_status="style only — not a reproduction of any copyrighted work",

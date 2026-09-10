@@ -123,6 +123,12 @@ data" actually means here. transcode_track refuses to write a chunk over this ra
 than silently shipping it; at any sane --chunk-minutes/--bitrate combination it should
 never fire, so if it does, the flags are the thing to fix, not this constant."""
 
+MIN_CHUNK_MB = 1.0
+"""Floor on one chunk's encoded size. chunk_count divides a track evenly, so this
+doesn't trim a short leftover tail — it reduces the part count itself, down to 1
+(don't chunk at all), whenever --chunk-minutes/--bitrate would otherwise produce a
+pile of files too small to be worth a separate download."""
+
 # Everything the app reads lives under one directory in the bucket, so the output tree is
 # a literal mirror of what gets uploaded: drop `bg/` at the bucket root and you're done.
 # Every path *written into* the catalogues stays relative to the bucket root (not to this
@@ -164,7 +170,13 @@ def resolve_goals(entry: dict[str, Any]) -> list[str]:
 
 
 
-def chunk_count(duration_s: float | None, chunk_s: float) -> int:
+def chunk_count(
+    duration_s: float | None,
+    chunk_s: float,
+    *,
+    bitrate_kbps: float = DEFAULT_BITRATE_KBPS,
+    min_chunk_bytes: float = MIN_CHUNK_MB * 1024 * 1024,
+) -> int:
     """How many pieces a track's cloud copy splits into: 1 (shipped whole) unless its
     duration is known and exceeds one chunk.
 
@@ -172,10 +184,22 @@ def chunk_count(duration_s: float | None, chunk_s: float) -> int:
     cut chunk boundary is a real discontinuity, not something the loop crossfade
     smooths over) — see :func:`manifest_entries_for` and ``main``'s per-track loop,
     the two places that decide "chunk or not" and must agree.
+
+    ``chunk_bounds`` divides the track evenly into whatever count comes back here, so
+    the *average* part size is what actually ships — no separate short "leftover"
+    chunk to worry about. That average is estimated from the encoder's bitrate (mp3 at
+    a fixed bit rate is close enough to exact for this) rather than measured, since
+    this runs before any audio is even decoded; a part count that would put the
+    average under ``min_chunk_bytes`` is reduced until it wouldn't, down to 1 (never
+    chunk a track this short at all) — a handful of large files beats a pile of ones
+    too small to be worth a separate download.
     """
     if not duration_s or duration_s <= chunk_s:
         return 1
-    return math.ceil(duration_s / chunk_s)
+    n = math.ceil(duration_s / chunk_s)
+    bytes_per_s = bitrate_kbps * 1000 / 8
+    max_parts_by_size = max(1, int(duration_s * bytes_per_s // min_chunk_bytes))
+    return max(1, min(n, max_parts_by_size))
 
 
 def chunk_ids(track_id: str, n_parts: int) -> list[str]:
@@ -188,13 +212,23 @@ def chunk_ids(track_id: str, n_parts: int) -> list[str]:
     return [f"{track_id}_part{i:0{width}d}" for i in range(1, n_parts + 1)]
 
 
-def manifest_entries_for(entry: dict[str, Any], chunk_s: float) -> list[dict[str, Any]]:
+def manifest_entries_for(
+    entry: dict[str, Any],
+    chunk_s: float,
+    *,
+    bitrate_kbps: float = DEFAULT_BITRATE_KBPS,
+    min_chunk_bytes: float = MIN_CHUNK_MB * 1024 * 1024,
+) -> list[dict[str, Any]]:
     """One catalog entry reduced to what the client actually selects on — one row, or
     (for a long non-loopable track) one row per chunk, all sharing the source track's
     goals/tags/loopable so a soundscape/goal filter still finds every piece of it.
     """
     loopable = entry.get("loopable", True)
-    n_parts = chunk_count(entry.get("duration_s"), chunk_s) if not loopable else 1
+    n_parts = (
+        chunk_count(entry.get("duration_s"), chunk_s, bitrate_kbps=bitrate_kbps, min_chunk_bytes=min_chunk_bytes)
+        if not loopable
+        else 1
+    )
     ids = chunk_ids(entry["track_id"], n_parts)
     name = _bg_display_name(entry)
     goals = resolve_goals(entry)
@@ -219,7 +253,12 @@ def manifest_entries_for(entry: dict[str, Any], chunk_s: float) -> list[dict[str
     ]
 
 
-def build_manifest(entries: list[dict[str, Any]], bitrate_kbps: int, chunk_s: float) -> dict[str, Any]:
+def build_manifest(
+    entries: list[dict[str, Any]],
+    bitrate_kbps: int,
+    chunk_s: float,
+    min_chunk_bytes: float = MIN_CHUNK_MB * 1024 * 1024,
+) -> dict[str, Any]:
     """The client-facing catalogue: presentation and selection keys only.
 
     Everything the backend keeps for its own purposes — prompts, seeds, requested and
@@ -230,7 +269,11 @@ def build_manifest(entries: list[dict[str, Any]], bitrate_kbps: int, chunk_s: fl
     A chunked track contributes several rows (:func:`manifest_entries_for`), so
     ``count`` is published files, not source tracks — what actually sits in the bucket.
     """
-    tracks = [row for entry in entries for row in manifest_entries_for(entry, chunk_s)]
+    tracks = [
+        row
+        for entry in entries
+        for row in manifest_entries_for(entry, chunk_s, bitrate_kbps=bitrate_kbps, min_chunk_bytes=min_chunk_bytes)
+    ]
     return {
         "version": MANIFEST_VERSION,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
@@ -473,6 +516,13 @@ def main() -> int:
         f"lower --chunk-minutes or --bitrate if it's hit",
     )
     parser.add_argument(
+        "--min-chunk-mb",
+        type=float,
+        default=MIN_CHUNK_MB,
+        help=f"never split a track into pieces smaller than this on average (default: "
+        f"{MIN_CHUNK_MB:g}) — fewer, larger chunks instead, down to shipping it whole",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="re-encode tracks whose MP3 already exists (default: skip them, so a "
@@ -551,12 +601,19 @@ def main() -> int:
 
     chunk_s = args.chunk_minutes * 60
     max_chunk_bytes = args.max_chunk_mb * 1024 * 1024
+    min_chunk_bytes = args.min_chunk_mb * 1024 * 1024
 
     if not args.catalog_only:
         for i, entry in enumerate(entries, 1):
             track_id = entry["track_id"]
             loopable = entry.get("loopable", True)
-            n_parts = chunk_count(entry.get("duration_s"), chunk_s) if not loopable else 1
+            n_parts = (
+                chunk_count(
+                    entry.get("duration_s"), chunk_s, bitrate_kbps=args.bitrate, min_chunk_bytes=min_chunk_bytes
+                )
+                if not loopable
+                else 1
+            )
             dsts = [out / AUDIO_SUBDIR / f"{cid}.mp3" for cid in chunk_ids(track_id, n_parts)]
             if not args.force and all(d.exists() for d in dsts):
                 total_bytes += sum(d.stat().st_size for d in dsts)
@@ -592,7 +649,7 @@ def main() -> int:
     # missing is left out of it too — otherwise the client would pick an id it can't
     # download and fail at play time instead of never offering it.
     publishable = [e for e in entries if e["track_id"] not in set(missing)]
-    manifest = build_manifest(publishable, args.bitrate, chunk_s)
+    manifest = build_manifest(publishable, args.bitrate, chunk_s, min_chunk_bytes)
     (out / MANIFEST_NAME).write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
 
     # Profiles are validated on read, so a bad hand-edit to assets/profiles.json aborts
