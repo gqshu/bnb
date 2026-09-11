@@ -1281,12 +1281,18 @@ SPECIAL_GROUPS: dict[str, SpecialGroup] = {
             # family the grid already established (shakuhachi, singing bowl) plus a plucked
             # guzheng for a second clear melodic line; wordless throughout (§6 guardrail — no
             # rendered sacred text).
+            # Also offered under focus (unlike the grid's buddhist_meditative style,
+            # which stays relax-only — "the branding reads as meditation, not
+            # productivity"): the sound itself is already built to the same AM-carrier
+            # standard as energizer (this group's own flowing/development/negative_prompt
+            # are the relax-side counterpart of that pack), so a focus offering costs
+            # nothing technically — this is the one keyword where that branding call
+            # was deliberately relaxed rather than kept blanket across the tradition.
             "temple": KeywordEntry(
                 "A Buddhist temple ensemble — a solo shakuhachi playing a clear, breathy "
                 "melody, answered and layered by a soft plucked guzheng carrying the tune "
                 "together, with only a very quiet singing-bowl resonance underneath, warm "
                 "and meditative, wordless throughout",
-                goals=frozenset({"relax"}),
             ),
             "lounge": KeywordEntry(
                 "A late-night slow jazz quartet — soft brushed-drum swing, a warm upright "

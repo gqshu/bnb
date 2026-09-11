@@ -514,6 +514,18 @@ def test_fill_to_per_cell_respects_goal_restricted_grid():
 # --- special groups ------------------------------------------------------------
 
 
+def test_unwind_temple_is_compatible_with_focus():
+    # Unlike the grid's buddhist_meditative style (deliberately relax-only —
+    # "the branding reads as meditation, not productivity"), this one keyword was
+    # explicitly opened up: the sound is already built to the AM-carrier standard
+    # (flowing/development/negative_prompt shared with energizer), so nothing about
+    # the render needs to change for a focus offering.
+    assert SPECIAL_GROUPS["unwind"].keywords["temple"].goals == frozenset({"relax", "focus"})
+    # lounge/piano keep the original relax-only branding call.
+    assert SPECIAL_GROUPS["unwind"].keywords["lounge"].goals == frozenset({"relax"})
+    assert SPECIAL_GROUPS["unwind"].keywords["piano"].goals == frozenset({"relax"})
+
+
 def test_natural_sounds_has_the_new_keywords():
     keywords = SPECIAL_GROUPS["natural_sounds"].keywords
     for name in ("universe", "fireplace"):
