@@ -3,12 +3,15 @@
     uv run scripts/prepare_cloud_assets.py                 # everything, into run/cloud_assets
     uv run scripts/prepare_cloud_assets.py --limit 5       # a small batch, to eyeball first
     uv run scripts/prepare_cloud_assets.py --catalog-only  # re-emit the catalogues, skip audio
+    uv run scripts/prepare_cloud_assets.py --catalog-only --carrier  # add carrier_hz only,
+                                                            # no re-encode (see below)
 
 This produces everything the mini program reads at runtime, so that a session needs no
 backend at all:
 
     <out>/
       mastering_report.json      what the audio pass measured and fixed (NOT uploaded)
+      carrier_report.json        per-track key/confidence for --carrier (NOT uploaded)
       bg/
         manifest.json            the background catalogue    (see `build_manifest`)
         profiles.json            the mode-profile catalogue  (see `build_profiles`)
@@ -73,6 +76,23 @@ the only place both halves are in the same room: a card's ``spec`` names a ``goa
 ``soundscape`` list, and :func:`unplayable_profiles` asks the finished manifest whether any
 track actually satisfies them. A card that no track can answer is a dead tile in the grid —
 it looks fine right up until someone taps it.
+
+``--carrier`` adds one more field to each manifest row: ``carrier_hz``, the frequency a
+binaural/monaural carrier should be synthesized at so it lands consonant with *this*
+track's key rather than an arbitrary fixed default (:mod:`estimate_root`, this
+directory). It runs :func:`estimate_root.analyze` against each **published** mp3 — not
+the source master — so a long non-loopable recording split into ``_partNN`` chunks
+(§ above) gets one carrier per chunk, which is as close as this pipeline comes to
+tracking a key that moves across a long piece, without inventing a time-varying carrier
+the client has no way to consume. It is a pure analysis pass over audio that already
+exists on disk, so it combines with ``--catalog-only`` for a fast, no-re-encode update:
+``--catalog-only --carrier`` rewrites the catalogues and adds ``carrier_hz`` without
+touching a single mp3. ``key_confidence``/``stability`` deliberately do **not** reach
+the manifest — the client mode a profile requests (binaural/monaural/isochronic) is a
+product decision made elsewhere and is never auto-switched by how confident an estimate
+is (see the ``audio.ts`` review this followed from); those numbers go to
+``carrier_report.json`` instead, for a human deciding which tracks to trust, following
+the same "measured, not uploaded" convention as ``mastering_report.json``.
 """
 
 from __future__ import annotations
@@ -140,6 +160,7 @@ PROFILE_SUBDIR = f"{BUCKET_ROOT}/profile"
 MANIFEST_NAME = f"{BUCKET_ROOT}/manifest.json"
 PROFILES_NAME = f"{BUCKET_ROOT}/profiles.json"
 REPORT_NAME = "mastering_report.json"  # sibling of BUCKET_ROOT, so it is never uploaded
+CARRIER_REPORT_NAME = "carrier_report.json"  # same convention, for --carrier's diagnostics
 # 2: per-track ``type`` (one substrate-or-group string) became ``tags`` (both taxonomy
 # axes), so a client can filter on style and on group keywords too. Clients written
 # against v1 fall back to reading ``tags[0]`` as the old type.
@@ -313,6 +334,42 @@ def build_manifest(
         "count": len(tracks),
         "tracks": tracks,
     }
+
+
+def add_carrier_fields(manifest: dict[str, Any], out: Path) -> tuple[dict[str, Any], list[str]]:
+    """Analyze each published track's own mp3 and add ``carrier_hz`` to its manifest row.
+
+    See the module docstring's ``--carrier`` paragraph for why this runs per published
+    file (not per source track) and why confidence/stability stay out of the manifest.
+    Mutates ``manifest["tracks"]`` in place and returns ``(report, missing_ids)``:
+    ``report`` is the per-track diagnostic payload for ``carrier_report.json``,
+    ``missing_ids`` are published rows whose mp3 wasn't found on disk (skipped rather
+    than failing the run — the fix is usually "run an encode first", not a crash here).
+    """
+    from estimate_root import analyze  # sibling script (scripts/estimate_root.py)
+
+    report: dict[str, Any] = {}
+    missing: list[str] = []
+    tracks = manifest["tracks"]
+    for i, row in enumerate(tracks, 1):
+        path = out / row["file"]
+        if not path.is_file():
+            missing.append(row["id"])
+            continue
+        info = analyze(path)
+        row["carrier_hz"] = info["carrier_hz"]
+        report[row["id"]] = {
+            "key": info["key"],
+            "key_confidence": info["key_confidence"],
+            "stability": info["stability"],
+            "low_confidence": info["low_confidence"],
+        }
+        flag = "  [low confidence]" if info["low_confidence"] else ""
+        print(
+            f"[carrier {i}/{len(tracks)}] {row['id']}  {info['key']} "
+            f"(conf {info['key_confidence']:.2f}) -> {info['carrier_hz']:.1f} Hz{flag}"
+        )
+    return report, missing
 
 
 def playable_tracks(manifest: dict[str, Any]) -> list[tuple[list[str], set[str]]]:
@@ -567,6 +624,15 @@ def main() -> int:
         help="rewrite manifest.json and profiles.json (and re-copy card art) without "
         "touching any audio",
     )
+    parser.add_argument(
+        "--carrier",
+        action="store_true",
+        help="analyze each published track's mp3 (scripts/estimate_root.py) and add "
+        "carrier_hz to its manifest row. Reads mp3s already in --out — pairs with "
+        "--catalog-only for a fast, no-re-encode update: --catalog-only --carrier. "
+        "Diagnostics (key/confidence/stability) go to carrier_report.json, not the "
+        "manifest.",
+    )
 
     audio = parser.add_argument_group(
         "audio",
@@ -682,6 +748,12 @@ def main() -> int:
     # download and fail at play time instead of never offering it.
     publishable = [e for e in entries if e["track_id"] not in set(missing)]
     manifest = build_manifest(publishable, args.bitrate, chunk_s, min_chunk_bytes)
+
+    carrier_report: dict[str, Any] | None = None
+    carrier_missing: list[str] = []
+    if args.carrier:
+        carrier_report, carrier_missing = add_carrier_fields(manifest, out)
+
     (out / MANIFEST_NAME).write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
 
     # Profiles are validated on read, so a bad hand-edit to assets/profiles.json aborts
@@ -712,6 +784,15 @@ def main() -> int:
                     },
                     "tracks": reports,
                 },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+
+    if carrier_report is not None:
+        (out / CARRIER_REPORT_NAME).write_text(
+            json.dumps(
+                {"generated_at": manifest["generated_at"], "tracks": carrier_report},
                 ensure_ascii=False,
                 indent=2,
             )
@@ -757,6 +838,11 @@ def main() -> int:
                   f"declick skipped: {', '.join(sorted(impulsive)[:3])}"
                   + (f" (+{len(impulsive) - 3} more)" if len(impulsive) > 3 else ""))
         print(f"            per-track detail in {REPORT_NAME} (not uploaded)")
+    if carrier_report is not None:
+        n_low = sum(1 for r in carrier_report.values() if r["low_confidence"])
+        print(f"carrier     {len(carrier_report)} track(s) got carrier_hz, {n_low} low-confidence "
+              f"(human judgment call, not auto-excluded)")
+        print(f"            per-track detail in {CARRIER_REPORT_NAME} (not uploaded)")
     if skipped and not args.force:
         print("            (skipped tracks kept whatever settings they were encoded with; "
               "use --force after changing any audio option)")
@@ -769,6 +855,14 @@ def main() -> int:
         for track_id in missing:
             print(f"  {track_id}", file=sys.stderr)
         print("These are excluded from the manifest.", file=sys.stderr)
+    if carrier_missing:
+        print(f"\nWARNING: {len(carrier_missing)} published track(s) have no mp3 on disk yet, "
+              f"carrier_hz not added for them (run an encode first, or drop --catalog-only):",
+              file=sys.stderr)
+        for track_id in carrier_missing[:10]:
+            print(f"  {track_id}", file=sys.stderr)
+        if len(carrier_missing) > 10:
+            print(f"  (+{len(carrier_missing) - 10} more)", file=sys.stderr)
     if missing_art:
         print(f"\nWARNING: {len(missing_art)} profile(s) name card art that isn't on disk:", file=sys.stderr)
         for item in missing_art:
